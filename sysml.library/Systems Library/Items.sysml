@@ -115,7 +115,8 @@ standard library package Items {
 			 * The Items that are composite subitems of this Item.
 			 */
 			 
-			private ref redefines Item::incomingTransferSort, subobjects::incomingTransferSort;
+			private ref redefines Item::incomingTransferSort, subobjects::incomingTransferSort, Occurrences::Occurrence::suboccurrences::incomingTransferSort;
+//			private ref redefines Item::incomingTransferSort, subobjects::incomingTransferSort;
 		}
 		
 		abstract part subparts: Part[0..*] :> subitems, parts {

@@ -74,10 +74,12 @@ standard library package StatePerformances {
 			feature accableT : Transfer redefines self;
 			feature accT : Transfer = thatSP.accepted;
 			inv { accableT == accT | incomingTransferSort(accT, accableT) }  
+//SFS:  need to reformulate for SFS			
 			inv { isDispatch implies
-				     allSubstatePerformances(dispatchScope)->forAll{in oSP : StatePerformance;						
+				     allSubstatePerformances(dispatchScope as Performance)->forAll{in oSP : StatePerformance;						
+//				     allSubstatePerformances(dispatchScope)->forAll{in oSP : StatePerformance;						
 						  oSP == thatSP | isEmpty(oSP.accepted) |
-	   					  includes(thatSP.exit.startShot.successors, oSP.exit.startShot) |
+//	   					  includes(thatSP.exit.startShot.successors, oSP.exit.startShot) |
 						  ( oSP.accepted != accableT & 
 							( incomingTransferSort(oSP.accepted, accableT) |
 							  includes(oSP.deferrable, accableT) ) ) } }
@@ -97,7 +99,8 @@ standard library package StatePerformances {
 		feature redefines isRunToCompletion default this.isRunToCompletion;
 		feature redefines runToCompletionScope default this.runToCompletionScope; 
 		inv { isRunToCompletion implies
-			     allSubtransitionPerformances(runToCompletionScope)->forAll{in tp : TransitionPerformance;
+			     allSubtransitionPerformances(runToCompletionScope as Performance)->forAll{in tp : TransitionPerformance;
+//			     allSubtransitionPerformances(runToCompletionScope)->forAll{in tp : TransitionPerformance;
 				    includes(tp.successors, entry) | includes(tp.predecessors, entry) }
 		}
 		

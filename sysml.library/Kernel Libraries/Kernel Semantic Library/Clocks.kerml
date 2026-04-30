@@ -10,6 +10,8 @@ standard library package Clocks {
 	private import Occurrences::Occurrence;
 	private import Occurrences::Life;
 	private import ControlFunctions::forAll;
+	//SFS:
+	private import Domain::Instant;
 	
 	private struct UniversalClockLife[1] :> Clock, Life {
 	    doc
@@ -68,7 +70,8 @@ standard library package Clocks {
 		
 		in o : Occurrence[1];
 		in clock : Clock[1] default localClock;
-		return timeInstant : NumericalValue[1];
+		return timeInstant : Instant[1];
+//		return timeInstant : NumericalValue[1];
 		
 		 inv startTimeConstraint {
 		 	doc
@@ -76,34 +79,37 @@ standard library package Clocks {
 			 * The TimeOf an Occurrence is equal to the time of its start snapshot.
 			 */
 			 
-		 	timeInstant == TimeOf(o.startShot, clock)
+		 	timeInstant == o.startShot
+//		 	timeInstant == TimeOf(o.startShot, clock)
 		 }	 
 
-		inv timeOrderingConstraint {
-			doc
-			/*
-			 * If one Occurrence happens before another, then the TimeOf the end
-			 * snapshot of the first Occurrence is no greater than the TimeOf the 
-			 * second Occurrence.
-			 */
+//SFS:  timeOrderingConstraint is not needed for SFS which has a temporal order operator, <
+		// inv timeOrderingConstraint {
+		// 	doc
+		// 	/*
+		// 	 * If one Occurrence happens before another, then the TimeOf the end
+		// 	 * snapshot of the first Occurrence is no greater than the TimeOf the 
+		// 	 * second Occurrence.
+		// 	 */
 			
-			o.predecessors->forAll{in p : Occurrence; 
-				TimeOf(p.endShot, clock) <= timeInstant
-			}
-		}
+		// 	o.predecessors->forAll{in p : Occurrence; 
+		// 		TimeOf(p.endShot, clock) <= timeInstant
+		// 	}
+		// }
 				
-		inv timeContinuityConstraint {
-			doc
-			/*
-			 * If one Occurrence happens immediately before another, then the TimeOf 
-			 * the end snapshot of the first Occurrence equals the TimeOf the second
-			 * Occurrence.
-			 */
+//SFS:	timeContinuityConstraint is not needed for SFS which has a continuous time domain, T				
+		// inv timeContinuityConstraint {
+		// 	doc
+		// 	/*
+		// 	 * If one Occurrence happens immediately before another, then the TimeOf 
+		// 	 * the end snapshot of the first Occurrence equals the TimeOf the second
+		// 	 * Occurrence.
+		// 	 */
 		 
-			o.immediatePredecessors->forAll{in p : Occurrence; 
-				TimeOf(p.endShot, clock) == timeInstant
-			}
-		}				
+		// 	o.immediatePredecessors->forAll{in p : Occurrence; 
+		// 		TimeOf(p.endShot, clock) == timeInstant
+		// 	}
+		// }				
 	}
 	
 	function DurationOf {
@@ -117,7 +123,12 @@ standard library package Clocks {
 		in o : Occurrence[1]; 
 		in clock : Clock[1] default localClock;
 		return duration : NumericalValue =
-			TimeOf(o.endShot, clock) - TimeOf(o.startShot, clock);
+			o.endShot - o.startShot;
+//			TimeOf(o.endShot, clock) - TimeOf(o.startShot, clock);
+		inv precondition {
+			doc /* Only valid after endShot */
+			o.endShot < clock.currentTime
+		}
 	}
 	
 	struct BasicClock :> Clock {

@@ -45,7 +45,8 @@ standard library package Views {
 				/*
 				 * The required ViewpointChecks.
 				 */
-                ref :>> ownedPerformances::this, subperformances::this default that.that;
+                ref :>> ownedPerformances::this, subperformances::this, Occurrences::Occurrence::this default that.that;
+//                ref :>> ownedPerformances::this, subperformances::this default that.that;
 			}
 		}
 	}

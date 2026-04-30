@@ -58,8 +58,10 @@ standard library package SpatialFrames {
              * The given point must exist at the given time.
              */
         
-            TimeOf(point.startShot) <= time and
-            time <= TimeOf(point.endShot)
+ //SFS:  reformulated for snapshots as Instants        
+            point.startShot <= time <= point.endShot
+        //    TimeOf(point.startShot) <= time and
+        //     time <= TimeOf(point.endShot)
         }
         
         inv spacePositionConstraint {

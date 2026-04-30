@@ -193,7 +193,8 @@ standard library package Actions {
 	
 		in :>> payload [0..*];
 	    ref sentMessage :>> sentTransfer: MessageTransfer, MessageAction {
-	        in :>> MessageTransfer::payload, MessageAction::payload;
+	        in :>> MessageTransfer::payload, MessageAction::payload, Transfers::SendPerformance::sentTransfer::payload;
+//	        in :>> MessageTransfer::payload, MessageAction::payload;
 	    }
 	}
 	

@@ -19,8 +19,16 @@ standard library package Occurrences {
 	private import SequenceFunctions::notEmpty;
 	private import SequenceFunctions::includes;
 	private import SequenceFunctions::union;
+  //SFS
+  private import Performances::BooleanEvaluation;
+  private import Assertion::Assert;
+  private import Domain::*;
+  private import Regions::*;
+  private import Allen::*;
 
-	abstract class Occurrence specializes Anything disjoint from DataValue {
+//SFS:  fundamental change of Occurrence to be Interval
+	abstract class Occurrence specializes Anything, Domain::Interval disjoint from DataValue {
+//	abstract class Occurrence specializes Anything disjoint from DataValue {
         doc
         /*
          * Occurrence is the most general classifier of entities that have identity and
@@ -34,7 +42,24 @@ standard library package Occurrences {
         
 		private import SequenceFunctions::*;
 
-		feature portionOfLife: Life[1] subsets portionOf default self;
+//SFS: all time shots become instants
+		portion feature startShot: Instant[1] :>> lowerBound {
+			doc
+			/* The snapshot representing the start of the occurrence in time. */
+		}
+
+		portion feature endShot: Instant[1] :>> upperBound {
+			doc
+			/* The snapshot at the end of the occurrence in time. */
+
+			/* suboccurrences at the end of an Occurrence must also end. */
+//SFS:  suboccurrences are constrained to end by Domain predicate			
+//			feature subendshot : Occurrence [0..*] chains self.suboccurrences.endShot {
+//				  feature superendshot : Occurrence [1] subsets that;
+//				  subset superendshot subsets self.timeCoincidentOccurrences; }
+		}
+
+		feature portionOfLife: Life[1] subsets portionOf default self as Life;
 
 		feature self: Occurrence[1] redefines Anything::self subsets timeSlices, spaceSlices, spaceTimeCoincidentOccurrences, sameLifeOccurrences;
 		feature sameLifeOccurrences: Occurrence[1..*] subsets things;
@@ -345,12 +370,12 @@ standard library package Occurrences {
 			 */
 		}
 
-		portion feature startShot: Occurrence[1] subsets snapshots {
-			doc
-			/*
-			 * The snapshot representing the start of the occurrence in time.
-			 */
-		}
+		// portion feature startShot: Occurrence[1] subsets snapshots {
+		// 	doc
+		// 	/*
+		// 	 * The snapshot representing the start of the occurrence in time.
+		// 	 */
+		// }
 
 		portion feature middleTimeSlice: Occurrence[0..1] subsets timeSlices {
 			doc
@@ -370,17 +395,17 @@ standard library package Occurrences {
 			 */
 		}
 
-		portion feature endShot: Occurrence[1] subsets snapshots {
-			doc
-			/*
-			 * The snapshot at the end of the occurrence in time.
-			 */
+		// portion feature endShot: Occurrence[1] subsets snapshots {
+		// 	doc
+		// 	/*
+		// 	 * The snapshot at the end of the occurrence in time.
+		// 	 */
 
-			/* suboccurrences at the end of an Occurrence must also end. */
-			feature subendshot : Occurrence [0..*] chains self.suboccurrences.endShot {
-				  feature superendshot : Occurrence [1] subsets that;
-				  subset superendshot subsets self.timeCoincidentOccurrences; }
-		}
+		// 	/* suboccurrences at the end of an Occurrence must also end. */
+		// 	feature subendshot : Occurrence [0..*] chains self.suboccurrences.endShot {
+		// 		  feature superendshot : Occurrence [1] subsets that;
+		// 		  subset superendshot subsets self.timeCoincidentOccurrences; }
+		// }
 
 		 connector :HappensJustBefore
 			from [0..1] earlierOccurrence references middleTimeSlice
@@ -623,8 +648,10 @@ standard library package Occurrences {
 			 * The incoming transfers received by this occurrence.
 			 */
 
-			end feature redefines source;
-			end feature redefines target;
+			end feature source;
+			end feature target;
+//			end feature redefines source;
+//			end feature redefines target;
 		}
 		
 		feature isDispatch : Boolean[1] default false {
@@ -670,8 +697,10 @@ standard library package Occurrences {
 			 * The outgoing transfers sent from this occurrence.
 			 */
 
-			end feature redefines source;
-			end feature redefines target;
+			end feature source;
+			end feature target;
+//			end feature redefines source;
+//			end feature redefines target;
 		}
 
 		var feature all outgoingTransfersFromSelf subsets outgoingTransfers {
@@ -703,7 +732,11 @@ standard library package Occurrences {
 	}
 
 	bool earlierFirstIncomingTransferSort : IncomingTransferSort {
-		return t1First = includes(t1.endShot.successors, t2.endShot);
+//SFS:  use temporal relationship instead of M0 features
+		in t1: Transfers::Transfer [1];
+		in t2: Transfers::Transfer [1];  
+		return t1First: Boolean [1] = t1.endShot < t2.endShot; 
+//		return t1First = includes(t1.endShot.successors, t2.endShot);
 	}
 
 	assoc all SelfSameLifeLink specializes BinaryLink {
@@ -790,8 +823,8 @@ standard library package Occurrences {
 		 * Occurrence is InsideOf itself and that InsideOf is transitive.
 		 */
 
-		end feature smallerSpace: Occurrence redefines source crosses largerSpace.spaceEnclosedOccurrences;
-		end insideOf [1..*] feature largerSpace: Occurrence redefines target;
+		end feature smallerSpace: Occurrence redefines sourceOccurrence crosses largerSpace.spaceEnclosedOccurrences;
+		end insideOf [1..*] feature largerSpace: Occurrence redefines targetOccurrence;
 	}
 
 	assoc all Within specializes HappensDuring, InsideOf intersects HappensDuring, InsideOf {
@@ -827,7 +860,7 @@ standard library package Occurrences {
 		 * PortionOf asserts one occurrence is a portion of another, including at least itself.
 		 */
 
-		end feature portionOccurrence: Occurrence redefines smallerOccurrence crosses portionedOccurrence.portions;
+		end feature portionOccurrence: Occurrence redefines smallerOccurrence; // crosses portionedOccurrence.portions;
 		end portionWithin subsets portionOf feature portionedOccurrence: Occurrence redefines largerOccurrence;
 	}
 
@@ -837,7 +870,7 @@ standard library package Occurrences {
 		 * TimeSliceOf asserts one occurrence is a time slice of another, including at least itself.
 		 */
 
-		end feature timeSliceOccurrence: Occurrence redefines portionOccurrence crosses timeSlicedOccurrence.timeSlices;
+		end feature timeSliceOccurrence: Occurrence redefines portionOccurrence; // crosses timeSlicedOccurrence.timeSlices;
 		end timeSliceWithin subsets timeSliceOf feature timeSlicedOccurrence: Occurrence redefines portionedOccurrence;
 	}
 
@@ -847,7 +880,7 @@ standard library package Occurrences {
 		 * SnapshotsOf asserts one occurrence is a snapshot of another.
 		 */
 
-		end feature snapshotOccurrence: Occurrence redefines timeSliceOccurrence crosses snapshottedOccurrence.snapshots;
+		end feature snapshotOccurrence: Occurrence redefines timeSliceOccurrence; // crosses snapshottedOccurrence.snapshots;
 		end snapshotWithin subsets snapshotOf feature snapshottedOccurrence: Occurrence redefines timeSlicedOccurrence;
 	}
 
@@ -860,7 +893,7 @@ standard library package Occurrences {
 		 * means every occurrence is a SpaceSliceOf itself and SpaceSliceOf is transitive.
 		 */
 
-		end feature spaceSliceOccurrence: Occurrence redefines portionOccurrence crosses spaceSlicedOccurrence.spaceSlices;
+		end feature spaceSliceOccurrence: Occurrence redefines portionOccurrence; // crosses spaceSlicedOccurrence.spaceSlices;
 		end spaceSliceWithin subsets spaceSliceOf feature spaceSlicedOccurrence: Occurrence redefines portionedOccurrence;
 	}
 
@@ -871,7 +904,7 @@ standard library package Occurrences {
 		 * it spaceShottedOccurrence.
 		 */
 
-		end feature spaceShotOccurrence: Occurrence redefines spaceSliceOccurrence crosses spaceShottedOccurrence.spaceShots;
+		end feature spaceShotOccurrence: Occurrence redefines spaceSliceOccurrence; // crosses spaceShottedOccurrence.spaceShots;
 		end spaceShotWithin subsets spaceSliceOf feature spaceShottedOccurrence: Occurrence redefines spaceSlicedOccurrence;
 	}
 

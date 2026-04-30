@@ -110,8 +110,10 @@ standard library package Flows {
          * and target input.
          */
     
-        end occurrence source: Occurrence :>> Flow::source, messages::source, flowTransfers::source;
-        end occurrence target: Occurrence :>> Flow::target, messages::target, flowTransfers::target;
+        end occurrence source: Occurrence :>> Flow::source, messages::source, flowTransfers::source, Transfers::transfers::source;
+        end occurrence target: Occurrence :>> Flow::target, messages::target, flowTransfers::target, Transfers::transfers::target;
+        // end occurrence source: Occurrence :>> Flow::source, messages::source, flowTransfers::source;
+        // end occurrence target: Occurrence :>> Flow::target, messages::target, flowTransfers::target;
     }
     
     abstract flow successionFlows: SuccessionFlow[0..*] nonunique :> flows, flowTransfersBefore {

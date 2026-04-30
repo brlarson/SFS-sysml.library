@@ -11,6 +11,7 @@ standard library package Interfaces {
     private import Ports::Port;
     
     private import ScalarValues::Natural;
+    private import ScalarValues::Positive;
     private import SequenceFunctions::size;
     private import SequenceFunctions::excludingAt;
     private import ControlFunctions::selectOne;
@@ -26,7 +27,8 @@ standard library package Interfaces {
         in seq[1..*] nonunique ordered; 
         in value[1] :> seq;
         
-        private attribute position : Natural[1] = (1..size(seq))->selectOne{in i; seq#(i) == value};
+        private attribute position : Positive[1] = (1..size(seq))->selectOne{in i; seq#(i) == value};
+ //       private attribute position : Natural[1] = (1..size(seq))->selectOne{in i; seq#(i) == value};
         seq->excludingAt(position)
     }
     
@@ -41,8 +43,10 @@ standard library package Interfaces {
          * may be targeted to one of the other participant Ports (depending on any 
          * other Interfaces in which the Port is also participating).
          */
-         
-        ref port :>> participant : Port [2..*] nonunique ordered {
+
+ // get error:  Subsetting feature cannot be nonunique if subsetted feature is unique        
+        ref port :>> participant : Port [2..*] //nonunique 
+           ordered {
             doc
             /*
              * The participants of an Interface must be Ports. The interfacingPorts of
@@ -66,8 +70,9 @@ standard library package Interfaces {
          * targeted to the other participant Port (depending on any other Interfaces 
          * in which the Port is also participating).
          */
-        
-        ref port :>> Interface::participant, BinaryConnection::participant[2] nonunique ordered;
+  // get error:  Subsetting feature cannot be nonunique if subsetted feature is unique               
+        ref port :>> Interface::participant, BinaryConnection::participant[2] //nonunique 
+          ordered;
      
         end port source: Port :>> BinaryConnection::source; 
         end port target: Port :>> BinaryConnection::target;
