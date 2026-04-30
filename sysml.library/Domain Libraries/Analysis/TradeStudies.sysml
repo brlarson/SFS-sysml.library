@@ -85,7 +85,8 @@ standard library package TradeStudies {
 		 * given alternatives.
 		 */
 		 
-		attribute :>> best = alternatives->minimize {
+		attribute :>> best = (alternatives as ScalarValue)->minimize {
+//		attribute :>> best = alternatives->minimize {
 			doc
 			/*
 			 * For a MinimizeObjective, the best value is the minimum one.
@@ -103,7 +104,8 @@ standard library package TradeStudies {
 		 * given alternatives.
 		 */
 	
-		attribute :>> best = alternatives->maximize {
+		attribute :>> best = (alternatives as ScalarValue)->maximize {
+//		attribute :>> best = alternatives->maximize {
 			doc
 			/*
 			 * For a MinimizeObjective, the best value is the maximum one.

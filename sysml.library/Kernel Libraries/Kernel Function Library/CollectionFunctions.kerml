@@ -58,7 +58,8 @@ standard library package CollectionFunctions {
 		
 		// Assumes row-major ordering for elements.
 		private function index { in arr: Array[1]; in i : Natural; in indexes : Positive[1..*];
-			if i <= 1? indexes#(1) else arr.dimensions#(i) * (index(arr, i-1, indexes) - 1) + indexes#(i)
+			if i <= 1? indexes#(1) else arr.dimensions#(i) * (index(arr, (i-1) as Natural, indexes) - 1) + indexes#(i)
+//			if i <= 1? indexes#(1) else arr.dimensions#(i) * (index(arr, i-1, indexes) - 1) + indexes#(i)
 		}
 		
 		return : Anything[0..1] =

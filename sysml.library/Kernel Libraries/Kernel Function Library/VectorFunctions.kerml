@@ -81,7 +81,8 @@ standard library package VectorFunctions {
 	 
 		in components: NumericalValue[1..*] ordered nonunique; 
 		return : NumericalVectorValue[1] {
-			:>> dimension = size(components);
+			:>> dimension = size(components) as Positive;
+//			:>> dimension = size(components);
 			:>> elements = components;
 		}
 	}
@@ -173,14 +174,16 @@ standard library package VectorFunctions {
 	 
 		in components: Real[*] ordered nonunique; 
 		return : CartesianVectorValue[1] {
-			:>> dimension = size(components);
+			:>> dimension = size(components) as Positive;
+//			:>> dimension = size(components);
 			:>> elements = components;
 		}
 	}
 	function CartesianThreeVectorOf specializes CartesianVectorOf { 
 		in components: Real[3] ordered nonunique;
 		return : CartesianThreeVectorValue[1] {
-		    feature :>> CartesianVectorOf::result::dimension, CartesianThreeVectorValue::dimension;
+		    feature :>> CartesianVectorOf::result::dimension, CartesianThreeVectorValue::dimension, VectorValues::ThreeVectorValue::dimension;
+//		    feature :>> CartesianVectorOf::result::dimension, CartesianThreeVectorValue::dimension;
 		}
 	}
 	
@@ -196,7 +199,8 @@ standard library package VectorFunctions {
 		 */
 	}
 	feature cartesian3DZeroVector: CartesianThreeVectorValue[1] =
-		cartesianZeroVector#(3);
+		cartesianZeroVector#(3) as CartesianThreeVectorValue;
+//		cartesianZeroVector#(3);
 	
 	function isCartesianZeroVector specializes isZeroVector {
 		doc
@@ -215,7 +219,8 @@ standard library package VectorFunctions {
 		return u: CartesianVectorValue[1] =
 			if w == null? v
 			else CartesianVectorOf(
-				(1..w.dimension)->collect{in i : Positive; v#(i) + w#(i)}
+				(1..w.dimension)->collect{in i : Positive; v#(i) + w#(i)} as Real
+//				(1..w.dimension)->collect{in i : Positive; v#(i) + w#(i)}
 			);
 	}
 	
@@ -225,9 +230,11 @@ standard library package VectorFunctions {
 		inv precondition { w != null implies v.dimension == w.dimension }
 		return u: CartesianVectorValue[1] =
 			CartesianVectorOf(
-				if w == null? CartesianVectorOf(v.elements->collect{in x : Real; -x})
+				if w == null? CartesianVectorOf(v.elements->collect{in x : Real; -x}) as Real
+//				if w == null? CartesianVectorOf(v.elements->collect{in x : Real; -x})
 				else CartesianVectorOf(
-					(1..v.dimension)->collect{in i : Positive; v#(i) - w#(i)}
+					(1..v.dimension)->collect{in i : Positive; v#(i) - w#(i)} as Real
+//					(1..v.dimension)->collect{in i : Positive; v#(i) - w#(i)}
 				)
 			);
 	}
@@ -262,7 +269,8 @@ standard library package VectorFunctions {
 	function cartesianAngle specializes angle { 
 		in v: CartesianVectorValue[1]; in w: CartesianVectorValue[1];
 		inv precondition { v.dimension == w.dimension }
-		return theta: Real[1] = arccos(cartesianInner(v, w) / (norm(v) * norm(w)));
+		return theta: Real[1] = arccos(cartesianInner(v, w) / (norm(v) * norm(w)) as TrigFunctions::UnitBoundedReal);
+//		return theta: Real[1] = arccos(cartesianInner(v, w) / (norm(v) * norm(w)));
 	}
 	
 	function sum { 

@@ -105,13 +105,15 @@ standard library package ControlFunctions {
 	function minimize {
 		in collection: ScalarValue[1..*];
 		in expr fn[0..*] { in argument: ScalarValue[1]; return : ScalarValue[1]; }
-		return : ScalarValue[1] = collection->collect {in x; fn(x)}->reduce min;
+		return : ScalarValue[1] = collection->collect {in x; fn(x as ScalarValue)}->reduce min;
+//		return : ScalarValue[1] = collection->collect {in x; fn(x)}->reduce min;
 	}
 	
 	function maximize { 
 		in collection: ScalarValue[1..*];
 		in expr fn[0..*] { in argument: ScalarValue[1]; return : ScalarValue[1]; }
-		return : ScalarValue = collection->collect {in x; fn(x)}->reduce max;
+		return : ScalarValue = collection->collect {in x; fn(x as ScalarValue)}->reduce max;
+//		return : ScalarValue = collection->collect {in x; fn(x)}->reduce max;
 	}
 	
 }

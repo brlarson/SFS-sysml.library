@@ -59,6 +59,34 @@ standard library package Occurrences {
 //				  subset superendshot subsets self.timeCoincidentOccurrences; }
 		}
 
+//SFS:  time slices become intervals
+		portion feature middleTimeSlice: Interval[0..1] {
+			doc
+			/*
+			 * A time slice that takes all the time between the start shot and end shot. There
+			 * is none when the startShot and endShot are the same.
+			 * 
+			 * SFS:  middleTimeSlice is the open interval between startShot and endShot. 
+       * If startShot=endShot then middleTimeSlice does not exist. 
+			 */
+    language "Domain" /* middleTimeSlice = startShot ,, endShot" */
+      :>> lowerBound = startShot;
+      :>> upperBound = endShot;
+      :>> openLeft = true;
+      :>> openRight = true;
+		}
+		inv { isEmpty((that as Occurrence).middleTimeSlice) == ((that as Occurrence).startShot == (that as Occurrence).endShot) }
+
+    feature :>> openLeft default false {
+      doc /* open-left does not include startShot in Occurrence 
+       * redefine as true if occurrence is open-left. */
+    }
+    feature :>> openRight default false {
+      doc /* open-right does not include endShot in Occurrence 
+       * redefine as true if occurrence is open-right. */
+    }
+
+
 		feature portionOfLife: Life[1] subsets portionOf default self as Life;
 
 		feature self: Occurrence[1] redefines Anything::self subsets timeSlices, spaceSlices, spaceTimeCoincidentOccurrences, sameLifeOccurrences;
@@ -361,7 +389,7 @@ standard library package Occurrences {
 			 */
 			binding [1] startShot = [1] endShot;
 		}
-		inv { snapshots == union(startShot, union(middleTimeSlice.snapshots, endShot)) }
+//		inv { snapshots == union(startShot, union(middleTimeSlice.snapshots, endShot)) }
 
 		feature snapshotOf : Occurrence[0..*] subsets timeSliceOf inverse of snapshots {
 			doc
@@ -377,14 +405,14 @@ standard library package Occurrences {
 		// 	 */
 		// }
 
-		portion feature middleTimeSlice: Occurrence[0..1] subsets timeSlices {
-			doc
-			/*
-			 * A time slice that takes all the time between the start shot and end shot. There
-			 * is none when the startShot and endShot are the same.
-			 */
-		}
-		inv { isEmpty((that as Occurrence).middleTimeSlice) == ((that as Occurrence).startShot == (that as Occurrence).endShot) }
+		// portion feature middleTimeSlice: Occurrence[0..1] subsets timeSlices {
+		// 	doc
+		// 	/*
+		// 	 * A time slice that takes all the time between the start shot and end shot. There
+		// 	 * is none when the startShot and endShot are the same.
+		// 	 */
+		// }
+		// inv { isEmpty((that as Occurrence).middleTimeSlice) == ((that as Occurrence).startShot == (that as Occurrence).endShot) }
 
 		connector :HappensJustBefore
 			from [1] earlierOccurrence references startShot

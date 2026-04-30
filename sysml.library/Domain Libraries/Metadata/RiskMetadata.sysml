@@ -21,9 +21,12 @@ standard library package RiskMetadata {
 		 * LevelEnum provides standard probability Levels for low, medium and high risks.
 		 */
 	
-		low = 0.25;
-		medium = 0.50;
-		high = 0.75;
+		low = 0.25 as RiskMetadata::Level;
+		medium = 0.50 as RiskMetadata::Level;
+		high = 0.75 as RiskMetadata::Level;
+		// low = 0.25;
+		// medium = 0.50;
+		// high = 0.75;
 	}
 
 	attribute def RiskLevel {

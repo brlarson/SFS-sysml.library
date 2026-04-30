@@ -166,7 +166,7 @@ standard library package ShapeItems {
 		attribute :>> length [1];
 		attribute :>> width [1];
 		attribute :>> xoffset [1];
-
+//don't know how to fix this error
 		item :>> edges [3] = (base, e2, e3);
 		item base [1] { length = Triangle::length; }
 		item e2 [1];

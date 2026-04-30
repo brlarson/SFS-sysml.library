@@ -46,7 +46,9 @@ standard library package Time {
 		 */
 	
 		in o : Occurrence[1]; 
-		in clock : Clock[1] default localClock;
+//Syside reports an error here which is incorrect given the definition of localClock		
+		in clock : Clock[1] default localClock as Clock;
+//		in clock : Clock[1] default localClock;
 		return timeInstant : TimeInstantValue[1];
 	}
 
@@ -58,7 +60,9 @@ standard library package Time {
 		 */
 	
 		in o : Occurrence[1]; 
-		in clock : Clock[1] default localClock;
+//Syside reports an error here which is incorrect given the definition of localClock		
+		in clock : Clock[1] default localClock as Clock;
+//		in clock : Clock[1] default localClock;
 		return duration : DurationValue;
 	}
 	

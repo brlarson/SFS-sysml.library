@@ -5,6 +5,7 @@ standard library package SampledFunctions {
 	 */
 
 	private import Base::Anything;
+	private import Base::DataValue;
 	private import ScalarValues::Positive;
 	private import Collections::KeyValuePair;
 	private import Collections::OrderedMap;
@@ -73,7 +74,8 @@ standard library package SampledFunctions {
 		in calc calculation { in x; }
 		in attribute domainValues [0..*];
 		return sampling = new SampledFunction (
-			samples = domainValues->collect { in x; new SamplePair(x, calculation(x)) }
+			samples = domainValues->collect { in x; new SamplePair(x as DataValue, calculation(x) as DataValue) }
+//			samples = domainValues->collect { in x; new SamplePair(x, calculation(x)) }
 		);
 	}
 	
@@ -98,7 +100,8 @@ standard library package SampledFunctions {
 		in attribute fn : SampledFunction;
 		in attribute value;
 		
-		private attribute domainValues = Domain(fn);
+		private attribute domainValues = Domain(fn) as DataValue;
+//		private attribute domainValues = Domain(fn);
 		private attribute index : Positive[0..1] =
 			(1..size(domainValues))->select { in i : Positive; domainValues#(i) <= value }#(1);
 			
@@ -112,8 +115,11 @@ standard library package SampledFunctions {
 		
 		return result [0..1] =
 			if index == null or index == size(domainValues)? null
-			else if domainValues#(index) < domainValues#(index+1)? Linear(fn.samples#(index), fn.samples#(index+1), value)
+			else if domainValues#(index) < domainValues#(index+1)? Linear(fn.samples#(index), fn.samples#(index+1), value) as DataValue
 			else Linear(fn.samples#(index+1), fn.samples#(index), value);
+			// if index == null or index == size(domainValues)? null
+			// else if domainValues#(index) < domainValues#(index+1)? Linear(fn.samples#(index), fn.samples#(index+1), value)
+			// else Linear(fn.samples#(index+1), fn.samples#(index), value);
 	}
 	
 }

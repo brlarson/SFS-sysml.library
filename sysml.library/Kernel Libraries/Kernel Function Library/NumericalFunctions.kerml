@@ -32,12 +32,14 @@ standard library package NumericalFunctions {
 	abstract function product { in collection: ScalarValue[0..*]; return : ScalarValue[1]; }
 	
 	function sum0 { in collection: NumericalValue[0..*]; in zero: ScalarValue[1]; 
- 		inv { isZero(zero) }		
+ 		inv { isZero(zero as NumericalValue) }		
+// 		inv { isZero(zero) }		
         return : ScalarValue = collection->reduce '+' ?? zero;
 	}
 	
 	function product1 { in collection: ScalarValue[0..*]; in one: ScalarValue[1]; 
-		inv { isUnit(one) }		
+		inv { isUnit(one as NumericalValue) }		
+//		inv { isUnit(one) }		
         return : ScalarValue = collection->reduce '*' ?? one;
 	}
 }

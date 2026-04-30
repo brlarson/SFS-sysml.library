@@ -57,7 +57,8 @@ standard library package SequenceFunctions {
 	function includingAt{ in seq: Anything[0..*] ordered nonunique; in values: Anything[0..*] ordered nonunique;
 		in index: Positive[1];
 		return : Anything[0..*] ordered nonunique = 
-			(seq->subsequence(1, index - 1), values, seq->subsequence(index + 1));
+			(seq->subsequence(1, (index - 1) as Positive), values, seq->subsequence(index + 1));
+//			(seq->subsequence(1, index - 1), values, seq->subsequence(index + 1));
 	}
 	function excluding{ in seq: Anything[0..*] ordered nonunique; in values: Anything[0..*];
 		return : Anything[0..*] ordered nonunique = seq->reject {in x; values->includes(x)};
@@ -65,11 +66,13 @@ standard library package SequenceFunctions {
 	function excludingAt{ in seq: Anything[0..*] ordered nonunique;
 		in startIndex: Positive[1]; in endIndex: Positive[1] default startIndex;
 		return : Anything[0..*] ordered nonunique = 
-			(seq->subsequence(1, startIndex - 1), seq->subsequence(endIndex + 1));
+			(seq->subsequence(1, (startIndex - 1) as Positive), seq->subsequence(endIndex + 1));
+//			(seq->subsequence(1, startIndex - 1), seq->subsequence(endIndex + 1));
 	}
 	
 	function subsequence{ in seq: Anything[0..*] ordered nonunique; 
-		in startIndex: Positive[1]; in endIndex: Positive[1] default size(seq);
+		in startIndex: Positive[1]; in endIndex: Positive[1] default size(seq) as Positive;
+//		in startIndex: Positive[1]; in endIndex: Positive[1] default size(seq);
 		return : Anything[0..*] = (startIndex..endIndex)->collect {in i; seq#(i)};
 	}
 	function head{ in seq: Anything[0..*] ordered nonunique;

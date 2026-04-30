@@ -85,14 +85,15 @@ standard library package SpatialItems {
 		}
 
 		private attribute cunionNum: Natural [1] = if isEmpty(componentItems) ? 0 else 1;
-		private attribute componentUnion[cunionNum] :> unionsOf {
-			doc
-			/*
-			 * A SpatialItem with componentItems is is a spatial union of them.
-			 */
+//SFS:  not used anywhere, but has an error I don't know how to fix:  Features of an attribute usage must be referential	
+		// private attribute componentUnion[cunionNum] :> unionsOf {
+		// 	doc
+		// 	/*
+		// 	 * A SpatialItem with componentItems is is a spatial union of them.
+		// 	 */
 		
-			item :>> elements : SpatialItem [1..*] = componentItems;
-		}
+		// 	item :>> elements : SpatialItem [1..*] = componentItems;
+		// }
 		
 		part componentParts : SpatialItem[1..*] :> componentItems, subSpatialParts {
 		    ref item :>> SpatialItem::localClock, componentItems::localClock, subSpatialParts::localClock, subparts::localClock;
@@ -110,7 +111,8 @@ standard library package SpatialItems {
 		in point : Point[1];
 		in timeInstant : TimeInstantValue[1];
 		in enclosingItem :>> 'frame' : SpatialItem[1];
-		in clock : Clock[1] default enclosingItem.localClock;
+		in clock : Clock[1] default enclosingItem.localClock as Clock;
+//		in clock : Clock[1] default enclosingItem.localClock;
 		return positionVector : Position3dVector[1] {
 			attribute :>> mRef = enclosingItem.coordinateFrame;
 		}
@@ -125,7 +127,8 @@ standard library package SpatialItems {
 	
 		in point : Point[1];
 		in enclosingItem :>> 'frame' : SpatialItem[1];
-		in clock : Clock[1] default enclosingItem.localClock;
+		in clock : Clock[1] default enclosingItem.localClock as Clock;
+//		in clock : Clock[1] default enclosingItem.localClock;
 		return positionVector : Position3dVector[1] {
 			attribute :>> mRef = enclosingItem.coordinateFrame;
 		}
@@ -143,7 +146,8 @@ standard library package SpatialItems {
 		in point2 : Point[1];
 		in timeInstant : TimeInstantValue[1];
 		in spatialItem :>> 'frame' : SpatialItem[1];
-		in clock : Clock[1] default spatialItem.localClock;
+		in clock : Clock[1] default spatialItem.localClock as Clock;
+//		in clock : Clock[1] default spatialItem.localClock;
 		return displacementVector : Displacement3dVector[1] {
 			attribute :>> mRef = spatialItem.coordinateFrame;
 		}
@@ -159,7 +163,8 @@ standard library package SpatialItems {
 		in point1 : Point[1];
 		in point2 : Point[1];
 		in spatialItem :>> 'frame' : SpatialItem[1];
-		in clock : Clock[1] default spatialItem.localClock;
+		in clock : Clock[1] default spatialItem.localClock as Clock;
+//		in clock : Clock[1] default spatialItem.localClock;
 		return displacementVector : Displacement3dVector[1] {
 			attribute :>> mRef = spatialItem.coordinateFrame;
 		}
