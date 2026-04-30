@@ -28,7 +28,8 @@ standard library package OccurrenceFunctions {
 		in x: Occurrence[0..1]; 
 		in y: Occurrence[0..1];
 		
-		return : Boolean[1] = x.portionOfLife == y.portionOfLife;
+		return : Boolean[1] = x.getLife == y.getLife;
+//		return : Boolean[1] = x.portionOfLife == y.portionOfLife;
 	}
 	
 	function isDuring {

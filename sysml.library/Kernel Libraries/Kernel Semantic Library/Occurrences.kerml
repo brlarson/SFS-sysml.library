@@ -86,10 +86,23 @@ standard library package Occurrences {
        * redefine as true if occurrence is open-right. */
     }
 
+//SFS:  remove self from M0 features
+		feature self: Occurrence[1] redefines Anything::self subsets things;  //timeSlices, spaceSlices, spaceTimeCoincidentOccurrences, sameLifeOccurrences;
 
-		feature portionOfLife: Life[1] subsets portionOf default self as Life;
+//SFS:  use getLife instead of portionOfLife
+		// feature portionOfLife: Life[1] subsets portionOf default self as Life;
 
-		feature self: Occurrence[1] redefines Anything::self subsets timeSlices, spaceSlices, spaceTimeCoincidentOccurrences, sameLifeOccurrences;
+//SFS new
+		function getLife {
+			doc /* Life is top-level Occurrence, suboccurrence of no other */
+			language "Domain" /* during(this,result) and
+			   not exists o : Occurrence in o<>this that during(o,result) */	
+			return result : Life[1];
+			if superoccurrence->isEmpty() ? this as Life
+			  else superoccurrence->head().getLife	
+		}
+
+//SFS:  use sameLife predicate instead of sameLifeOccurrences feature
 		feature sameLifeOccurrences: Occurrence[1..*] subsets things;
 
 		feature this : Occurrence[1] default self {
@@ -348,7 +361,7 @@ standard library package Occurrences {
 			 * thing occurring).
 			 */
 
-            portion redefines portionOfLife = (that as Occurrence).portionOfLife;
+//            portion redefines portionOfLife = (that as Occurrence).portionOfLife;
 		}
 
 		feature portionOf : Occurrence[1..*] inverse of portions {
@@ -779,8 +792,8 @@ standard library package Occurrences {
 		end selfSameLives [1..*] feature selfSameLife: Anything redefines target;
 
 		feature all sourceOccurrence : Occurrence [0..1] subsets myselfSameLife;
-		feature all targetOccurrence : Occurrence [0..1] subsets selfSameLife, sourceOccurrence.sameLifeOccurrences;
-		binding oSelf of sourceOccurrence.portionOfLife = targetOccurrence.portionOfLife;
+		feature all targetOccurrence : Occurrence [0..1] subsets selfSameLife;  //, sourceOccurrence.sameLifeOccurrences;
+		// binding oSelf of sourceOccurrence.portionOfLife = targetOccurrence.portionOfLife;
 
 		feature all sourceDataValue : DataValue [0..1] subsets myselfSameLife;
 		feature all targetDataValue : DataValue [0..1] subsets selfSameLife;
