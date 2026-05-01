@@ -495,14 +495,16 @@ standard library package Occurrences {
 //            portion redefines portionOfLife = (that as Occurrence).portionOfLife;
 		}
 
-		feature portionOf : Occurrence[1..*] inverse of portions {
-			doc
-			/*
-			 * Occurrences of which this occurrence is a portion, including at
-			 * least this occurrence.
-			 */
-		}
+//SFS:  remove
+		// feature portionOf : Occurrence[1..*] inverse of portions {
+		// 	doc
+		// 	/*
+		// 	 * Occurrences of which this occurrence is a portion, including at
+		// 	 * least this occurrence.
+		// 	 */
+		// }
 
+//SFS:  time slices replaced by intervals, so timeSlices and timeSliceOf features removed
 		// portion feature timeSlices: Occurrence[1..*] subsets portions {
 		// 	doc
 		// 	/*
@@ -511,7 +513,6 @@ standard library package Occurrences {
 		// 	 */
 		// }
 
-//SFS:  time slices replaced by intervals, so timeSlices and timeSliceOf features removed
 		// feature timeSliceOf : Occurrence[1..*] subsets portionOf inverse of timeSlices {
 		// 	doc
 		// 	/*
@@ -896,7 +897,7 @@ standard library package Occurrences {
 		/*
 		 * A Life is an Occurrence that has no superoccurrence.
 		*/
-		inv { isEmpty{superoccurrence}}
+		inv { isEmpty(superoccurrence) }
 	}
 
 	// abstract class all Life specializes Occurrence {
