@@ -414,35 +414,51 @@ standard library package Occurrences {
 			not RegionOverlap(Location(self),Location(o))
 		}
 
-		feature justOutsideOfOccurrences: Occurrence[0..*] // subsets outsideOfOccurrences 
-		  inverse of justOutsideOfOccurrences {
-			doc
-			/*
-			 * Occurrences that have no space between some of their space slices and some space slices of this occurrence.
-			 */
+//SFS:  use justOutsideOfOccurrence predicate instead of justOutsideOfOccurrences feature
+		// feature justOutsideOfOccurrences: Occurrence[0..*] // subsets outsideOfOccurrences 
+		//   inverse of justOutsideOfOccurrences {
+		// 	doc
+		// 	/*
+		// 	 * Occurrences that have no space between some of their space slices and some space slices of this occurrence.
+		// 	 */
 
-			feature separateSpaceToo: Occurrence[1] subsets that;
-			feature separateSpace: Occurrence[1] subsets self;
+		// 	feature separateSpaceToo: Occurrence[1] subsets that;
+		// 	feature separateSpace: Occurrence[1] subsets self;
 
-			connector :MatesWith [1..*]
-				from [0..*] separateSpaceToo references separateSpaceToo.spaceSlices
-				to [0..*] separateSpace references separateSpace.spaceSlices;
+		// 	connector :MatesWith [1..*]
+		// 		from [0..*] separateSpaceToo references separateSpaceToo.spaceSlices
+		// 		to [0..*] separateSpace references separateSpace.spaceSlices;
+		// }
+//SFS new
+		predicate justOutsideOfOccurrence {
+			doc /* SFS:  true when self is just outside of o */
+			in o : Occurrence;
+			FilmConnected(Location(self),Location(o))
 		}
 
-		feature matingOccurrences: Occurrence[1..*] subsets justOutsideOfOccurrences inverse of matingOccurrences {
-			doc
-			/*
-			 * Occurrences that have no space between them and this one.
-			 */
+//SFS:  use matesWithOccurrence predicate instead of matingOccurrences feature
+		// feature matingOccurrences: Occurrence[1..*] // subsets justOutsideOfOccurrences 
+		//   inverse of matingOccurrences {
+		// 	doc
+		// 	/*
+		// 	 * Occurrences that have no space between them and this one.
+		// 	 */
 
-			feature matingSpaceToo: Occurrence[1] subsets that;
-			feature matingSpace: Occurrence[1] subsets self;
-			feature matingOccurrence: Occurrence [1] {
-				portion feature redefines spaceBoundary [1];
-//				inv { contains(unionsOf, union(matingSpaceToo, matingSpace)) }
-				portion feature redefines spaceInterior [0];
-			}
-		}
+		// 	feature matingSpaceToo: Occurrence[1] subsets that;
+		// 	feature matingSpace: Occurrence[1] subsets self;
+		// 	feature matingOccurrence: Occurrence [1] {
+		// 		portion feature redefines spaceBoundary [1];
+		// 		inv { contains(unionsOf, union(matingSpaceToo, matingSpace)) }
+		// 		portion feature redefines spaceInterior [0];
+		// 	}
+		// }
+//SFS new
+		predicate matesWithOccurrence {
+			doc /* SFS:  true when self is just outside of o and o is contained in that */
+			in o : Occurrence;
+			feature matingSpaceToo: Occurrence[1] subsets self.that;
+			justOutsideOfOccurrence(o) and RegionContainment(Location(matingSpaceToo),Location(o))
+		}	
 
 		feature innerSpaceDimension : Natural [1] {
 			doc
@@ -1154,10 +1170,10 @@ standard library package Occurrences {
 		 * MatesWith is an OutsideOf asserting that two occurrences have no space between them.
 		 */
 
-		end feature matingSpaceToo: Occurrence redefines separateSpaceToo
-		  crosses matingSpace.matingOccurrences;
-		end feature matingSpace: Occurrence redefines separateSpace
-		  crosses matingSpaceToo.matingOccurrences;
+		end feature matingSpaceToo: Occurrence redefines separateSpaceToo;
+//		  crosses matingSpace.matingOccurrences;
+		end feature matingSpace: Occurrence redefines separateSpace;
+//		  crosses matingSpaceToo.matingOccurrences;
 	}
 
 	assoc all InnerSpaceOf specializes OutsideOf {
