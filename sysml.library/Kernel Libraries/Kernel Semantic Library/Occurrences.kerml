@@ -599,7 +599,8 @@ standard library package Occurrences {
 			 */
 		}
 
-		feature spaceSliceOf: Occurrence[1..*] subsets portionOf inverse of spaceSlices {
+		feature spaceSliceOf: Occurrence[1..*] //subsets portionOf 
+		  inverse of spaceSlices {
 			doc
 			/*
 			 * Occurrences of which this occurrence is a space slice, including at least this
@@ -890,14 +891,22 @@ standard library package Occurrences {
 		}
 	}
 
-	abstract class all Life specializes Occurrence {
-		binding portionOf = self {
-			doc
-			/*
-			 * Lives are only portions of themselves.
-			 */
-			}
+	class Life specializes Occurrence {
+		doc
+		/*
+		 * A Life is an Occurrence that has no superoccurrence.
+		*/
+		inv { isEmpty{superoccurrence}}
 	}
+
+	// abstract class all Life specializes Occurrence {
+	// 	binding portionOf = self {
+	// 		doc
+	// 		/*
+	// 		 * Lives are only portions of themselves.
+	// 		 */
+	// 		}
+	// }
 
 	abstract feature occurrences: Occurrence[0..*] nonunique subsets things;
 	
@@ -1039,7 +1048,8 @@ standard library package Occurrences {
 		 */
 
 		end feature portionOccurrence: Occurrence redefines smallerOccurrence; // crosses portionedOccurrence.portions;
-		end portionWithin subsets portionOf feature portionedOccurrence: Occurrence redefines largerOccurrence;
+		end portionWithin //subsets portionOf 
+		  feature portionedOccurrence: Occurrence redefines largerOccurrence;
 	}
 
 	assoc all TimeSliceOf specializes PortionOf {
