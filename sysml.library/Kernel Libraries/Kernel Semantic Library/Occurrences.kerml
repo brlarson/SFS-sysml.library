@@ -364,6 +364,14 @@ standard library package Occurrences {
 			spaceTimeEnclosedOccurrence(o) and (o.innerSpaceDimension == 0)
 		}
 
+//SFS new
+		predicate spaceCoincidentOccurrence {
+			doc /* SFS:  true when self and o are space coincident */
+			in o : Occurrence;
+			RegionContainment(Location(o),Location(self)) and RegionContainment(Location(self),Location(o))
+		}
+
+//SFS:  use spaceTimeCoincidentOccurrence predicate instead of spaceTimeCoincidentOccurrences feature
 		// feature spaceTimeCoincidentOccurrences: Occurrence[1..*] 
 		// 	subsets // timeCoincidentOccurrences, 
 		// 	  spaceEnclosedOccurrences, spaceTimeEnclosedOccurrences 
@@ -374,29 +382,40 @@ standard library package Occurrences {
 		// 	 * Occurrences that this one completely includes in both space and time,
 		// 	 * and vice-versa, including this one.
 		// 	 */
-
 		// 	feature redefines thatOccurrence subsets largerSpace;
 		// 	feature redefines thisOccurrence subsets smallerSpace;
-
 		// 	/* spaceTimeCoincidentOccurrences occurrences are inside of each other. */
 		// 	connector :InsideOf
 		// 		from [1] largerSpace references thatOccurrence
 		// 		to [1] smallerSpace references thisOccurrence;
-
 		// 	/* spaceTimeCoincidentOccurrences is transitive */
 		// 	subset thatOccurrence.spaceTimeCoincidentOccurrences
 		// 		subsets thisOccurrence.spaceTimeCoincidentOccurrences;
 		// }
-
-		feature outsideOfOccurrences: Occurrence[0..*] subsets occurrences //withoutOccurrences 
-		  inverse of outsideOfOccurrences {
-			doc
-			/*
-			 * Occurrences that do not overlap in space (not necessarily in time, see successors).
-			 */
+//SFS new
+		predicate spaceTimeCoincidentOccurrence {
+			doc /* SFS:  true when self and o are space-time coincident */
+			in o : Occurrence;
+			spaceCoincidentOccurrence(o) and timeCoincidentOccurrence(o)
 		}
 
-		feature justOutsideOfOccurrences: Occurrence[0..*] subsets outsideOfOccurrences inverse of justOutsideOfOccurrences {
+//SFS:  use outsideOfOccurrence predicate instead of outsideOfOccurrences feature
+		// feature outsideOfOccurrences: Occurrence[0..*] subsets occurrences //withoutOccurrences 
+		//   inverse of outsideOfOccurrences {
+		// 	doc
+		// 	/*
+		// 	 * Occurrences that do not overlap in space (not necessarily in time, see successors).
+		// 	 */
+		// }
+//SFS new
+	  predicate outsideOfOccurrence {
+			doc /* SFS:  true when region of self does not overlap region of o */
+			in o : Occurrence;
+			not RegionOverlap(Location(self),Location(o))
+		}
+
+		feature justOutsideOfOccurrences: Occurrence[0..*] // subsets outsideOfOccurrences 
+		  inverse of justOutsideOfOccurrences {
 			doc
 			/*
 			 * Occurrences that have no space between some of their space slices and some space slices of this occurrence.
@@ -740,7 +759,7 @@ standard library package Occurrences {
 			from [0..*] surroundedSpace references spaceBoundary.inner
 			to [1] surroundingSpace references spaceInterior;
 
-		feature innerSpaceOccurrences: Occurrence [0..*] subsets outsideOfOccurrences {
+		feature innerSpaceOccurrences: Occurrence [0..*] { //subsets outsideOfOccurrences {
 			doc
 			/*
 			 * Occurrences that completely occupy the space surrounded by an inner space boundary of this occurrence.
@@ -758,7 +777,7 @@ standard library package Occurrences {
 			inv { (isEmpty(hbi) == notEmpty(hbo)) & (notEmpty(hbo) == outerSpace.isClosed) }
 		}
 
-		feature surroundedByOccurrences: Occurrence [0..*] subsets outsideOfOccurrences {
+		feature surroundedByOccurrences: Occurrence [0..*] { //subsets outsideOfOccurrences {
 			doc
 			/*
 			 * Occurrences that have inner spaces that completely include this occurrence.
@@ -1110,10 +1129,10 @@ standard library package Occurrences {
 		 * spatial extent of both of them. This means no Occurrence is OutsideOf itself.
 		 */
 
-		end feature separateSpaceToo: Occurrence redefines sourceOccurrence, separateOccurrenceToo
-			crosses separateSpace.outsideOfOccurrences;
-		end feature separateSpace: Occurrence redefines targetOccurrence, separateOccurrence
-			crosses separateSpaceToo.outsideOfOccurrences;
+		end feature separateSpaceToo: Occurrence redefines sourceOccurrence, separateOccurrenceToo;
+//			crosses separateSpace.outsideOfOccurrences;
+		end feature separateSpace: Occurrence redefines targetOccurrence, separateOccurrence;
+//			crosses separateSpaceToo.outsideOfOccurrences;
 	}
 
 	assoc all JustOutsideOf specializes OutsideOf {
@@ -1123,10 +1142,10 @@ standard library package Occurrences {
 		 * no space between them.
 		 */
 
-		end feature redefines separateSpaceToo: Occurrence
-			crosses separateSpace.justOutsideOfOccurrences;
-		end feature redefines separateSpace: Occurrence
-		  crosses separateSpaceToo.justOutsideOfOccurrences;
+		end feature redefines separateSpaceToo: Occurrence;
+//			crosses separateSpace.justOutsideOfOccurrences;
+		end feature redefines separateSpace: Occurrence;
+//		  crosses separateSpaceToo.justOutsideOfOccurrences;
 	}
 
 	assoc all MatesWith specializes JustOutsideOf {
