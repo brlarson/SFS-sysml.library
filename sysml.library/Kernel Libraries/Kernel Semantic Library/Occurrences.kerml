@@ -347,16 +347,16 @@ standard library package Occurrences {
 		}
 
 //SFS:  use spaceTimeEnclosedPoint predicate instead of spaceTimeEnclosedPoints feature
-		feature all spaceTimeEnclosedPoints : Occurrence[1..*] subsets occurrences //spaceTimeEnclosedOccurrences 
-		{
-			doc
-			/*
-			 * All space time enclosed occurrences that take up zero time and space.
-			 */
+		// feature all spaceTimeEnclosedPoints : Occurrence[1..*] subsets occurrences //spaceTimeEnclosedOccurrences 
+		// {
+		// 	doc
+		// 	/*
+		// 	 * All space time enclosed occurrences that take up zero time and space.
+		// 	 */
 
-			redefines innerSpaceDimension = 0;
-			binding [1] startShot = [1] endShot;
-		}
+		// 	redefines innerSpaceDimension = 0;
+		// 	binding [1] startShot = [1] endShot;
+		// }
 //SFS new
 		predicate spaceTimeEnclosedPoint {
 			doc /* SFS: an occurrence with dimension 0 is different than Regions::Point */
