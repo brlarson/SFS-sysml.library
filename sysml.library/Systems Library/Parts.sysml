@@ -28,7 +28,8 @@ doc
 		part start: Part :>> Item::start;
 		part done: Part :>> Item::done;
 		
-		abstract port ownedPorts: Port[0..*] :> ports, timeEnclosedOccurrences {
+		abstract port ownedPorts: Port[0..*] :> ports //, timeEnclosedOccurrences 
+		{
 			doc
 			/*
 			 * Ports that are owned by this Part.

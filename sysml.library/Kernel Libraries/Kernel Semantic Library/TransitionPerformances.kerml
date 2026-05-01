@@ -40,7 +40,8 @@ standard library package TransitionPerformances {
 		private succession all [*] guard then [*] effect;
 
 		feature accNum: Natural [1] = if isEmpty(trigger) ? 0 else 1;
-		step accept: AcceptPerformance[accNum] subsets timeEnclosedOccurrences, acceptPerformances {
+		step accept: AcceptPerformance[accNum] subsets //timeEnclosedOccurrences, 
+		  acceptPerformances {
 			feature redefines acceptedTransfer = trigger;
 		}
         binding accept.receiver = triggerTarget;

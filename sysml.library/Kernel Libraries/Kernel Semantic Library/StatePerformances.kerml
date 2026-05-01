@@ -98,11 +98,11 @@ standard library package StatePerformances {
 		
 		feature redefines isRunToCompletion default this.isRunToCompletion;
 		feature redefines runToCompletionScope default this.runToCompletionScope; 
-		inv { isRunToCompletion implies
-			     allSubtransitionPerformances(runToCompletionScope as Performance)->forAll{in tp : TransitionPerformance;
+//		inv { isRunToCompletion implies
+//			     allSubtransitionPerformances(runToCompletionScope as Performance)->forAll{in tp : TransitionPerformance;
 //			     allSubtransitionPerformances(runToCompletionScope)->forAll{in tp : TransitionPerformance;
-				    includes(tp.successors, entry) | includes(tp.predecessors, entry) }
-		}
+//				    includes(tp.successors, entry) | includes(tp.predecessors, entry) }
+//		}
 		
 		function allSubtransitionPerformances {
 			in p : Performance [1];

@@ -62,15 +62,16 @@ standard library package Items {
 
 			item envelopingItem [1];
 
-			assert constraint {
-				doc
-				/* 
-				 * This constraint prevents an envelopingShape from being a portion.
-				 */
+//SFS:  why does this constraint prevent being a portion?
+			// assert constraint {
+			// 	doc
+			// 	/* 
+			// 	 * This constraint prevents an envelopingShape from being a portion.
+			// 	 */
 				 
-				envelopingItem.shape.spaceTimeCoincidentOccurrences->includes(that) and
-				envelopingItem.spaceTimeEnclosedOccurrences->includes(that.that) 
-			}
+			// 	envelopingItem.shape.spaceTimeCoincidentOccurrences->includes(that) and
+			// 	envelopingItem.spaceTimeEnclosedOccurrences->includes(that.that) 
+			// }
 		}
 		
 		item boundingShapes : StructuredSpaceObject [0..*] :> envelopingShapes {

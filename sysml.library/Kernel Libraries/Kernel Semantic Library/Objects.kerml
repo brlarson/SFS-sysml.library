@@ -44,16 +44,18 @@ standard library package Objects {
 			 */
 		}
 		
-		abstract step enactedPerformances: Performance[0..*] subsets involvingPerformances, timeEnclosedOccurrences
-			intersects involvingPerformances, timeEnclosedOccurrences {
+		abstract step enactedPerformances: Performance[0..*] subsets involvingPerformances //, timeEnclosedOccurrences intersects involvingPerformances, timeEnclosedOccurrences 
+			{
 			doc
 			/*
 			 * Performances that are enacted by this object.
 			 */
 		}
 		
-		composite step ownedPerformances: Performance[0..*] subsets involvingPerformances, timeEnclosedOccurrences, suboccurrences
-			intersects involvingPerformances, timeEnclosedOccurrences, suboccurrences {
+		composite step ownedPerformances: Performance[0..*] subsets involvingPerformances, //timeEnclosedOccurrences, 
+			suboccurrences
+			intersects involvingPerformances, //timeEnclosedOccurrences, 
+			suboccurrences {
 			doc
 			/*
 			 * Performances that are owned by this object.

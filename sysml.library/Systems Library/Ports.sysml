@@ -20,7 +20,8 @@ standard library package Ports {
     
         ref self: Port :>> Object::self;
         
-        port subports: Port [0..*] :> ports, timeEnclosedOccurrences {
+        port subports: Port [0..*] :> ports  //, timeEnclosedOccurrences 
+        {
             doc
             /*
              * The Ports that are subports of this Port.

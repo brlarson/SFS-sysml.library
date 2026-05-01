@@ -44,8 +44,8 @@ standard library package Performances {
 		feature redefines isDispatch default true;
   		feature redefines dispatchScope default thisPerformance;
   		
-		step enclosedPerformances: Performance[0..*] subsets performances, timeEnclosedOccurrences
-			intersects performances, timeEnclosedOccurrences {
+		step enclosedPerformances: Performance[0..*] subsets performances  //, timeEnclosedOccurrences	intersects performances, timeEnclosedOccurrences 
+			{
 			doc
 			/*
 			 * timeEnclosedOccurrences of this Performance that are also Performances.
