@@ -72,7 +72,9 @@ standard library package SpatialFrames {
              */
         
             (frame.spaceShots as Point)->forAll{in p : Point;
-                p.spaceTimeEnclosedOccurrences->includes(point) implies
+ //SFS:   need to invoke parameter point           
+                p.spaceTimeEnclosedOccurrence implies
+ //               p.spaceTimeEnclosedOccurrences->includes(point) implies
                     positionVector == PositionOf(p, time, frame)
             }
         }
@@ -114,10 +116,13 @@ standard library package SpatialFrames {
          * If either point1 or point2 occurs within the other, then the displacementVector is
          * the zero vector.
          */
-        
-            (point1.spaceTimeEnclosedOccurrences->includes(point2) or
-            point2.spaceTimeEnclosedOccurrences->includes(point1)) implies
+ //SFS:   need to invoke parameters point1 and point2    
+            (point1.spaceTimeEnclosedOccurrence or
+            point2.spaceTimeEnclosedOccurrence) implies
                 isZeroVector(displacementVector)
+            // (point1.spaceTimeEnclosedOccurrences->includes(point2) or
+            // point2.spaceTimeEnclosedOccurrences->includes(point1)) implies
+            //     isZeroVector(displacementVector)
         }
     }
     

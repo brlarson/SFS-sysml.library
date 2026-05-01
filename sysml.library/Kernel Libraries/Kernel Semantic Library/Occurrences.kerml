@@ -326,19 +326,19 @@ standard library package Occurrences {
 		}
 
 //SFS:  use spaceTimeEnclosedOccurrence predicate instead of spaceTimeEnclosedOccurrences feature
-		feature all spaceTimeEnclosedOccurrences: Occurrence[1..*] subsets occurrences // timeEnclosedOccurrences, 
-		//  spaceEnclosedOccurrences
-		//	intersects timeEnclosedOccurrences, spaceEnclosedOccurrences 
-			{
-			doc
-			/*
-			 * Occurrences that this one completely includes in both space and time,
-			 * including this one.
-			 */
+		// feature all spaceTimeEnclosedOccurrences: Occurrence[1..*] subsets occurrences // timeEnclosedOccurrences, 
+		// //  spaceEnclosedOccurrences
+		// //	intersects timeEnclosedOccurrences, spaceEnclosedOccurrences 
+		// 	{
+		// 	doc
+		// 	/*
+		// 	 * Occurrences that this one completely includes in both space and time,
+		// 	 * including this one.
+		// 	 */
 
-			/* spaceTimeEnclosedOccurrences is transitive */
-		//	subset largerSpace.spaceTimeEnclosedOccurrences subsets smallerSpace.spaceTimeEnclosedOccurrences;
-		}
+		// 	/* spaceTimeEnclosedOccurrences is transitive */
+		// //	subset largerSpace.spaceTimeEnclosedOccurrences subsets smallerSpace.spaceTimeEnclosedOccurrences;
+		// }
 //SFS new
 		predicate spaceTimeEnclosedOccurrence {
 			doc /* SFS:  replaces feature spaceEnclosedOccurrences; true when self contains o */
@@ -346,7 +346,9 @@ standard library package Occurrences {
 			spaceEnclosedOccurrence(o) and timeEnclosedOccurrence(o)
 		}
 
-		feature all spaceTimeEnclosedPoints : Occurrence[1..*] subsets spaceTimeEnclosedOccurrences {
+//SFS:  use spaceTimeEnclosedPoint predicate instead of spaceTimeEnclosedPoints feature
+		feature all spaceTimeEnclosedPoints : Occurrence[1..*] subsets occurrences //spaceTimeEnclosedOccurrences 
+		{
 			doc
 			/*
 			 * All space time enclosed occurrences that take up zero time and space.
@@ -354,6 +356,12 @@ standard library package Occurrences {
 
 			redefines innerSpaceDimension = 0;
 			binding [1] startShot = [1] endShot;
+		}
+//SFS new
+		predicate spaceTimeEnclosedPoint {
+			doc /* SFS: an occurrence with dimension 0 is different than Regions::Point */
+			in o : Occurrence;
+			spaceTimeEnclosedOccurrence(o) and (o.innerSpaceDimension == 0)
 		}
 
 		// feature spaceTimeCoincidentOccurrences: Occurrence[1..*] 
@@ -412,7 +420,7 @@ standard library package Occurrences {
 			feature matingSpace: Occurrence[1] subsets self;
 			feature matingOccurrence: Occurrence [1] {
 				portion feature redefines spaceBoundary [1];
-				inv { contains(unionsOf, union(matingSpaceToo, matingSpace)) }
+//				inv { contains(unionsOf, union(matingSpaceToo, matingSpace)) }
 				portion feature redefines spaceInterior [0];
 			}
 		}
@@ -440,7 +448,8 @@ standard library package Occurrences {
 		inv { notEmpty(outerSpaceDimension) implies
 			 (outerSpaceDimension >= innerSpaceDimension & outerSpaceDimension <= 3) }
 
-		portion feature all portions: Occurrence[1..*] subsets spaceTimeEnclosedOccurrences {
+		portion feature all portions: Occurrence[1..*] subsets occurrences // spaceTimeEnclosedOccurrences 
+		{
 			doc
 			/*
 			 * All spaceTimeEnclosedOccurrences that have the same portionOfLife (considered the same
@@ -587,79 +596,81 @@ standard library package Occurrences {
 			/* spaceShotOf is transitive */
 			subset spaceShottedOccurrence.spaceShotOf subsets spaceShotOccurrence.spaceShotOf;
 		}
+//SFS:  removed
+		// feature unionsOf: Set[0..*] {
+		// 	doc
+		// 	/*
+		// 	 * Sets of occurrences, where the time and space taken by all the occurrences in each
+		// 	 * set together is the same as taken by this occurrence (all four dimensional points in
+		// 	 * the occurrences of each set are at the same time and space as those of this
+		// 	 * occurrence).
+		// 	 */
 
-		feature unionsOf: Set[0..*] {
-			doc
-			/*
-			 * Sets of occurrences, where the time and space taken by all the occurrences in each
-			 * set together is the same as taken by this occurrence (all four dimensional points in
-			 * the occurrences of each set are at the same time and space as those of this
-			 * occurrence).
-			 */
+		// 	feature redefines elements: Occurrence[0..*];
+		// 	feature union: Occurrence[0..1];
 
-			feature redefines elements: Occurrence[0..*];
-			feature union: Occurrence[0..1];
+		// 	connector :Within
+		// 		  from [0..*] smallerOccurrence references elements 
+		// 		  to [1] largerOccurrence references union;
+		// 	connector :Within
+		// 		  from [0..*] smallerOccurrence references union.spaceTimeEnclosedPoints
+		// 		  to [1..*] largerOccurrence references elements;
+		// }
+//		binding  [0..1] unionsOf.union = [1] self;
 
-			connector :Within
-				  from [0..*] smallerOccurrence references elements 
-				  to [1] largerOccurrence references union;
-			connector :Within
-				  from [0..*] smallerOccurrence references union.spaceTimeEnclosedPoints
-				  to [1..*] largerOccurrence references elements;
-		}
-		binding  [0..1] unionsOf.union = [1] self;
+//SFS:  removed
+		// feature intersectionsOf: Set[0..*] {
+		// 	doc
+		// 	/*
+		// 	 * Sets of occurrences, where the time and space taken in common between the occurrences
+		// 	 * in each set is at the same as taken by this occurrence (all four dimensional points
+		// 	 * common to the occurrences in each set are at the same time and space as those in this
+		// 	 * occurrence).
+		// 	 */
 
-		feature intersectionsOf: Set[0..*] {
-			doc
-			/*
-			 * Sets of occurrences, where the time and space taken in common between the occurrences
-			 * in each set is at the same as taken by this occurrence (all four dimensional points
-			 * common to the occurrences in each set are at the same time and space as those in this
-			 * occurrence).
-			 */
+		// 	feature redefines elements: Occurrence[0..*] {
+		// 		feature all notIntersection: Occurrence[0..*] subsets spaceTimeEnclosedPoints;
+		// 	}
+		// 	feature intersection: Occurrence[0..1];
 
-			feature redefines elements: Occurrence[0..*] {
-				feature all notIntersection: Occurrence[0..*] subsets spaceTimeEnclosedPoints;
-			}
-			feature intersection: Occurrence[0..1];
+		// 	connector :Within
+		// 		  from [1] smallerOccurrence references intersection
+		// 		  to [0..*] largerOccurrence references elements;
+		// 	connector :Without
+		// 		  from [0..*] separateOccurrenceToo references elements.notIntersection
+		// 		  to [1] separateOccurrence references intersection;
+		// 	connector :Without
+		// 		  from [0..*] separateOccurrenceToo references elements.notIntersection
+		// 		  to [1..*] separateOccurrence references elements;
+		// }
+//		binding [0..1] intersectionsOf.intersection = [1] self;
 
-			connector :Within
-				  from [1] smallerOccurrence references intersection
-				  to [0..*] largerOccurrence references elements;
-			connector :Without
-				  from [0..*] separateOccurrenceToo references elements.notIntersection
-				  to [1] separateOccurrence references intersection;
-			connector :Without
-				  from [0..*] separateOccurrenceToo references elements.notIntersection
-				  to [1..*] separateOccurrence references elements;
-		}
-		binding [0..1] intersectionsOf.intersection = [1] self;
+//SFS:  removed
+		// feature differencesOf: OrderedSet[0..*] {
+		// 	doc
+		// 	/*
+		// 	 * Ordered sets of occurrences, where the time and space taken by first occurrence in
+		// 	 * each set that is not in the time and space taken by the remaining occurrences is the
+		// 	 * same as taken by this occurrence (all four dimensional points in the minuend that are
+		// 	 * not in any subtrahend are at the same time and space as those in this occurrence).
+		// 	 */
+		// 	feature redefines elements: Occurrence[0..*];
+		// 	feature difference: Occurrence[0..1];
+		// 	feature minuend: Occurrence [0..1] subsets elements, interdiff.elements = head(elements);
+		// 	feature subtrahend: Occurrence[*] subsets elements = tail(elements);
+		// 	feature interdiff: Set [0..1] {
+		// 		feature redefines elements: Occurrence[1..*];
+		// 		feature all notSubtrahend: Occurrence [0..*] subsets elements;
+		// 	}
 
-		feature differencesOf: OrderedSet[0..*] {
-			doc
-			/*
-			 * Ordered sets of occurrences, where the time and space taken by first occurrence in
-			 * each set that is not in the time and space taken by the remaining occurrences is the
-			 * same as taken by this occurrence (all four dimensional points in the minuend that are
-			 * not in any subtrahend are at the same time and space as those in this occurrence).
-			 */
-			feature redefines elements: Occurrence[0..*];
-			feature difference: Occurrence[0..1];
-			feature minuend: Occurrence [0..1] subsets elements, interdiff.elements = head(elements);
-			feature subtrahend: Occurrence[*] subsets elements = tail(elements);
-			feature interdiff: Set [0..1] {
-				feature redefines elements: Occurrence[1..*];
-				feature all notSubtrahend: Occurrence [0..*] subsets elements;
-			}
+		// 	connector :Without
+		// 		  from [0..*] separateOccurrenceToo references interdiff.notSubtrahend 
+		// 		  to [1..*] separateOccurrence references subtrahend;
 
-			connector :Without
-				  from [0..*] separateOccurrenceToo references interdiff.notSubtrahend 
-				  to [1..*] separateOccurrence references subtrahend;
-
-			inv { isEmpty(difference) == isEmpty(interdiff) }
-			inv { notEmpty(difference) implies (difference.intersectionsOf == interdiff) }
-		}
-		binding [0..1] differencesOf.difference = [1] self;
+		// 	inv { isEmpty(difference) == isEmpty(interdiff) }
+		// 	inv { notEmpty(difference) implies (difference.intersectionsOf == interdiff) }
+		// }
+		// binding [0..1] differencesOf.difference = [1] self;
 
 		portion feature spaceInterior: Occurrence[0..1] subsets spaceSlices {
 			doc
@@ -704,8 +715,8 @@ standard library package Occurrences {
 			}
 
 			inv { notEmpty(inner) implies notEmpty(outer) }
-			inv { notEmpty(outer) implies
-				contains(unionsOf, union(outer, inner)) }
+//			inv { notEmpty(outer) implies
+//				contains(unionsOf, union(outer, inner)) }
 		}
 
 		feature spaceBoundaryOf: Occurrence[0..*] subsets spaceShotOf inverse of spaceBoundary {
@@ -718,7 +729,7 @@ standard library package Occurrences {
 			inv { spaceBounderOf.spaceBoundary == that.that }
 		}
 
-		inv { not isClosed implies contains((that as Occurrence).unionsOf, union(spaceBoundary, spaceInterior)) }
+//		inv { not isClosed implies contains((that as Occurrence).unionsOf, union(spaceBoundary, spaceInterior)) }
 		inv { innerSpaceDimension == 0 implies isEmpty(spaceBoundary) }
 
 		connector :SurroundedBy
