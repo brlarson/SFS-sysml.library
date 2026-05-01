@@ -503,13 +503,13 @@ standard library package Occurrences {
 			 */
 		}
 
-		portion feature timeSlices: Occurrence[1..*] subsets portions {
-			doc
-			/*
-			 * Portions of an occurrence taking up all of its space over some period of time,
-			 * including at least this occurrence.
-			 */
-		}
+		// portion feature timeSlices: Occurrence[1..*] subsets portions {
+		// 	doc
+		// 	/*
+		// 	 * Portions of an occurrence taking up all of its space over some period of time,
+		// 	 * including at least this occurrence.
+		// 	 */
+		// }
 
 //SFS:  time slices replaced by intervals, so timeSlices and timeSliceOf features removed
 		// feature timeSliceOf : Occurrence[1..*] subsets portionOf inverse of timeSlices {
@@ -560,14 +560,14 @@ standard library package Occurrences {
 		// }
 		// inv { isEmpty((that as Occurrence).middleTimeSlice) == ((that as Occurrence).startShot == (that as Occurrence).endShot) }
 
-		connector :HappensJustBefore
-			from [1] earlierOccurrence references startShot
-			to [0..1] laterOccurrence references middleTimeSlice {
-			doc
-			/*
-			 * The startShot happens immediately before the middle time slice.
-			 */
-		}
+		// connector :HappensJustBefore
+		// 	from [1] earlierOccurrence references startShot
+		// 	to [0..1] laterOccurrence references middleTimeSlice {
+		// 	doc
+		// 	/*
+		// 	 * The startShot happens immediately before the middle time slice.
+		// 	 */
+		// }
 
 		// portion feature endShot: Occurrence[1] subsets snapshots {
 		// 	doc
@@ -581,14 +581,14 @@ standard library package Occurrences {
 		// 		  subset superendshot subsets self.timeCoincidentOccurrences; }
 		// }
 
-		 connector :HappensJustBefore
-			from [0..1] earlierOccurrence references middleTimeSlice
-			to [1] laterOccurrence references endShot {
-			doc
-			/*
-			 * The endShot happens after the middle time slice.
-			 */
-		}
+		//  connector :HappensJustBefore
+		// 	from [0..1] earlierOccurrence references middleTimeSlice
+		// 	to [1] laterOccurrence references endShot {
+		// 	doc
+		// 	/*
+		// 	 * The endShot happens after the middle time slice.
+		// 	 */
+		// }
 
 		portion feature spaceSlices: Occurrence[1..*] subsets portions {
 			doc

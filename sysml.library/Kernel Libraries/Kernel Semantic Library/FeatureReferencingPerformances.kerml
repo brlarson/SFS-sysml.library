@@ -50,7 +50,7 @@ standard library package FeatureReferencingPerformances {
 		 */
      	
 		in abstract feature onOccurrence : Occurrence {
-			abstract feature startingAt : Occurrence [1] subsets timeSlices {
+			abstract feature startingAt : Occurrence [1] {  // subsets timeSlices {
 				abstract feature accessedFeature : Anything [*] nonunique;
 			}
 		}
@@ -98,9 +98,9 @@ standard library package FeatureReferencingPerformances {
 		 */	
 
 		in feature redefines onOccurrence {
-	    	feature monitoredOccurrence : Occurrence [1] subsets timeSlices {
+	    	feature monitoredOccurrence : Occurrence [1] {  // subsets timeSlices {
 	      		abstract feature monitoredFeature : Anything[*] nonunique;
-	      		feature beforeTimeSlice : Occurrence [1] subsets timeSlices {
+	      		feature beforeTimeSlice : Occurrence [1] {  //} subsets timeSlices {
 	        		feature redefines monitoredFeature;
 	        	}
 	      		feature afterSnapshot : Occurrence [1] {  //subsets snapshots {
