@@ -483,7 +483,8 @@ standard library package Occurrences {
 		inv { notEmpty(outerSpaceDimension) implies
 			 (outerSpaceDimension >= innerSpaceDimension & outerSpaceDimension <= 3) }
 
-		portion feature all portions: Occurrence[1..*] subsets occurrences // spaceTimeEnclosedOccurrences 
+		portion feature all portions: Occurrence[1..*] subsets occurrences 
+		  // spaceEnclosedOccurrences, spaceTimeEnclosedOccurrences 
 		{
 			doc
 			/*
@@ -510,36 +511,38 @@ standard library package Occurrences {
 			 */
 		}
 
-		feature timeSliceOf : Occurrence[1..*] subsets portionOf inverse of timeSlices {
-			doc
-			/*
-			 * Occurrences of which this occurrence is a time slice, including at least this
-			 * occurrence.
-			 */
+//SFS:  time slices replaced by intervals, so timeSlices and timeSliceOf features removed
+		// feature timeSliceOf : Occurrence[1..*] subsets portionOf inverse of timeSlices {
+		// 	doc
+		// 	/*
+		// 	 * Occurrences of which this occurrence is a time slice, including at least this
+		// 	 * occurrence.
+		// 	 */
 
-			feature timeSliceOccurrence: Occurrence[1] subsets that;
-			feature timeSlicedOccurrence: Occurrence[1] subsets self;
+		// 	feature timeSliceOccurrence: Occurrence[1] subsets that;
+		// 	feature timeSlicedOccurrence: Occurrence[1] subsets self;
 
-			/* timeSliceOf is transitive */
-			subset timeSlicedOccurrence.timeSliceOf subsets timeSliceOccurrence.timeSliceOf;
-		}
+		// 	/* timeSliceOf is transitive */
+		// 	subset timeSlicedOccurrence.timeSliceOf subsets timeSliceOccurrence.timeSliceOf;
+		// }
 
-		portion feature all snapshots: Occurrence[1..*] subsets timeSlices {
-			doc
-			/*
-			 * Time slices of an occurrence that happen at a single instant of time
-			 * (i.e., have no duration).
-			 */
-			binding [1] startShot = [1] endShot;
-		}
+		// portion feature all snapshots: Occurrence[1..*] subsets timeSlices {
+		// 	doc
+		// 	/*
+		// 	 * Time slices of an occurrence that happen at a single instant of time
+		// 	 * (i.e., have no duration).
+		// 	 */
+		// 	binding [1] startShot = [1] endShot;
+		// }
 //		inv { snapshots == union(startShot, union(middleTimeSlice.snapshots, endShot)) }
 
-		feature snapshotOf : Occurrence[0..*] subsets timeSliceOf inverse of snapshots {
-			doc
-			/*
-			 * Occurrences of which this occurrence is a snapshot.
-			 */
-		}
+//SFS:  snapshots replaced by instants, so snapshots and snapshotOf features removed
+		// feature snapshotOf : Occurrence[0..*] subsets timeSliceOf inverse of snapshots {
+		// 	doc
+		// 	/*
+		// 	 * Occurrences of which this occurrence is a snapshot.
+		// 	 */
+		// }
 
 		// portion feature startShot: Occurrence[1] subsets snapshots {
 		// 	doc
@@ -1046,7 +1049,8 @@ standard library package Occurrences {
 		 */
 
 		end feature timeSliceOccurrence: Occurrence redefines portionOccurrence; // crosses timeSlicedOccurrence.timeSlices;
-		end timeSliceWithin subsets timeSliceOf feature timeSlicedOccurrence: Occurrence redefines portionedOccurrence;
+		end timeSliceWithin //subsets timeSliceOf 
+		  feature timeSlicedOccurrence: Occurrence redefines portionedOccurrence;
 	}
 
 	assoc all SnapshotOf specializes TimeSliceOf {
@@ -1056,7 +1060,8 @@ standard library package Occurrences {
 		 */
 
 		end feature snapshotOccurrence: Occurrence redefines timeSliceOccurrence; // crosses snapshottedOccurrence.snapshots;
-		end snapshotWithin subsets snapshotOf feature snapshottedOccurrence: Occurrence redefines timeSlicedOccurrence;
+		end snapshotWithin // subsets snapshotOf 
+		  feature snapshottedOccurrence: Occurrence redefines timeSlicedOccurrence;
 	}
 
 	assoc all SpaceSliceOf specializes PortionOf {

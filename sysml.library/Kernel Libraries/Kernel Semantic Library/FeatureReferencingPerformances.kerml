@@ -103,7 +103,7 @@ standard library package FeatureReferencingPerformances {
 	      		feature beforeTimeSlice : Occurrence [1] subsets timeSlices {
 	        		feature redefines monitoredFeature;
 	        	}
-	      		feature afterSnapshot : Occurrence [1] subsets snapshots {
+	      		feature afterSnapshot : Occurrence [1] {  //subsets snapshots {
 	        		feature redefines monitoredFeature;
 	        	}
 	      		connector :HappensJustBefore from beforeTimeSlice to afterSnapshot;

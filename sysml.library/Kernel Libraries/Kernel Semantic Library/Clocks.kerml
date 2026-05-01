@@ -45,18 +45,19 @@ standard library package Clocks {
 			 * A scalar time reference that advances over the lifetime of the Clock. 
 			 */
 		}
-						
-		inv timeFlowConstraint {
-			doc
-			/*
-			 * The currentTime of a snapshot of a Clock is equal to
-			 * the TimeOf the snapshot relative to that Clock.
-			 */
+
+//SFS:  timeFlowConstraint is not needed for SFS which has a continuous time domain, T						
+		// inv timeFlowConstraint {
+		// 	doc
+		// 	/*
+		// 	 * The currentTime of a snapshot of a Clock is equal to
+		// 	 * the TimeOf the snapshot relative to that Clock.
+		// 	 */
 			
-			snapshots->forAll{in s : Clock; 
-				TimeOf(s, thisClock) == s.currentTime
-			}
-		}		
+		// 	snapshots->forAll{in s : Clock; 
+		// 		TimeOf(s, thisClock) == s.currentTime
+		// 	}
+		// }		
 	}
 	
 	abstract function TimeOf {
