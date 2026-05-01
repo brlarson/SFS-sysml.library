@@ -274,26 +274,26 @@ standard library package Occurrences {
     }
 
 //SFS:  use timeCoincidentOccurrence predicate instead of timeCoincidentOccurrences feature
-		feature all timeCoincidentOccurrences: Occurrence[1..*] subsets occurrences // timeEnclosedOccurrences 
-		  inverse of timeCoincidentOccurrences {
-			doc
-			/*
-			 * Occurrences that start at the same time and end at the same time as this occurrence,
-			 * including at least this occurrence.
-			 */
+		// feature all timeCoincidentOccurrences: Occurrence[1..*] subsets occurrences // timeEnclosedOccurrences 
+		//   inverse of timeCoincidentOccurrences {
+		// 	doc
+		// 	/*
+		// 	 * Occurrences that start at the same time and end at the same time as this occurrence,
+		// 	 * including at least this occurrence.
+		// 	 */
 
-			feature thatOccurrence: Occurrence[1] subsets that;  // longerOccurrence;
-			feature thisOccurrence: Occurrence[1] subsets this;  //shorterOccurrence;
+		// 	feature thatOccurrence: Occurrence[1] subsets that;  // longerOccurrence;
+		// 	feature thisOccurrence: Occurrence[1] subsets this;  //shorterOccurrence;
 
-			/* timeCoincidentOccurrences occurrences happen during each other. */
-			connector :HappensDuring
-				from [1] shorterOccurrence references thisOccurrence
-				to [1] longerOccurrence references thatOccurrence;
+		// 	/* timeCoincidentOccurrences occurrences happen during each other. */
+		// 	connector :HappensDuring
+		// 		from [1] shorterOccurrence references thisOccurrence
+		// 		to [1] longerOccurrence references thatOccurrence;
 
-			/* timeCoincidentOccurrences is transitive */
-			subset thatOccurrence.timeCoincidentOccurrences
-				subsets thisOccurrence.timeCoincidentOccurrences;
-		}
+		// 	/* timeCoincidentOccurrences is transitive */
+		// 	subset thatOccurrence.timeCoincidentOccurrences
+		// 		subsets thisOccurrence.timeCoincidentOccurrences;
+		// }
 //SFS new
 		predicate timeCoincidentOccurrence {
 			doc /* SFS:  true when o coincident self */
@@ -301,25 +301,33 @@ standard library package Occurrences {
 			coincident(o,self)
 		}
 
-		feature spaceEnclosedOccurrences: Occurrence[1..*] subsets occurrences {
-			doc
-			/*
-			 * Occurrences that this one completely includes in space (not necessarily in time),
-			 * including this one.
-			 */
+//SFS:  use spaceEnclosedOccurrence predicate instead of spaceEnclosedOccurrences feature
+		// feature spaceEnclosedOccurrences: Occurrence[1..*] subsets occurrences {
+		// 	doc
+		// 	/*
+		// 	 * Occurrences that this one completely includes in space (not necessarily in time),
+		// 	 * including this one.
+		// 	 */
 
-			feature largerSpace: Occurrence[1] subsets that;
-			feature smallerSpace: Occurrence[1] subsets self;
+		// 	feature largerSpace: Occurrence[1] subsets that;
+		// 	feature smallerSpace: Occurrence[1] subsets self;
 
-			/* spaceEnclosedOccurrences is transitive. */
-			subset smallerSpace.spaceEnclosedOccurrences subsets largerSpace.spaceEnclosedOccurrences;
+		// 	/* spaceEnclosedOccurrences is transitive. */
+		// 	subset smallerSpace.spaceEnclosedOccurrences subsets largerSpace.spaceEnclosedOccurrences;
 
-			/* smallerSpace are outside occurrences that are outside their largerSpace */
-			subset smallerSpace.outsideOfOccurrences subsets largerSpace.outsideOfOccurrences;
+		// 	/* smallerSpace are outside occurrences that are outside their largerSpace */
+		// 	subset smallerSpace.outsideOfOccurrences subsets largerSpace.outsideOfOccurrences;
+		// }
+//SFS new
+		predicate spaceEnclosedOccurrence {
+			doc /* SFS:  true when self contains o */
+			in o : Occurrence;
+			RegionContainment(Location(self),Location(o))
 		}
 
-		feature all spaceTimeEnclosedOccurrences: Occurrence[1..*] subsets // timeEnclosedOccurrences, 
-		  spaceEnclosedOccurrences
+//SFS:  use spaceTimeEnclosedOccurrence predicate instead of spaceTimeEnclosedOccurrences feature
+		feature all spaceTimeEnclosedOccurrences: Occurrence[1..*] subsets occurrences // timeEnclosedOccurrences, 
+		//  spaceEnclosedOccurrences
 		//	intersects timeEnclosedOccurrences, spaceEnclosedOccurrences 
 			{
 			doc
@@ -329,7 +337,13 @@ standard library package Occurrences {
 			 */
 
 			/* spaceTimeEnclosedOccurrences is transitive */
-			subset largerSpace.spaceTimeEnclosedOccurrences subsets smallerSpace.spaceTimeEnclosedOccurrences;
+		//	subset largerSpace.spaceTimeEnclosedOccurrences subsets smallerSpace.spaceTimeEnclosedOccurrences;
+		}
+//SFS new
+		predicate spaceTimeEnclosedOccurrence {
+			doc /* SFS:  replaces feature spaceEnclosedOccurrences; true when self contains o */
+			in o : Occurrence;
+			spaceEnclosedOccurrence(o) and timeEnclosedOccurrence(o)
 		}
 
 		feature all spaceTimeEnclosedPoints : Occurrence[1..*] subsets spaceTimeEnclosedOccurrences {
@@ -937,7 +951,7 @@ standard library package Occurrences {
 		 * Occurrence is InsideOf itself and that InsideOf is transitive.
 		 */
 
-		end feature smallerSpace: Occurrence redefines sourceOccurrence crosses largerSpace.spaceEnclosedOccurrences;
+		end feature smallerSpace: Occurrence redefines sourceOccurrence;  // crosses largerSpace.spaceEnclosedOccurrences;
 		end insideOf [1..*] feature largerSpace: Occurrence redefines targetOccurrence;
 	}
 
