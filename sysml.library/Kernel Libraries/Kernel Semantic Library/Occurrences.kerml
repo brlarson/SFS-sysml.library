@@ -93,7 +93,7 @@ standard library package Occurrences {
 		// feature portionOfLife: Life[1] subsets portionOf default self as Life;
 
 //SFS new
-		function getLife {
+		expr getLife {
 			doc /* Life is top-level Occurrence, suboccurrence of no other */
 			language "Domain" /* during(this,result) and
 			   not exists o : Occurrence in o<>this that during(o,result) */	
@@ -102,10 +102,10 @@ standard library package Occurrences {
 			  else superoccurrence->head().getLife	
 		}
 
-//SFS:  use sameLife predicate instead of sameLifeOccurrences feature
+//SFS:  use sameLife bool instead of sameLifeOccurrences feature
 	//	feature sameLifeOccurrences: Occurrence[1..*] subsets things;
 //SFS new		
-		predicate sameLife {
+		bool sameLife {
 			doc /* SFS: o has the same Life as this */
 			in o : Occurrence;
 			this.getLife == o.getLife
@@ -154,7 +154,7 @@ standard library package Occurrences {
 		/* Occurrences may be suboccurrences of no more than one other occurrence. */		
 		feature superoccurrence: Occurrence[0..1] subsets occurrences inverse of suboccurrences;
 
-//SFS:  use withoutOccurrence predicate instead of withoutOccurrences feature
+//SFS:  use withoutOccurrence bool instead of withoutOccurrences feature
 		// feature withoutOccurrences: Occurrence[0..*] unions successors, predecessors, outsideOfOccurrences
 		// 	inverse of withoutOccurrences {
 		// 	doc
@@ -166,13 +166,13 @@ standard library package Occurrences {
 		// 	inv { (that as Occurrence) != (that.that as Occurrence) }
 		// }
 //SFS new
-    predicate withoutOccurrence {  
+    bool withoutOccurrence {  
       doc /* SFS: true when o is separated in either time or space */
       in o : Occurrence;
       nonoverlaps(o,this) or not RegionOverlap(Location(o),Location(this)) 
     }
 
-//SFS:  use precessor predicate instead of predecessors feature
+//SFS:  use precessor bool instead of predecessors feature
 		// feature predecessors: Occurrence[0..*] subsets withoutOccurrences {
 		// 	doc
 		// 	/*
@@ -180,13 +180,13 @@ standard library package Occurrences {
 		// 	 */
 		// }
 //SFS new
-    predicate predecessor { 
+    bool predecessor { 
       doc /* SFS:  true when o precedes this */
       in o : Occurrence;
       precedes(o,this)
     }
 
-//SFS:  use successor predicate instead of successors feature
+//SFS:  use successor bool instead of successors feature
 		// feature successors: Occurrence[0..*] subsets withoutOccurrences inverse of predecessors {
 		// 	doc
 		// 	/*
@@ -199,7 +199,7 @@ standard library package Occurrences {
 		// 	subset laterOccurrence.successors subsets earlierOccurrence.successors;
 		// }
 //SFS new
-    predicate successor {
+    bool successor {
       doc /* SFS:  true when self precedes o */
       in o : Occurrence;
       precedes(this,o)
@@ -216,7 +216,7 @@ standard library package Occurrences {
 		}
 
 //SFS new
-    predicate immediatePredecessor { 
+    bool immediatePredecessor { 
       doc /* SFS:  true when o nearly meets this */
       in o : Occurrence;
       nearlyMeets(o,this)
@@ -235,13 +235,13 @@ standard library package Occurrences {
 		}
 
  //SFS new
-   predicate immediateSuccessor { 
+   bool immediateSuccessor { 
       doc /* SFS:  true when this nearly meets o */
       in o : Occurrence;
       nearlyMeets(this,o)
     }
 
-//SFS:  use timeEnclosedOccurrence predicate instead of timeEnclosedOccurrences feature
+//SFS:  use timeEnclosedOccurrence bool instead of timeEnclosedOccurrences feature
 //  commenting timeEnclosedOccurrences out causes strange error in Flows::Message
 //Could not find implicit supertype EventOccurrenceUsage.suboccurrence ('Occurrences'::'Occurrence'::'timeEnclosedOccurrences') - invalid standard library.(implicit-supertype)
 		feature timeEnclosedOccurrences: Occurrence[1..*] subsets occurrences {
@@ -267,13 +267,13 @@ standard library package Occurrences {
 			subset shorterOccurrence.timeEnclosedOccurrences subsets longerOccurrence.timeEnclosedOccurrences;
 		}
 //SFS new
-    predicate timeEnclosedOccurrence {
+    bool timeEnclosedOccurrence {
       doc /* SFS:  true when o during self */
       in o : Occurrence;
       during(o,self)
     }
 
-//SFS:  use timeCoincidentOccurrence predicate instead of timeCoincidentOccurrences feature
+//SFS:  use timeCoincidentOccurrence bool instead of timeCoincidentOccurrences feature
 		// feature all timeCoincidentOccurrences: Occurrence[1..*] subsets occurrences // timeEnclosedOccurrences 
 		//   inverse of timeCoincidentOccurrences {
 		// 	doc
@@ -295,13 +295,13 @@ standard library package Occurrences {
 		// 		subsets thisOccurrence.timeCoincidentOccurrences;
 		// }
 //SFS new
-		predicate timeCoincidentOccurrence {
+		bool timeCoincidentOccurrence {
 			doc /* SFS:  true when o coincident self */
 			in o : Occurrence;
 			coincident(o,self)
 		}
 
-//SFS:  use spaceEnclosedOccurrence predicate instead of spaceEnclosedOccurrences feature
+//SFS:  use spaceEnclosedOccurrence bool instead of spaceEnclosedOccurrences feature
 		// feature spaceEnclosedOccurrences: Occurrence[1..*] subsets occurrences {
 		// 	doc
 		// 	/*
@@ -319,13 +319,13 @@ standard library package Occurrences {
 		// 	subset smallerSpace.outsideOfOccurrences subsets largerSpace.outsideOfOccurrences;
 		// }
 //SFS new
-		predicate spaceEnclosedOccurrence {
+		bool spaceEnclosedOccurrence {
 			doc /* SFS:  true when self contains o */
 			in o : Occurrence;
 			RegionContainment(Location(self),Location(o))
 		}
 
-//SFS:  use spaceTimeEnclosedOccurrence predicate instead of spaceTimeEnclosedOccurrences feature
+//SFS:  use spaceTimeEnclosedOccurrence bool instead of spaceTimeEnclosedOccurrences feature
 		// feature all spaceTimeEnclosedOccurrences: Occurrence[1..*] subsets occurrences // timeEnclosedOccurrences, 
 		// //  spaceEnclosedOccurrences
 		// //	intersects timeEnclosedOccurrences, spaceEnclosedOccurrences 
@@ -340,13 +340,13 @@ standard library package Occurrences {
 		// //	subset largerSpace.spaceTimeEnclosedOccurrences subsets smallerSpace.spaceTimeEnclosedOccurrences;
 		// }
 //SFS new
-		predicate spaceTimeEnclosedOccurrence {
+		bool spaceTimeEnclosedOccurrence {
 			doc /* SFS:  replaces feature spaceEnclosedOccurrences; true when self contains o */
 			in o : Occurrence;
 			spaceEnclosedOccurrence(o) and timeEnclosedOccurrence(o)
 		}
 
-//SFS:  use spaceTimeEnclosedPoint predicate instead of spaceTimeEnclosedPoints feature
+//SFS:  use spaceTimeEnclosedPoint bool instead of spaceTimeEnclosedPoints feature
 		// feature all spaceTimeEnclosedPoints : Occurrence[1..*] subsets occurrences //spaceTimeEnclosedOccurrences 
 		// {
 		// 	doc
@@ -358,20 +358,20 @@ standard library package Occurrences {
 		// 	binding [1] startShot = [1] endShot;
 		// }
 //SFS new
-		predicate spaceTimeEnclosedPoint {
+		bool spaceTimeEnclosedPoint {
 			doc /* SFS: an occurrence with dimension 0 is different than Regions::Point */
 			in o : Occurrence;
 			spaceTimeEnclosedOccurrence(o) and (o.innerSpaceDimension == 0)
 		}
 
 //SFS new
-		predicate spaceCoincidentOccurrence {
+		bool spaceCoincidentOccurrence {
 			doc /* SFS:  true when self and o are space coincident */
 			in o : Occurrence;
 			RegionContainment(Location(o),Location(self)) and RegionContainment(Location(self),Location(o))
 		}
 
-//SFS:  use spaceTimeCoincidentOccurrence predicate instead of spaceTimeCoincidentOccurrences feature
+//SFS:  use spaceTimeCoincidentOccurrence bool instead of spaceTimeCoincidentOccurrences feature
 		// feature spaceTimeCoincidentOccurrences: Occurrence[1..*] 
 		// 	subsets // timeCoincidentOccurrences, 
 		// 	  spaceEnclosedOccurrences, spaceTimeEnclosedOccurrences 
@@ -393,13 +393,13 @@ standard library package Occurrences {
 		// 		subsets thisOccurrence.spaceTimeCoincidentOccurrences;
 		// }
 //SFS new
-		predicate spaceTimeCoincidentOccurrence {
+		bool spaceTimeCoincidentOccurrence {
 			doc /* SFS:  true when self and o are space-time coincident */
 			in o : Occurrence;
 			spaceCoincidentOccurrence(o) and timeCoincidentOccurrence(o)
 		}
 
-//SFS:  use outsideOfOccurrence predicate instead of outsideOfOccurrences feature
+//SFS:  use outsideOfOccurrence bool instead of outsideOfOccurrences feature
 		// feature outsideOfOccurrences: Occurrence[0..*] subsets occurrences //withoutOccurrences 
 		//   inverse of outsideOfOccurrences {
 		// 	doc
@@ -408,13 +408,13 @@ standard library package Occurrences {
 		// 	 */
 		// }
 //SFS new
-	  predicate outsideOfOccurrence {
+	  bool outsideOfOccurrence {
 			doc /* SFS:  true when region of self does not overlap region of o */
 			in o : Occurrence;
 			not RegionOverlap(Location(self),Location(o))
 		}
 
-//SFS:  use justOutsideOfOccurrence predicate instead of justOutsideOfOccurrences feature
+//SFS:  use justOutsideOfOccurrence bool instead of justOutsideOfOccurrences feature
 		// feature justOutsideOfOccurrences: Occurrence[0..*] // subsets outsideOfOccurrences 
 		//   inverse of justOutsideOfOccurrences {
 		// 	doc
@@ -430,13 +430,13 @@ standard library package Occurrences {
 		// 		to [0..*] separateSpace references separateSpace.spaceSlices;
 		// }
 //SFS new
-		predicate justOutsideOfOccurrence {
+		bool justOutsideOfOccurrence {
 			doc /* SFS:  true when self is just outside of o */
 			in o : Occurrence;
 			FilmConnected(Location(self),Location(o))
 		}
 
-//SFS:  use matesWithOccurrence predicate instead of matingOccurrences feature
+//SFS:  use matesWithOccurrence bool instead of matingOccurrences feature
 		// feature matingOccurrences: Occurrence[1..*] // subsets justOutsideOfOccurrences 
 		//   inverse of matingOccurrences {
 		// 	doc
@@ -453,11 +453,10 @@ standard library package Occurrences {
 		// 	}
 		// }
 //SFS new
-		predicate matesWithOccurrence {
+		bool matesWithOccurrence {
 			doc /* SFS:  true when self is just outside of o and o is contained in that */
 			in o : Occurrence;
-			feature matingSpaceToo: Occurrence[1] subsets self.that;
-			justOutsideOfOccurrence(o) and RegionContainment(Location(matingSpaceToo),Location(o))
+			justOutsideOfOccurrence(o) and RegionContainment(Location(that),Location(o))
 		}	
 
 		feature innerSpaceDimension : Natural [1] {
@@ -544,14 +543,14 @@ standard library package Occurrences {
 		// 	 * Occurrences of which this occurrence is a snapshot.
 		// 	 */
 		// }
-
+//SFS:  startShot is Instant
 		// portion feature startShot: Occurrence[1] subsets snapshots {
 		// 	doc
 		// 	/*
 		// 	 * The snapshot representing the start of the occurrence in time.
 		// 	 */
 		// }
-
+//SFS:  middleTimeSlice is open Interval between startShot and endShot
 		// portion feature middleTimeSlice: Occurrence[0..1] subsets timeSlices {
 		// 	doc
 		// 	/*
@@ -561,6 +560,7 @@ standard library package Occurrences {
 		// }
 		// inv { isEmpty((that as Occurrence).middleTimeSlice) == ((that as Occurrence).startShot == (that as Occurrence).endShot) }
 
+//SFS:  unnecessary given definition of Occurrence as Interval
 		// connector :HappensJustBefore
 		// 	from [1] earlierOccurrence references startShot
 		// 	to [0..1] laterOccurrence references middleTimeSlice {
@@ -569,19 +569,19 @@ standard library package Occurrences {
 		// 	 * The startShot happens immediately before the middle time slice.
 		// 	 */
 		// }
-
+//SFS:	endShot is Instant
 		// portion feature endShot: Occurrence[1] subsets snapshots {
 		// 	doc
 		// 	/*
 		// 	 * The snapshot at the end of the occurrence in time.
 		// 	 */
-
 		// 	/* suboccurrences at the end of an Occurrence must also end. */
 		// 	feature subendshot : Occurrence [0..*] chains self.suboccurrences.endShot {
 		// 		  feature superendshot : Occurrence [1] subsets that;
 		// 		  subset superendshot subsets self.timeCoincidentOccurrences; }
 		// }
 
+//SFS:  unnecessary given definition of Occurrence as Interval
 		//  connector :HappensJustBefore
 		// 	from [0..1] earlierOccurrence references middleTimeSlice
 		// 	to [1] laterOccurrence references endShot {
@@ -591,7 +591,9 @@ standard library package Occurrences {
 		// 	 */
 		// }
 
-		portion feature spaceSlices: Occurrence[1..*] subsets portions {
+//SFS:  spaceSlices no longer portion
+		//portion 
+		feature spaceSlices: Occurrence[1..*] {  //subsets portions {
 			doc
 			/*
 			 * Portions of this occurrence that extend for exactly the same time and some or all
@@ -616,7 +618,9 @@ standard library package Occurrences {
 			subset spaceSlicedOccurrence.spaceSliceOf subsets spaceSliceOccurrence.spaceSliceOf;
 		}
 
-		portion feature spaceShots: Occurrence[1..*] subsets spaceSlices {
+//SFS:  spaceShots no longer portion
+		//portion 
+		feature spaceShots: Occurrence[1..*] subsets spaceSlices {
 			doc
 			/*
 			 * All spaceSlices of this occurrence that are of a lower inner space dimension than it.
@@ -636,6 +640,7 @@ standard library package Occurrences {
 			/* spaceShotOf is transitive */
 			subset spaceShottedOccurrence.spaceShotOf subsets spaceShotOccurrence.spaceShotOf;
 		}
+
 //SFS:  removed
 		// feature unionsOf: Set[0..*] {
 		// 	doc
@@ -712,7 +717,8 @@ standard library package Occurrences {
 		// }
 		// binding [0..1] differencesOf.difference = [1] self;
 
-		portion feature spaceInterior: Occurrence[0..1] subsets spaceSlices {
+		//portion 
+		feature spaceInterior: Occurrence[0..1] subsets spaceSlices {
 			doc
 			/*
 			 * A space slice of this occurrence that includes all its space shots except the
@@ -720,6 +726,7 @@ standard library package Occurrences {
 			 * of the same inner space dimension as this occurrence, except if it is zero,
 			 * whereupon there is no space interior.
 			 */
+			language "Domain" /* innerSpaceDimension = 3 implies Location(spaceInterior) = RegionInterior(Location(this))*/ 
 		}
 
 		feature spaceInteriorOf: Occurrence[0..1] subsets spaceSliceOf inverse of spaceInterior {
@@ -727,11 +734,13 @@ standard library package Occurrences {
 			/*
 			 * An Occurrence of which this one is the space interior.
 			 */
+			language "Domain" /* innerSpaceDimension = 3 implies Location(this) = RegionInterior(Location(spaceInteriorOf))*/ 
 		}
 
 		inv { notEmpty(spaceInterior) implies spaceInterior.innerSpaceDimension == innerSpaceDimension }
 
-		portion feature spaceBoundary: Occurrence[0..1] subsets spaceShots {
+		//portion 
+		feature spaceBoundary: Occurrence[0..1] subsets spaceShots {
 			doc
 			/*
 			 * The space shot of this Occurrence that is not among those of its space interior,
@@ -739,7 +748,7 @@ standard library package Occurrences {
 			 * into space slices that also have no spaceBoundary, where the outer one surrounds
 			 * the inner ones.
 			 */
-
+			language "Domain" /* innerSpaceDimension = 3 implies RegionSurface(this) = spaceBoundary */
 			inv { isClosed == true }
 
 			feature spaceBounder: Occurrence [1] subsets self;
@@ -900,6 +909,7 @@ standard library package Occurrences {
 		inv { isEmpty(superoccurrence) }
 	}
 
+//SFS:  Life changed to composite ranter than portion
 	// abstract class all Life specializes Occurrence {
 	// 	binding portionOf = self {
 	// 		doc
@@ -917,15 +927,19 @@ standard library package Occurrences {
 		return t1First: Boolean [1]; 
 	}
 
-	bool earlierFirstIncomingTransferSort : IncomingTransferSort {
 //SFS:  use temporal relationship instead of M0 features
+	bool earlierFirstIncomingTransferSort : IncomingTransferSort {
 		in t1: Transfers::Transfer [1];
 		in t2: Transfers::Transfer [1];  
 		return t1First: Boolean [1] = t1.endShot < t2.endShot; 
 //		return t1First = includes(t1.endShot.successors, t2.endShot);
 	}
 
-	assoc all SelfSameLifeLink specializes BinaryLink {
+//SFS:  substituted getLife for portionOfLife
+// why the multiplicity [1..*] on the ends?
+// what does "all" mean here?
+	assoc //all 
+	  SelfSameLifeLink specializes BinaryLink {
 		doc
 		/*
 		 * SelfSameLifeLink is a binary association that is equivalent to SelfLink if the
@@ -936,12 +950,17 @@ standard library package Occurrences {
 		end myselfSameLives [1..*] feature myselfSameLife: Anything redefines source;
 		end selfSameLives [1..*] feature selfSameLife: Anything redefines target;
 
-		feature all sourceOccurrence : Occurrence [0..1] subsets myselfSameLife;
-		feature all targetOccurrence : Occurrence [0..1] subsets selfSameLife;  //, sourceOccurrence.sameLifeOccurrences;
+		feature //all 
+			sourceOccurrence : Occurrence [0..1] subsets myselfSameLife;
+		feature //all 
+		  targetOccurrence : Occurrence [0..1] subsets selfSameLife;  //, sourceOccurrence.sameLifeOccurrences;
+		binding oSelf of sourceOccurrence.getLife = targetOccurrence.getLife;
 		// binding oSelf of sourceOccurrence.portionOfLife = targetOccurrence.portionOfLife;
 
-		feature all sourceDataValue : DataValue [0..1] subsets myselfSameLife;
-		feature all targetDataValue : DataValue [0..1] subsets selfSameLife;
+		feature //all 
+			sourceDataValue : DataValue [0..1] subsets myselfSameLife;
+		feature //all 
+		  targetDataValue : DataValue [0..1] subsets selfSameLife;
 		binding dSelf of sourceDataValue = targetDataValue;
 	}
 
@@ -961,7 +980,9 @@ standard library package Occurrences {
 		end feature targetOccurrence: Occurrence redefines BinaryLink::target;
 	}
 
-	assoc all HappensDuring specializes HappensLink {
+//SFS:  remove "all" and cross-multiplicity, add Allen interval
+	assoc //all 
+	  HappensDuring specializes HappensLink {
 		doc
 		/*
 		 * HappensDuring asserts that the shorterOccurrence happens during the longerOccurrence.
@@ -970,20 +991,23 @@ standard library package Occurrences {
 		 * same time as) some snapshot of the longerOccurrence. Note that this means every
 		 * Occurrence HappensDuring itself and that HappensDuring is transitive.
 		 */
-		
+		language "Domain" /* during(shorterOccurrence, longerOccurrence) */
 		end feature shorterOccurrence: Occurrence redefines sourceOccurrence; // crosses longerOccurrence.timeEnclosedOccurrences;
-		end happensDuring [1..*] feature longerOccurrence: Occurrence redefines targetOccurrence;
+		end //happensDuring [1..*] 
+			feature longerOccurrence: Occurrence redefines targetOccurrence;
 	}
 
-	assoc all HappensWhile specializes HappensDuring {
+//SFS:  remove "all" and cross-multiplicity, add Allen interval
+	assoc //all 
+	  HappensWhile specializes HappensDuring {
 		doc
 		/*
 		 * HappensWhile asserts that two occurrences happen during each other, that is, they
 		 * each start at the same time and end at the same time.
 		 */
-
+		language "Domain" /* coincident(thisOccurrence, thatOccurrence) */
 		end feature thisOccurrence: Occurrence redefines shorterOccurrence;  // crosses thatOccurrence.timeCoincidentOccurrences;
-		end happensWhile [1..*] // subsets timeCoincidentOccurrences 
+		end // happensWhile [1..*] subsets timeCoincidentOccurrences 
 		  feature thatOccurrence: Occurrence redefines longerOccurrence;
 	}
 	
@@ -1001,7 +1025,9 @@ standard library package Occurrences {
         end feature targetOccurrence: Occurrence redefines BinaryLink::target;
     }
 
-	assoc all InsideOf specializes SpaceLink {
+//SFS:  remove "all" and cross-multiplicity, add spatial relationship
+	assoc //all 
+	  InsideOf specializes SpaceLink {
 		doc
 		/*
 		 * InsideOf asserts that its largerSpace completely overlaps its smallerSpace in space (not
@@ -1009,12 +1035,15 @@ standard library package Occurrences {
 		 * smallerSpace are in the spatial extent of the largerSpace. Note that this means every
 		 * Occurrence is InsideOf itself and that InsideOf is transitive.
 		 */
-
+		language "Domain" /* RegionContainment(Location(smallerSpace), Location(largerSpace)) */
 		end feature smallerSpace: Occurrence redefines sourceOccurrence;  // crosses largerSpace.spaceEnclosedOccurrences;
-		end insideOf [1..*] feature largerSpace: Occurrence redefines targetOccurrence;
+		end //insideOf [1..*] 
+			feature largerSpace: Occurrence redefines targetOccurrence;
 	}
 
-	assoc all Within specializes HappensDuring, InsideOf intersects HappensDuring, InsideOf {
+//SFS:  remove "all" and cross-multiplicity, add spatial relationship and Allen interval
+	assoc //all 
+	  Within specializes HappensDuring, InsideOf intersects HappensDuring, InsideOf {
 		doc
 		/*
 		 * Within asserts that its largerOccurrence completely overlaps its smallerOccurrence in
@@ -1022,23 +1051,29 @@ standard library package Occurrences {
 		 * during and are included in the space of the largerOccurrence. This means every occurrence
 		 * is Within itself and Within is transitive.
 		 */
-
+		language "Domain" /* RegionContainment(Location(smallerOccurrence), Location(largerOccurrence)) 
+		 * and during(smallerOccurrence, largerOccurrence) */
 		end feature smallerOccurrence: Occurrence redefines shorterOccurrence, smallerSpace;
 		  // crosses largerOccurrence.spaceTimeEnclosedOccurrences;
-		end within [1..*] feature largerOccurrence: Occurrence redefines longerOccurrence, largerSpace;
+		end //within [1..*] 
+		  feature largerOccurrence: Occurrence redefines longerOccurrence, largerSpace;
 	 }
 
-	assoc all WithinBoth specializes Within, HappensWhile {
+//SFS:  remove "all" and cross-multiplicity, add spatial relationship and Allen interval
+	assoc //all 
+	  WithinBoth specializes Within, HappensWhile {
 		doc
 		/*
 		 * WithinBoth asserts that two occurrences are Within each other, that is, they occupy the
 		 * same four dimensional region.  Note that this means every Occurrence is WithinBoth with
 		 * itself and transitive.
 		 */ 
-
+		language "Domain" /* coincident(thisOccurrence, thatOccurrence) 
+		 * and RegionContainment(Location(thisOccurrence), Location(thatOccurrence)) 
+		 * and RegionContainment(Location(thatOccurrence), Location(thisOccurrence)) */
 		end feature thisOccurrence redefines smallerOccurrence, HappensWhile::thisOccurrence;
 		  // crosses thatOccurrence.spaceTimeCoincidentOccurrences;
-		end withinBoth //subsets spaceTimeCoincidentOccurrences 
+		end // withinBoth subsets spaceTimeCoincidentOccurrences 
 		  feature thatOccurrence redefines largerOccurrence, HappensWhile::thatOccurrence;
 	}
 
