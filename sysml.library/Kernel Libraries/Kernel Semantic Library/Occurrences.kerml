@@ -1135,21 +1135,28 @@ standard library package Occurrences {
 	// 	end spaceShotWithin subsets spaceSliceOf feature spaceShottedOccurrence: Occurrence redefines spaceSlicedOccurrence;
 	// }
 
-	assoc all Without specializes BinaryLink unions HappensBefore, OutsideOf {
+//SFS:  remove "all", add spatial relationship and Allen interval
+	assoc //all 
+		Without specializes BinaryLink //unions HappensBefore, OutsideOf 
+	{
 		doc
 		/*
 		 * Without is the most general association that asserts complete separation (no overlap) in
 		 * either space or time, or both, between two occurrences.  That is, no four dimensional
 		 * points are in both occurrences. Note that this means no Occurrence is Without itself.
 		 */
-
+		language "Domain" /* nonoverlaps(separateOccurrenceToo, separateOccurrence)
+		 * or not RegionOverlap(Location(separateOccurrenceToo), Location(separateOccurrence)) */
 		end feature separateOccurrenceToo: Occurrence redefines BinaryLink::source;
 //		  crosses separateOccurrence.withoutOccurrences;
 		end feature separateOccurrence: Occurrence redefines BinaryLink::target;
 //		  crosses separateOccurrenceToo.withoutOccurrences;
 	}
 
-	assoc all HappensBefore specializes HappensLink, Without {
+//SFS:  remove "all", add Allen interval
+	assoc //all 
+		HappensBefore specializes HappensLink //, Without 
+	{
 		doc
 		/*
 		 * HappensBefore asserts that the earlierOccurrence is completely separated in time (not
@@ -1160,25 +1167,29 @@ standard library package Occurrences {
 		 * and startShot of the laterOccurrence. Note that this means no Occurrence HappensBefore
 		 * itself.
 		 */
-
-		end feature earlierOccurrence: Occurrence redefines sourceOccurrence, separateOccurrenceToo; 
+		language "Domain" /* precedes(earlierOccurrence, laterOccurrence) */
+		end feature earlierOccurrence: Occurrence redefines sourceOccurrence; //, separateOccurrenceToo; 
 //			crosses laterOccurrence.predecessors;
-		end feature laterOccurrence: Occurrence redefines targetOccurrence, separateOccurrence; 
+		end feature laterOccurrence: Occurrence redefines targetOccurrence; //, separateOccurrence; 
 //			crosses earlierOccurrence.successors;
 	}
 
-	assoc all HappensJustBefore specializes HappensBefore {
+//SFS:  remove "all", add Allen interval
+	assoc //all 
+	  HappensJustBefore specializes HappensBefore {
 		doc
 		/*
 		 * HappensJustBefore is HappensBefore asserting that there is no possibility of another
 		 * occurrences happening in the time between the earlierOccurrence and laterOccurrence.
 		 */
-
+		language "Domain" /* nearlyMeets(earlierOccurrence, laterOccurrence) */
 		end feature redefines earlierOccurrence: Occurrence;  // crosses laterOccurrence.immediatePredecessors;
 		end feature redefines laterOccurrence: Occurrence;  // crosses earlierOccurrence.immediateSuccessors;
 	}
 
-	feature all happensBeforeLinks: HappensBefore[0..*] nonunique subsets binaryLinks {
+//SFS:  remove "all", gets Allen interval from HappensBefore
+	feature //all 
+		happensBeforeLinks: HappensBefore[0..*] nonunique subsets binaryLinks {
 		doc
 		/*
 		 * happensBeforeLinks is a specialization of binaryLinks restricted to type HappensBefore.
@@ -1189,34 +1200,40 @@ standard library package Occurrences {
 		end feature laterOccurrence: Occurrence redefines HappensBefore::laterOccurrence, binaryLinks::target;
 	 }
 
-	assoc all OutsideOf specializes SpaceLink, Without {
+//SFS:  remove "all", add spatial relationship
+	assoc //all 
+		OutsideOf specializes SpaceLink { //, Without {
 		doc
 		/*
 		 * OutsideOf asserts that two occurrences do not overlap in space (not necessarily in time,
 		 * see HappensBefore).	That is, no four dimensional points of the occurrences are in the
 		 * spatial extent of both of them. This means no Occurrence is OutsideOf itself.
 		 */
-
-		end feature separateSpaceToo: Occurrence redefines sourceOccurrence, separateOccurrenceToo;
+		language "Domain" /* not RegionOverlap(Location(separateSpaceToo), Location(separateSpace)) */
+		end feature separateSpaceToo: Occurrence redefines sourceOccurrence; //, separateOccurrenceToo;
 //			crosses separateSpace.outsideOfOccurrences;
-		end feature separateSpace: Occurrence redefines targetOccurrence, separateOccurrence;
+		end feature separateSpace: Occurrence redefines targetOccurrence; //, separateOccurrence;
 //			crosses separateSpaceToo.outsideOfOccurrences;
 	}
 
-	assoc all JustOutsideOf specializes OutsideOf {
+//SFS:  remove "all", add spatial relationship
+	assoc //all 
+		JustOutsideOf specializes OutsideOf {
 		doc
 		/*
 		 * JustOutsideOf is an OutsideOf asserting that two occurrences have some space slices with
 		 * no space between them.
 		 */
-
+		language "Domain" /* FilmConnected(Location(separateSpaceToo), Location(separateSpace)) */
 		end feature redefines separateSpaceToo: Occurrence;
 //			crosses separateSpace.justOutsideOfOccurrences;
 		end feature redefines separateSpace: Occurrence;
 //		  crosses separateSpaceToo.justOutsideOfOccurrences;
 	}
 
-	assoc all MatesWith specializes JustOutsideOf {
+//SFS:  MatesWith=JustOutsideOf
+	assoc //all 
+		MatesWith specializes JustOutsideOf {
 		doc
 		/*
 		 * MatesWith is an OutsideOf asserting that two occurrences have no space between them.
@@ -1228,25 +1245,29 @@ standard library package Occurrences {
 //		  crosses matingSpaceToo.matingOccurrences;
 	}
 
-	assoc all InnerSpaceOf specializes OutsideOf {
+//SFS:  remove "all", add spatial relationship
+	assoc //all 
+		InnerSpaceOf specializes SpaceLink { //OutsideOf {
 		doc
 		/*
 		 * InnerSpaceOf is an OutsideOf asserting that the space surrounded by an inner space boundary
 		 * of one occurrence (outer space) is completely occupied by another occurrence (inner space).
 		 */
-
-		end feature outerSpace: Occurrence redefines separateSpaceToo;
-		end feature innerSpace: Occurrence redefines separateSpace crosses outerSpace.innerSpaceOccurrences;
+		language "Domain" /* Location(innerSpace) = RegionInterior(Location(outerSpace))*/
+		end feature outerSpace: Occurrence redefines sourceOccurrence;
+		end feature innerSpace: Occurrence redefines targetOccurrence crosses outerSpace.innerSpaceOccurrences;
 	}
 
-	assoc all SurroundedBy specializes OutsideOf {
+//SFS:  remove "all", add spatial relationship
+	assoc //all 
+		SurroundedBy specializes SpaceLink { //OutsideOf {
 		doc
 		/*
 		 * SurroundedBy is an OutsideOf asserting that one occurrence (surrounded space) is included
 		 * in space by an inner space occurrence of another (surrounding space).
 		 */
-
-		end feature surroundedSpace: Occurrence redefines separateSpaceToo;
-		end feature surroundingSpace: Occurrence redefines separateSpace crosses surroundedSpace.surroundedByOccurrences;
+		language "Domain" /* RegionContainment(Location(surroundedSpace), Location(surroundingSpace)) */
+		end feature surroundedSpace: Occurrence redefines sourceOccurrence;
+		end feature surroundingSpace: Occurrence redefines targetOccurrence crosses surroundedSpace.surroundedByOccurrences;
 	}
 }
