@@ -1077,62 +1077,63 @@ standard library package Occurrences {
 		  feature thatOccurrence redefines largerOccurrence, HappensWhile::thatOccurrence;
 	}
 
-	assoc all PortionOf specializes Within {
-		doc
-		/*
-		 * PortionOf asserts one occurrence is a portion of another, including at least itself.
-		 */
+//SFS:  remove all portion associations
+	// assoc all PortionOf specializes Within {
+	// 	doc
+	// 	/*
+	// 	 * PortionOf asserts one occurrence is a portion of another, including at least itself.
+	// 	 */
 
-		end feature portionOccurrence: Occurrence redefines smallerOccurrence; // crosses portionedOccurrence.portions;
-		end portionWithin //subsets portionOf 
-		  feature portionedOccurrence: Occurrence redefines largerOccurrence;
-	}
+	// 	end feature portionOccurrence: Occurrence redefines smallerOccurrence; // crosses portionedOccurrence.portions;
+	// 	end portionWithin //subsets portionOf 
+	// 	  feature portionedOccurrence: Occurrence redefines largerOccurrence;
+	// }
 
-	assoc all TimeSliceOf specializes PortionOf {
-		doc
-		/*
-		 * TimeSliceOf asserts one occurrence is a time slice of another, including at least itself.
-		 */
+	// assoc all TimeSliceOf specializes PortionOf {
+	// 	doc
+	// 	/*
+	// 	 * TimeSliceOf asserts one occurrence is a time slice of another, including at least itself.
+	// 	 */
 
-		end feature timeSliceOccurrence: Occurrence redefines portionOccurrence; // crosses timeSlicedOccurrence.timeSlices;
-		end timeSliceWithin //subsets timeSliceOf 
-		  feature timeSlicedOccurrence: Occurrence redefines portionedOccurrence;
-	}
+	// 	end feature timeSliceOccurrence: Occurrence redefines portionOccurrence; // crosses timeSlicedOccurrence.timeSlices;
+	// 	end timeSliceWithin //subsets timeSliceOf 
+	// 	  feature timeSlicedOccurrence: Occurrence redefines portionedOccurrence;
+	// }
 
-	assoc all SnapshotOf specializes TimeSliceOf {
-		doc
-		/*
-		 * SnapshotsOf asserts one occurrence is a snapshot of another.
-		 */
+	// assoc all SnapshotOf specializes TimeSliceOf {
+	// 	doc
+	// 	/*
+	// 	 * SnapshotsOf asserts one occurrence is a snapshot of another.
+	// 	 */
 
-		end feature snapshotOccurrence: Occurrence redefines timeSliceOccurrence; // crosses snapshottedOccurrence.snapshots;
-		end snapshotWithin // subsets snapshotOf 
-		  feature snapshottedOccurrence: Occurrence redefines timeSlicedOccurrence;
-	}
+	// 	end feature snapshotOccurrence: Occurrence redefines timeSliceOccurrence; // crosses snapshottedOccurrence.snapshots;
+	// 	end snapshotWithin // subsets snapshotOf 
+	// 	  feature snapshottedOccurrence: Occurrence redefines timeSlicedOccurrence;
+	// }
 
-	assoc all SpaceSliceOf specializes PortionOf {
-		doc
-		/*
-		 * SpaceSliceOf asserts that its spaceSliceOccurrence extends for exactly the same time and
-		 * some or all the space of the spaceSlicedOccurrence and that the spaceSliceOccurrence is
-		 * of the same of lower innerSpaceDimension than the spaceSliceOccurrence.  Note that this
-		 * means every occurrence is a SpaceSliceOf itself and SpaceSliceOf is transitive.
-		 */
+	// assoc all SpaceSliceOf specializes PortionOf {
+	// 	doc
+	// 	/*
+	// 	 * SpaceSliceOf asserts that its spaceSliceOccurrence extends for exactly the same time and
+	// 	 * some or all the space of the spaceSlicedOccurrence and that the spaceSliceOccurrence is
+	// 	 * of the same of lower innerSpaceDimension than the spaceSliceOccurrence.  Note that this
+	// 	 * means every occurrence is a SpaceSliceOf itself and SpaceSliceOf is transitive.
+	// 	 */
 
-		end feature spaceSliceOccurrence: Occurrence redefines portionOccurrence; // crosses spaceSlicedOccurrence.spaceSlices;
-		end spaceSliceWithin subsets spaceSliceOf feature spaceSlicedOccurrence: Occurrence redefines portionedOccurrence;
-	}
+	// 	end feature spaceSliceOccurrence: Occurrence redefines portionOccurrence; // crosses spaceSlicedOccurrence.spaceSlices;
+	// 	end spaceSliceWithin subsets spaceSliceOf feature spaceSlicedOccurrence: Occurrence redefines portionedOccurrence;
+	// }
 
-	assoc all SpaceShotOf specializes SpaceSliceOf {
-		doc
-		/*
-		 * SpaceShotOf asserts that its spaceShotOccurrence is of a lower inner space dimension than
-		 * it spaceShottedOccurrence.
-		 */
+	// assoc all SpaceShotOf specializes SpaceSliceOf {
+	// 	doc
+	// 	/*
+	// 	 * SpaceShotOf asserts that its spaceShotOccurrence is of a lower inner space dimension than
+	// 	 * it spaceShottedOccurrence.
+	// 	 */
 
-		end feature spaceShotOccurrence: Occurrence redefines spaceSliceOccurrence; // crosses spaceShottedOccurrence.spaceShots;
-		end spaceShotWithin subsets spaceSliceOf feature spaceShottedOccurrence: Occurrence redefines spaceSlicedOccurrence;
-	}
+	// 	end feature spaceShotOccurrence: Occurrence redefines spaceSliceOccurrence; // crosses spaceShottedOccurrence.spaceShots;
+	// 	end spaceShotWithin subsets spaceSliceOf feature spaceShottedOccurrence: Occurrence redefines spaceSlicedOccurrence;
+	// }
 
 	assoc all Without specializes BinaryLink unions HappensBefore, OutsideOf {
 		doc
