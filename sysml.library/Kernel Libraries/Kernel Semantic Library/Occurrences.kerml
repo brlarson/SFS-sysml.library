@@ -1245,7 +1245,7 @@ standard library package Occurrences {
 //		  crosses matingSpaceToo.matingOccurrences;
 	}
 
-//SFS:  remove "all", add spatial relationship
+//SFS:  remove "all", add spatial relationship, think OutsideOf is wrong
 	assoc //all 
 		InnerSpaceOf specializes SpaceLink { //OutsideOf {
 		doc
@@ -1258,7 +1258,7 @@ standard library package Occurrences {
 		end feature innerSpace: Occurrence redefines targetOccurrence crosses outerSpace.innerSpaceOccurrences;
 	}
 
-//SFS:  remove "all", add spatial relationship
+//SFS:  remove "all", add spatial relationship, think OutsideOf is wrong
 	assoc //all 
 		SurroundedBy specializes SpaceLink { //OutsideOf {
 		doc
