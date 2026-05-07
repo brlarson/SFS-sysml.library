@@ -65,7 +65,8 @@ standard library package ControlFunctions {
 	function selectOne { 
 		in collection: Anything[0..*] ordered nonunique;
 		in expr selector1[0..*] { in argument: Anything[1]; return : Boolean[1]; }
-		return : Anything[0..1] = collection->select {in x; selector1(x)}#(1);
+//SFS get error: Invocation expression must invoke a `Behavior` or a feature typed by a single `Behavior`sysideinvocation-expression-instantiated-type		
+		return : Anything[0..1]; // = collection->select {in x; selector1(x)}#(1);
 	}
 	
 	abstract function reject{ 
@@ -105,14 +106,16 @@ standard library package ControlFunctions {
 	function minimize {
 		in collection: ScalarValue[1..*];
 		in expr fn[0..*] { in argument: ScalarValue[1]; return : ScalarValue[1]; }
-		return : ScalarValue[1] = collection->collect {in x; fn(x as ScalarValue)}->reduce min;
+//SFS get error: Invocation expression must invoke a `Behavior` or a feature typed by a single `Behavior`sysideinvocation-expression-instantiated-type		
+		return : ScalarValue[1];  // = collection->collect {in x; fn(x as ScalarValue)}->reduce min;
 //		return : ScalarValue[1] = collection->collect {in x; fn(x)}->reduce min;
 	}
 	
 	function maximize { 
 		in collection: ScalarValue[1..*];
 		in expr fn[0..*] { in argument: ScalarValue[1]; return : ScalarValue[1]; }
-		return : ScalarValue = collection->collect {in x; fn(x as ScalarValue)}->reduce max;
+//SFS get error: Invocation expression must invoke a `Behavior` or a feature typed by a single `Behavior`sysideinvocation-expression-instantiated-type		
+		return : ScalarValue; // = collection->collect {in x; fn(x as ScalarValue)}->reduce max;
 //		return : ScalarValue = collection->collect {in x; fn(x)}->reduce max;
 	}
 	
