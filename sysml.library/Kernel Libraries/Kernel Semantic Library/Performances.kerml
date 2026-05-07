@@ -44,12 +44,14 @@ standard library package Performances {
 		feature redefines isDispatch default true;
   		feature redefines dispatchScope default thisPerformance;
   		
+//SFS:  enclosedPerformances are suboccurrences (containment)			
 		step enclosedPerformances: Performance[0..*] subsets performances  //, timeEnclosedOccurrences	intersects performances, timeEnclosedOccurrences 
-			{
+		{
 			doc
 			/*
 			 * timeEnclosedOccurrences of this Performance that are also Performances.
 			 */
+			language "Domain" /* forall ep in enclosedPerformances are during(ep,self) */
 		}
 		
 		feature thisPerformance: Performance [1] default self {
@@ -80,8 +82,9 @@ standard library package Performances {
 			feature redefines thisPerformance default (that as Performance).thisPerformance;
 		}		
 	}
-	
-	abstract function Evaluation specializes Performance {
+
+//SFS:  because Evaluation is a Function, it is immediate	
+	abstract function Evaluation specializes Anything { //Performance {
 		doc
 		/*
 		 * Evaluation is the most general class of functions that may be evaluated to compute
@@ -90,7 +93,16 @@ standard library package Performances {
 	 
 		return result: Anything[0..*] nonunique;
 	}
-	
+
+//SFS:  use Computation to model calculation done by the system
+	abstract behavior Computation specializes Performance, Evaluation {
+		doc
+		/*
+		 * Computation is a specialization of Performance and Evaluation for the case of computing a result.
+		 */
+			
+	}
+
 	abstract predicate BooleanEvaluation specializes Evaluation {
 		doc
 		/*
@@ -100,7 +112,16 @@ standard library package Performances {
 	 
 		return : Boolean[1];
 	}
-	
+
+//SFS:  add BooleanComputation
+	abstract behavior BooleanComputation specializes Computation, BooleanEvaluation {
+		doc
+		/*
+		 * BooleanComputation is a specialization of Computation and BooleanEvaluation for the case of
+		 * computing a Boolean truth value.
+		 */	
+	}
+
 	abstract function MetadataAccessEvaluation specializes Evaluation {
 		doc
 		/*
@@ -166,7 +187,9 @@ standard library package Performances {
 		return : Anything[0..0];
 	}
 
-	assoc all InvolvedIn specializes BinaryLink { 
+//SFS  remove 'all'
+	assoc // all 
+	InvolvedIn specializes BinaryLink { 
 		doc
 		/*
 		 * InvolvedIn asserts that the involvedObject is involved in the Behavior carried out by the 
@@ -177,7 +200,9 @@ standard library package Performances {
 		end feature involvingPerformance: Performance redefines target crosses involvedObject.involvingPerformances;
 	}
 	
-	assoc all Performs specializes InvolvedIn {
+//SFS  remove 'all'
+	assoc // all
+	Performs specializes InvolvedIn {
 		doc
 		/*
 		 * Performs asserts that the performer enacts the Behavior carried out by the performance.
@@ -193,14 +218,23 @@ standard library package Performances {
 		 * performances is the most general feature for performances of Behaviors.
 		 */
 	}
-	
-	abstract expr evaluations: Evaluation[0..*] nonunique subsets performances {
+
+//SFS:  make evaluations immediate	
+	abstract expr evaluations: Evaluation[0..*] nonunique subsets things {  // performances {
 		doc
 		/*
 		 * evaluations is a specialization of performances for evaluations of Functions.
 		 */
 	}
-	
+
+//SFS:  add computations
+	abstract step computations: Computation[0..*] nonunique subsets performances {
+		doc
+		/*
+		 * computations is a specialization of performances for the Computation.
+		 */
+	}
+
 	abstract expr constructorEvaluations [0..*] nonunique subsets evaluations  {
 	    doc
 	    /*
