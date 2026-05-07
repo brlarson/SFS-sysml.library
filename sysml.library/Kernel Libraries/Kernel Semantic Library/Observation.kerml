@@ -13,9 +13,13 @@ standard library package Observation {
 	private import ControlFunctions::select;
 	private import ControlPerformances::DecisionPerformance;
 	private import ControlPerformances::IfThenPerformance;
-	private import FeatureReferencingPerformances::FeatureWritePerformance;
-	private import FeatureReferencingPerformances::BooleanEvaluationResultToMonitorPerformance;
+//SFS:  removes uses of FeatureReferencingPerformances	
+	// private import FeatureReferencingPerformances::FeatureWritePerformance;
+	// private import FeatureReferencingPerformances::BooleanEvaluationResultToMonitorPerformance;
 	private import Transfers::TransferBefore;
+//SFS:
+	private import Domain::SetNow;
+	private import Domain::GetChangeToTrue;
 
     private struct DefaultMonitorLife[1] :> ChangeMonitor, Life {
         doc
@@ -53,6 +57,7 @@ standard library package Observation {
 		}
 	}
 	
+//SFS: use GetChangeToTrue instead of BooleanEvaluationResultToMonitorPerformance		
 	private behavior ObserveChange {
 		doc
 		/*
@@ -64,20 +69,25 @@ standard library package Observation {
 		in feature changeObserver : Occurrence[1];
 		in feature changeSignal : ChangeSignal[1];
 		
-		composite step wait : IfThenPerformance {
-			doc
-			/*
-			 * If the result of the changeSignal.signalCondition is false, then wait for 
-			 * it to become true.
-			 */
+		// composite step wait : IfThenPerformance {
+		// 	doc
+		// 	/*
+		// 	 * If the result of the changeSignal.signalCondition is false, then wait for 
+		// 	 * it to become true.
+		// 	 */
 
-			in bool redefines ifTest {
+		// 	in bool redefines ifTest {
+		// 		not changeSignal.signalCondition()
+		// 	}
+		// 	in step redefines thenClause : BooleanEvaluationResultToMonitorPerformance {
+		// 		in bool onOccurrence = changeSignal.signalCondition;
+		// 	}
+		// }		
+		composite step wait : GetChangeToTrue {
+			in bool redefines e {
 				not changeSignal.signalCondition()
 			}
-			in step redefines thenClause : BooleanEvaluationResultToMonitorPerformance {
-				in bool onOccurrence = changeSignal.signalCondition;
-			}
-		}		
+		}
 		
 		succession wait then transfer;
 		
@@ -96,6 +106,7 @@ standard library package Observation {
 	    }
 	}
 	
+//SFS: use SetNow instead of FeatureWritePerformance
 	struct ChangeMonitor {
 		doc
 		/*
@@ -107,21 +118,28 @@ standard library package Observation {
 		private thisMonitor : ChangeMonitor redefines self;
 		private composite feature observations[0..*] : ObserveChange;
 		
-		private behavior AssignObservations specializes FeatureWritePerformance {
-			doc
-			/*
-			 * Assign a replacement set of observations as those being managed by a
-			 * given ChangeMonitor.
-			 */
+		// private behavior AssignObservations specializes FeatureWritePerformance {
+		// 	doc
+		// 	/*
+		// 	 * Assign a replacement set of observations as those being managed by a
+		// 	 * given ChangeMonitor.
+		// 	 */
 
-			in feature monitor : ChangeMonitor redefines onOccurrence {
-				feature redefines startingAt {
-					feature redefines accessedFeature, observations;
-				}
+		// 	in feature monitor : ChangeMonitor redefines onOccurrence {
+		// 		feature redefines startingAt {
+		// 			feature redefines accessedFeature, observations;
+		// 		}
+		// 	}
+		// 	inout feature redefines replacementValues[0..*] : ObserveChange;
+		// }
+		private behavior AssignObservations specializes SetNow {
+			in feature monitor : ChangeMonitor redefines d {
+				feature observations redefines f;
 			}
-			inout feature redefines replacementValues[0..*] : ObserveChange;
-		}
-		
+			in feature replacementValues : ObserveChange redefines v;
+		}	
+
+//SFS:  make replacementValues 'in'		
 		step startObservation { 
 			doc
 			/*
@@ -136,10 +154,12 @@ standard library package Observation {
 			}
 			private composite step addObservation : AssignObservations[1] {
 				in monitor = thisMonitor; 
-				inout replacementValues = observations->including(observation);	
+				// inout
+				in replacementValues = observations->including(observation);	
 			}
 		}
 		
+//SFS:  make replacementValues 'in'		
 		step cancelObservation { 
 			doc
 			/*
@@ -154,7 +174,8 @@ standard library package Observation {
 				};
 			private composite step removeObservation : AssignObservations[1] {
 				in monitor = thisMonitor; 
-				inout replacementValues = observations->excluding(observations);
+				// inout
+				in replacementValues = observations->excluding(observations);
 			}
 		}
 	}	
