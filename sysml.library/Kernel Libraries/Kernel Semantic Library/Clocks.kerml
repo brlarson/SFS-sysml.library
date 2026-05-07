@@ -20,6 +20,7 @@ standard library package Clocks {
 	     */
 	}
 	
+//SFS:  universalClock is the "big T" in the Kripke structure defining Domain Logic	
 	feature universalClock : UniversalClockLife[1] {
 		doc
 		/*
@@ -132,37 +133,38 @@ standard library package Clocks {
 		}
 	}
 	
-	struct BasicClock :> Clock {
-		doc
-		/*
-		 * A BasicClock is a Clock whose currentTime is a Real number.
-		 */
+//SFS:  BasicClock is unnecessary	because Instant <: Real
+	// struct BasicClock :> Clock {
+	// 	doc
+	// 	/*
+	// 	 * A BasicClock is a Clock whose currentTime is a Real number.
+	// 	 */
 		
-		var feature :>> currentTime : Real;
-	}
+	// 	var feature :>> currentTime : Real;
+	// }
 	
-	function BasicTimeOf :> TimeOf {
-		doc
-		/*
-		 * BasicTimeOf returns the TimeOf an Occurrence as a Real number relative
-		 * to a BasicClock.
-		 */
+	// function BasicTimeOf :> TimeOf {
+	// 	doc
+	// 	/*
+	// 	 * BasicTimeOf returns the TimeOf an Occurrence as a Real number relative
+	// 	 * to a BasicClock.
+	// 	 */
 
-		in o : Occurrence[1];
-		in clock : BasicClock[1];
-		return : Real[1];
-	}
+	// 	in o : Occurrence[1];
+	// 	in clock : BasicClock[1];
+	// 	return : Real[1];
+	// }
 	
-	function BasicDurationOf :> DurationOf {
-		doc
-		/*
-		 * BasicDurationOf returns the DurationOf an Occurrence as a Real number relative
-		 * to a BasicClock.
-		 */
+	// function BasicDurationOf :> DurationOf {
+	// 	doc
+	// 	/*
+	// 	 * BasicDurationOf returns the DurationOf an Occurrence as a Real number relative
+	// 	 * to a BasicClock.
+	// 	 */
 		
-		in o : Occurrence[1];
-		in clock : BasicClock[1];
-		return : Real[1];
-	}
+	// 	in o : Occurrence[1];
+	// 	in clock : BasicClock[1];
+	// 	return : Real[1];
+	// }
 
 }
