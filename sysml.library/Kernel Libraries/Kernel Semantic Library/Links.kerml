@@ -35,7 +35,7 @@ standard library package Links {
          * SelfLink is a binary association in which the things at the two ends are asserted
          * to be the same.
          */
-        
+        language "Domain" /* thisThing = sameThing */       
         end feature thisThing: Anything redefines source subsets sameThing crosses sameThing.self;
         end self2 [1] feature sameThing: Anything redefines target subsets thisThing;
     }
