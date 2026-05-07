@@ -73,7 +73,7 @@ standard library package SpatialFrames {
         
             (frame.spaceShots as Point)->forAll{in p : Point;
  //SFS:   need to invoke parameter point           
-                p.spaceTimeEnclosedOccurrence implies
+                p.spaceTimeEnclosedOccurrence(point) implies
  //               p.spaceTimeEnclosedOccurrences->includes(point) implies
                     positionVector == PositionOf(p, time, frame)
             }
@@ -109,16 +109,16 @@ standard library package SpatialFrames {
         in clock : Clock[1] default frame.localClock;
         return displacementVector : ThreeVectorValue[1] =
             PositionOf(point2, time, frame, clock) - PositionOf(point1, time, frame, clock);
-            
+
+//SFS:  is this necesary?            
         inv zeroDisplacementConstraint {
         doc
         /*
          * If either point1 or point2 occurs within the other, then the displacementVector is
          * the zero vector.
          */
- //SFS:   need to invoke parameters point1 and point2    
-            (point1.spaceTimeEnclosedOccurrence or
-            point2.spaceTimeEnclosedOccurrence) implies
+            (point1.spaceTimeEnclosedOccurrence(point2) or
+            point2.spaceTimeEnclosedOccurrence(point1)) implies
                 isZeroVector(displacementVector)
             // (point1.spaceTimeEnclosedOccurrences->includes(point2) or
             // point2.spaceTimeEnclosedOccurrences->includes(point1)) implies
