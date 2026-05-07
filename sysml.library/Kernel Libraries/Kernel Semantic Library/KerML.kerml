@@ -1,4 +1,8 @@
 standard library package KerML {
+
+//SFS:  Changes in Expression and Function to make them immediate are not included in the abstract syntax.
+//  Consequently, there may be unexpected error from use of metaclass reflaection
+
 	doc 
 	/*
 	 * This package contains a reflective KerML model of the KerML abstract syntax.
@@ -339,11 +343,12 @@ standard library package KerML {
 		metaclass ElementFilterMembership specializes OwningMembership {
 			derived composite var feature condition : Expression[1..1] redefines ownedMemberElement;
 		}		
-		
-		metaclass Expression specializes Step {
+
+//SFS:  Expression specializes Feature, added 'parameter'		
+		metaclass Expression specializes Feature { //Step {
 			derived var feature isModelLevelEvaluable : Boolean[1..1];
-			
-			derived var feature 'function' : Function[0..1] redefines 'behavior';
+			derived var feature parameter : Feature[0..*] subsets input;
+			derived var feature 'function' : Function[0..1];  // redefines 'behavior';
 			derived var feature result : Feature[1..1] subsets output, parameter;
 		}		
 		
@@ -375,12 +380,12 @@ standard library package KerML {
 		}		
 		
 		metaclass FlowEnd specializes Feature;		
-		
-		metaclass Function specializes Behavior {
-			derived var feature isModelLevelEvaluable : Boolean[1..1];
-			
-			derived var feature expression : Expression[0..*] subsets 'step';
-			derived var feature result : Feature[1..1] subsets output, parameter;
+
+//SFS:  Function specializes Classifier to be immediate		
+		metaclass Function specializes Classifier { // Behavior {
+			derived var feature isModelLevelEvaluable : Boolean[1..1];		
+			derived var feature expression : Expression[0..*] subsets 'member';  //'step';
+			derived var feature result : Feature[1..1] redefines output;  // subsets output, parameter;
 		}		
 		
 		metaclass IndexExpression specializes OperatorExpression {

@@ -1,4 +1,8 @@
 standard library package FeatureReferencingPerformances {
+
+//SFS:  All functions and behaviors in FeatureReferencingPerformances are superceded
+// by functions and behaviors in Domain.	
+
 	doc
 	/*
 	 * This package defines Behaviors used to read, write and monitor values of a referenced Feature of an 
