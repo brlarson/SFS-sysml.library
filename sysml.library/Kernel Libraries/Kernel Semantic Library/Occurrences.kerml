@@ -781,13 +781,14 @@ standard library package Occurrences {
 //		inv { not isClosed implies contains((that as Occurrence).unionsOf, union(spaceBoundary, spaceInterior)) }
 		inv { innerSpaceDimension == 0 implies isEmpty(spaceBoundary) }
 
-		connector :SurroundedBy
-			from [0..*] surroundedSpace references spaceInterior
-			to [1] surroundingSpace references spaceBoundary.outer;
+//SFS:  effect of SurroundedBy provided by Regions definitions
+		// connector :SurroundedBy
+		// 	from [0..*] surroundedSpace references spaceInterior
+		// 	to [1] surroundingSpace references spaceBoundary.outer;
 
-		connector :SurroundedBy
-			from [0..*] surroundedSpace references spaceBoundary.inner
-			to [1] surroundingSpace references spaceInterior;
+		// connector :SurroundedBy
+		// 	from [0..*] surroundedSpace references spaceBoundary.inner
+		// 	to [1] surroundingSpace references spaceInterior;
 
 		feature innerSpaceOccurrences: Occurrence [0..*] { //subsets outsideOfOccurrences {
 			doc
@@ -1259,15 +1260,16 @@ standard library package Occurrences {
 	}
 
 //SFS:  remove "all", add spatial relationship, think OutsideOf is wrong
-	assoc //all 
-		SurroundedBy specializes SpaceLink { //OutsideOf {
-		doc
-		/*
-		 * SurroundedBy is an OutsideOf asserting that one occurrence (surrounded space) is included
-		 * in space by an inner space occurrence of another (surrounding space).
-		 */
-		language "Domain" /* RegionContainment(Location(surroundedSpace), Location(surroundingSpace)) */
-		end feature surroundedSpace: Occurrence redefines sourceOccurrence;
-		end feature surroundingSpace: Occurrence redefines targetOccurrence crosses surroundedSpace.surroundedByOccurrences;
-	}
+//remove completely because of Regions definitions
+	// assoc //all 
+	// 	SurroundedBy specializes SpaceLink { //OutsideOf {
+	// 	doc
+	// 	/*
+	// 	 * SurroundedBy is an OutsideOf asserting that one occurrence (surrounded space) is included
+	// 	 * in space by an inner space occurrence of another (surrounding space).
+	// 	 */
+	// 	language "Domain" /* RegionContainment(Location(surroundedSpace), Location(surroundingSpace)) */
+	// 	end feature surroundedSpace: Occurrence redefines sourceOccurrence;
+	// 	end feature surroundingSpace: Occurrence redefines targetOccurrence crosses surroundedSpace.surroundedByOccurrences;
+	// }
 }

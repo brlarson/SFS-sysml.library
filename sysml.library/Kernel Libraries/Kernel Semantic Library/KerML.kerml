@@ -385,6 +385,7 @@ standard library package KerML {
 		metaclass Function specializes Classifier { // Behavior {
 			derived var feature isModelLevelEvaluable : Boolean[1..1];		
 			derived var feature expression : Expression[0..*] subsets 'member';  //'step';
+			derived var feature parameter : Feature[0..*];  //added
 			derived var feature result : Feature[1..1] redefines output;  // subsets output, parameter;
 		}		
 		
