@@ -18,6 +18,8 @@ standard library package StatePerformances {
 	private import ControlFunctions::select;
 	private import ControlFunctions::collect;
 	private import SequenceFunctions::*;
+//SFS:
+  private import Allen::precedes;	
 	
 	behavior StatePerformance specializes DecisionPerformance {
 		feature isTriggerDuring: Boolean default true;
@@ -79,6 +81,8 @@ standard library package StatePerformances {
 				     allSubstatePerformances(dispatchScope as Performance)->forAll{in oSP : StatePerformance;						
 //				     allSubstatePerformances(dispatchScope)->forAll{in oSP : StatePerformance;						
 						  oSP == thatSP | isEmpty(oSP.accepted) |
+//SFS:  use Instant inequality for precidence							
+							oSP.exit.startShot < thatSP.exit.startShot |
 //	   					  includes(thatSP.exit.startShot.successors, oSP.exit.startShot) |
 						  ( oSP.accepted != accableT & 
 							( incomingTransferSort(oSP.accepted, accableT) |

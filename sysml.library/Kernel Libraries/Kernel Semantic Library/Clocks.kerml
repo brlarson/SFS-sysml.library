@@ -71,7 +71,7 @@ standard library package Clocks {
 		 */
 		
 		in o : Occurrence[1];
-		in clock : Clock[1] default localClock;
+		in clock : Clock[1] default universalClock;  //localClock;
 		return timeInstant : Instant[1];
 //		return timeInstant : NumericalValue[1];
 		
@@ -113,7 +113,8 @@ standard library package Clocks {
 		// 	}
 		// }				
 	}
-	
+
+//SFS:  use Instant 	
 	function DurationOf {
 		doc
 		/*
@@ -123,7 +124,7 @@ standard library package Clocks {
 		 */
 		
 		in o : Occurrence[1]; 
-		in clock : Clock[1] default localClock;
+		in clock : Clock[1] default universalClock;  //localClock;
 		return duration : NumericalValue =
 			o.endShot - o.startShot;
 //			TimeOf(o.endShot, clock) - TimeOf(o.startShot, clock);

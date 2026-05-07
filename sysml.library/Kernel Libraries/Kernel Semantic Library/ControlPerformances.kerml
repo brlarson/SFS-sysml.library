@@ -12,7 +12,8 @@ standard library package ControlPerformances {
 	private import Occurrences::HappensBefore;
 	private import Occurrences::SelfSameLifeLink;
 	private import Performances::Performance;
-	private import Performances::BooleanEvaluation;
+//SFS:  change BooleanEvaluation to BooleanComputation		 	
+	private import Performances::BooleanComputation;
 	
 	behavior DecisionPerformance specializes Performance {
 		doc
@@ -62,8 +63,8 @@ standard library package ControlPerformances {
 		 * An IfPerformance is a Performance that determines whether the ifTest evaluation result is true 
 		 * (by whether ifTrue has a value).
 		 */	
-		 
-		in ifTest : BooleanEvaluation[1];
+//SFS:  change BooleanEvaluation to BooleanComputation		 
+		in ifTest : BooleanComputation[1];  // BooleanEvaluation[1];
 	}
 	
 	behavior IfThenPerformance specializes IfPerformance {
@@ -114,10 +115,10 @@ standard library package ControlPerformances {
 		 * previous one, except the first time) and the untilTest evaluation result is not true after 
 		 * each iteration and before the next one (except the last one).
 		 */
-		 
-		in whileTest : BooleanEvaluation[1..*];
+//SFS:  change BooleanEvaluation to BooleanComputation		 		 
+		in whileTest : BooleanComputation[1..*];
 		in body : Occurrence[0..*];
-        in untilTest : BooleanEvaluation[0..*];
+        in untilTest : BooleanComputation[0..*];
 		
 		step whileDecision : IfThenPerformance[1..*];
 		step untilDecision : IfElsePerformance[0..*];

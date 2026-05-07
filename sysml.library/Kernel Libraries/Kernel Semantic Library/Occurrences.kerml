@@ -118,7 +118,7 @@ standard library package Occurrences {
 			 * Occurrence itself. However, this is overridden for ownedPerformances of Objects and
 			 * subperformances of Performances.
 			 */
-			inv happensDuring { during(self, this) }
+			inv happensDuring { during(self as Occurrence, this) }
 		}
 //SFS:  replaced by happensDuring invariant		
 //		connector :HappensDuring from [1] self to [1] this;
@@ -270,7 +270,7 @@ standard library package Occurrences {
     bool timeEnclosedOccurrence {
       doc /* SFS:  true when o during self */
       in o : Occurrence;
-      during(o,self)
+      during(o,this)
     }
 
 //SFS:  use timeCoincidentOccurrence bool instead of timeCoincidentOccurrences feature
@@ -298,7 +298,7 @@ standard library package Occurrences {
 		bool timeCoincidentOccurrence {
 			doc /* SFS:  true when o coincident self */
 			in o : Occurrence;
-			coincident(o,self)
+			coincident(o,this)
 		}
 
 //SFS:  use spaceEnclosedOccurrence bool instead of spaceEnclosedOccurrences feature
@@ -320,9 +320,9 @@ standard library package Occurrences {
 		// }
 //SFS new
 		bool spaceEnclosedOccurrence {
-			doc /* SFS:  true when self contains o */
+			doc /* SFS:  true when this contains o */
 			in o : Occurrence;
-			RegionContainment(Location(self),Location(o))
+			RegionContainment(Location(this),Location(o))
 		}
 
 //SFS:  use spaceTimeEnclosedOccurrence bool instead of spaceTimeEnclosedOccurrences feature
@@ -368,7 +368,7 @@ standard library package Occurrences {
 		bool spaceCoincidentOccurrence {
 			doc /* SFS:  true when self and o are space coincident */
 			in o : Occurrence;
-			RegionContainment(Location(o),Location(self)) and RegionContainment(Location(self),Location(o))
+			RegionContainment(Location(o),Location(this)) and RegionContainment(Location(this),Location(o))
 		}
 
 //SFS:  use spaceTimeCoincidentOccurrence bool instead of spaceTimeCoincidentOccurrences feature
@@ -411,7 +411,7 @@ standard library package Occurrences {
 	  bool outsideOfOccurrence {
 			doc /* SFS:  true when region of self does not overlap region of o */
 			in o : Occurrence;
-			not RegionOverlap(Location(self),Location(o))
+			not RegionOverlap(Location(this),Location(o))
 		}
 
 //SFS:  use justOutsideOfOccurrence bool instead of justOutsideOfOccurrences feature
@@ -431,9 +431,9 @@ standard library package Occurrences {
 		// }
 //SFS new
 		bool justOutsideOfOccurrence {
-			doc /* SFS:  true when self is just outside of o */
+			doc /* SFS:  true when this is just outside of o */
 			in o : Occurrence;
-			FilmConnected(Location(self),Location(o))
+			FilmConnected(Location(this),Location(o))
 		}
 
 //SFS:  use matesWithOccurrence bool instead of matingOccurrences feature
@@ -860,8 +860,9 @@ standard library package Occurrences {
 		}
 		feature runToCompletionScope: Occurrence [1] default self;
 		connector :HappensDuring from [1] self to [1] runToCompletionScope;
- 
- 		feature incomingTransferSort : IncomingTransferSort [0..*] default earlierFirstIncomingTransferSort {
+
+//SFS:  change to bool 
+ 		bool incomingTransferSort : IncomingTransferSort [0..*] default earlierFirstIncomingTransferSort {
 			doc
 			/*
 			 * Determines which transfer to accept when multiple are available and which of the unaccepted 

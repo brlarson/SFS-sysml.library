@@ -109,7 +109,8 @@ standard library package Triggers {
 			 */
 		}
 		
-		in feature clock : Clock[1] default localClock {
+//SFS:  change default to universalClock		
+		in feature clock : Clock[1] default universalClock {  //localClock {
 			doc
 			/*
 			 * The Clock to be used as the reference for the timeInstant. The default is
@@ -158,8 +159,9 @@ standard library package Triggers {
 			 * The Occurrence to which the TimeSignal is to be sent.
 			 */
 		}
-		
-		in feature clock : Clock[1] default localClock {
+
+//SFS:  change default to universalClock		
+		in feature clock : Clock[1] default universalClock {  //localClock {
 			doc
 			/*
 			 * The Clock to be used as the reference for the time delay. The default is

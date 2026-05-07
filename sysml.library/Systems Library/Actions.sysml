@@ -456,8 +456,9 @@ standard library package Actions {
 		 * A WhileLoopAction is a Kernel LoopPerformance that is also a LoopAction.
 		 * It is the base type for all WhileLoopActionUsages.
 		 */
-	
-		in whileTest default {true} {
+
+//SFS:  use trueComputations instead of {true}	
+		in whileTest default Performances::trueComputations {  //{true} {
 			doc
 			/*
 			 * A Boolean expression that must be true for the loop to continue.
@@ -473,8 +474,9 @@ standard library package Actions {
 			 * untilTest is false.
 			 */
 		}
-		
-		in untilTest default {false} {
+
+//SFS:  use falseComputations instead of {false}		
+		in untilTest default Performances::falseComputations {  //{false} {
 			doc
 			/*
 			 * A Boolean expression that must be false for the loop to continue.

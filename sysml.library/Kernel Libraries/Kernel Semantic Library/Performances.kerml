@@ -251,6 +251,15 @@ standard library package Performances {
 		 * booleanEvaluations is a specialization of evaluations restricted to type BooleanEvaluation.
 		 */
 	}
+
+//SFS:  new
+	abstract expr booleanComputations: BooleanComputation[0..*] nonunique subsets computations {
+		doc
+		/*
+		 * booleanComputations is a specialization of computations restricted to type BooleanComputation.
+		 */
+	}
+
 	
 	abstract expr trueEvaluations subsets booleanEvaluations {
 		doc
@@ -263,10 +272,33 @@ standard library package Performances {
 		binding result = trueValue;
 	}
 	
+//SFS:  new
+	abstract expr trueComputations subsets booleanComputations {
+		doc
+		/*
+		 * trueComputations is a subset of booleanComputations that result in true. It is the most general
+		 * feature of invariants that are not negated. 
+		 */
+	
+		private feature trueValue = true;
+		binding result = trueValue;
+	}
+	
 	abstract expr falseEvaluations subsets booleanEvaluations {
 		doc
 		/*
 		 * falseEvaluations is a subset of booleanEvaluations that result in false. It is the most general
+		 * feature of invariants that are negated.
+		 */
+	
+        private feature falseValue = false;
+        binding result = falseValue;
+	}
+	
+	abstract expr falseComputations subsets booleanComputations {
+		doc
+		/*
+		 * falseComputations is a subset of booleanComputations that result in false. It is the most general
 		 * feature of invariants that are negated.
 		 */
 	

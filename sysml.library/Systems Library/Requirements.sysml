@@ -23,27 +23,30 @@ standard library package Requirements {
 		 * separate assumptions and required constraints such that, if all the assumptions are true,
 		 * then all the required constraints must be true.
 		 */
-	
-		constraint assumptions[0..*] :> constraintChecks, subperformances {
+//SFS:  constraint should not be a Performance	
+		constraint assumptions[0..*] :> constraintChecks { //, subperformances {
 			doc
 			/*
 			 * Assumptions that must hold for the required constraints to apply.
 			 */
 		}
 		
-		constraint constraints[0..*] :> constraintChecks, subperformances {
+//SFS:  constraint should not be a Performance	
+		constraint constraints[0..*] :> constraintChecks { //, subperformances {
 			doc
 			/*
 			 * The required constraints that are to be checked.
 			 */
 		}
-		
-		return result = allTrue(assumptions()) implies allTrue(constraints()) {
-			doc
-			/*
-			 * If all the assumptions are true, then all the required constraints must hold.
-			 */
-		}
+
+//SFS get error:  Invocation expression must invoke a `Behavior` or a feature typed by a single `Behavior`
+//  need to allow invocation expressions to be expressions		
+//		return result = allTrue(assumptions()) implies allTrue(constraints()) {
+		// 	doc
+		// 	/*
+		// 	 * If all the assumptions are true, then all the required constraints must hold.
+		// 	 */
+		// }
 	}
 	
 	abstract requirement def RequirementCheck :> RequirementConstraintCheck {
