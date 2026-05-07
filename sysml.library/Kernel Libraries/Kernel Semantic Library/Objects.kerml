@@ -44,22 +44,27 @@ standard library package Objects {
 			 */
 		}
 		
+//SFS: 	feature timeEnclosedOccurrences replaced by function timeEnclosedOccurrences
 		abstract step enactedPerformances: Performance[0..*] subsets involvingPerformances //, timeEnclosedOccurrences intersects involvingPerformances, timeEnclosedOccurrences 
 			{
 			doc
 			/*
 			 * Performances that are enacted by this object.
 			 */
+			language "Domain" /* forall ep in enactedPerformances are self.timeEnclosedOccurrence(ep) */
 		}
 		
-		composite step ownedPerformances: Performance[0..*] subsets involvingPerformances, //timeEnclosedOccurrences, 
-			suboccurrences
-			intersects involvingPerformances, //timeEnclosedOccurrences, 
-			suboccurrences {
+//SFS: 	feature timeEnclosedOccurrences replaced by function timeEnclosedOccurrences,
+//  involvingPerformances already subsets suboccurrences 
+		composite step ownedPerformances: Performance[0..*] subsets involvingPerformances //, //timeEnclosedOccurrences, 	suboccurrences
+			//intersects involvingPerformances, timeEnclosedOccurrences, suboccurrences 
+			{
 			doc
 			/*
 			 * Performances that are owned by this object.
 			 */
+			language "Domain" /* forall op in ownedPerformances are self->
+			  * (timeEnclosedOccurrence(ep) and Mereology::PartOf(op,self) */
 			 
 			feature redefines this default that {
 				doc
@@ -74,6 +79,8 @@ standard library package Objects {
 			/*
 			 * A space boundary that is a structured space object.
 			 */
+			language "Domain" /* not structuredSpaceBoundary->empty implies
+			  * Regions::RegionSurface(Regions::Location(self)) = structuredSpaceBoundary */
 		}
 	}
 	
@@ -189,21 +196,23 @@ standard library package Objects {
             feature redefines StructuredSpaceObject::innerSpaceDimension, Point::innerSpaceDimension;         
         }
 
+//SFS:	replace use of feature unionsOf		
 		portion feature faces : StructuredSurface[0..*] ordered subsets structuredSpaceObjectCells {
 		    feature redefines that : StructuredSpaceObject;
 			feature redefines edges subsets that.edges;
 			feature redefines vertices subsets that.vertices;
 			derived feature redefines spaceBoundary; 
 			inv { isEmpty(spaceBoundary) == isEmpty(union(edges, vertices)) }
-			inv { notEmpty(spaceBoundary) implies contains(spaceBoundary.unionsOf, union(edges, vertices)) }
+//			inv { notEmpty(spaceBoundary) implies contains(spaceBoundary.unionsOf, union(edges, vertices)) }
 		}
 
+//SFS:	replace use of feature unionsOf		
 		portion feature edges : StructuredCurve[0..*] ordered subsets structuredSpaceObjectCells {
             feature redefines that : StructuredSpaceObject;
 			feature redefines vertices subsets that.vertices;
 			derived feature redefines spaceBoundary;
 			inv { isEmpty(spaceBoundary) == isEmpty(vertices) }
-			inv { notEmpty(spaceBoundary) implies contains(spaceBoundary.unionsOf, vertices) }
+//			inv { notEmpty(spaceBoundary) implies contains(spaceBoundary.unionsOf, vertices) }
 		}
 
 		portion feature vertices : StructuredPoint[0..*] ordered subsets structuredSpaceObjectCells;
