@@ -45,13 +45,14 @@ standard library package Performances {
   		feature redefines dispatchScope default thisPerformance;
   		
 //SFS:  enclosedPerformances are suboccurrences (containment)			
-		step enclosedPerformances: Performance[0..*] subsets performances  //, timeEnclosedOccurrences	intersects performances, timeEnclosedOccurrences 
+		step enclosedPerformances: Performance[0..*] subsets subperformances
+		  // performances, timeEnclosedOccurrences	intersects performances, timeEnclosedOccurrences 
 		{
 			doc
 			/*
 			 * timeEnclosedOccurrences of this Performance that are also Performances.
 			 */
-			language "Domain" /* forall ep in enclosedPerformances are during(ep,self) */
+			language "Domain" /* forall ep in enclosedPerformances are during(ep,thisPerformance) */
 		}
 		
 		feature thisPerformance: Performance [1] default self {
@@ -59,11 +60,14 @@ standard library package Performances {
 			/*
 			 * Defaults to the root of the subperformance composition tree.
 			 */
+			language "Domain" /* during(self, thisPerformance) */
 		}
-		connector :HappensDuring from [1] self to [1] thisPerformance; 
-		
-		composite step subperformances: Performance[0..*] subsets enclosedPerformances, suboccurrences
-			intersects enclosedPerformances, suboccurrences {
+//SFS:	connector unnecessary because:  during(self, thisPerformance) 	
+//		connector :HappensDuring from [1] self to [1] thisPerformance; 
+
+//SFS:  enclosedPerformances are suboccurrences (containment)		
+		composite step subperformances: Performance[0..*] subsets suboccurrences {
+			// enclosedPerformances, suboccurrences intersects enclosedPerformances, suboccurrences 
 			doc
 			/*
 			 * enclosedPerformances that are composite. 
@@ -103,6 +107,7 @@ standard library package Performances {
 			
 	}
 
+//SFS:  BooleanEvaluation is now immediate
 	abstract predicate BooleanEvaluation specializes Evaluation {
 		doc
 		/*
@@ -113,7 +118,7 @@ standard library package Performances {
 		return : Boolean[1];
 	}
 
-//SFS:  add BooleanComputation
+//SFS:  add BooleanComputation to model calculation done by the system
 	abstract behavior BooleanComputation specializes Computation, BooleanEvaluation {
 		doc
 		/*
@@ -259,7 +264,6 @@ standard library package Performances {
 		 * booleanComputations is a specialization of computations restricted to type BooleanComputation.
 		 */
 	}
-
 	
 	abstract expr trueEvaluations subsets booleanEvaluations {
 		doc
@@ -295,6 +299,7 @@ standard library package Performances {
         binding result = falseValue;
 	}
 	
+//SFS:  new
 	abstract expr falseComputations subsets booleanComputations {
 		doc
 		/*

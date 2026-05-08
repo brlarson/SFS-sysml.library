@@ -43,12 +43,14 @@ standard library package Occurrences {
 		private import SequenceFunctions::*;
 
 //SFS: all time shots become instants
-		portion feature startShot: Instant[1] :>> lowerBound {
+//		portion 
+		feature startShot: Instant[1] :>> lowerBound {
 			doc
 			/* The snapshot representing the start of the occurrence in time. */
 		}
 
-		portion feature endShot: Instant[1] :>> upperBound {
+//		portion 
+		feature endShot: Instant[1] :>> upperBound {
 			doc
 			/* The snapshot at the end of the occurrence in time. */
 
@@ -60,7 +62,8 @@ standard library package Occurrences {
 		}
 
 //SFS:  time slices become intervals
-		portion feature middleTimeSlice: Interval[0..1] {
+//		portion 
+		feature middleTimeSlice: Interval[0..1] {
 			doc
 			/*
 			 * A time slice that takes all the time between the start shot and end shot. There
@@ -482,17 +485,17 @@ standard library package Occurrences {
 		inv { notEmpty(outerSpaceDimension) implies
 			 (outerSpaceDimension >= innerSpaceDimension & outerSpaceDimension <= 3) }
 
-		portion feature all portions: Occurrence[1..*] subsets occurrences 
-		  // spaceEnclosedOccurrences, spaceTimeEnclosedOccurrences 
-		{
-			doc
-			/*
-			 * All spaceTimeEnclosedOccurrences that have the same portionOfLife (considered the same
-			 * thing occurring).
-			 */
-
+//SFS:  remove
+// 		portion feature all portions: Occurrence[1..*] subsets occurrences 
+// 		  // spaceEnclosedOccurrences, spaceTimeEnclosedOccurrences 
+// 		{
+// 			doc
+// 			/*
+// 			 * All spaceTimeEnclosedOccurrences that have the same portionOfLife (considered the same
+// 			 * thing occurring).
+// 			 */
 //            portion redefines portionOfLife = (that as Occurrence).portionOfLife;
-		}
+// 		}
 
 //SFS:  remove
 		// feature portionOf : Occurrence[1..*] inverse of portions {
