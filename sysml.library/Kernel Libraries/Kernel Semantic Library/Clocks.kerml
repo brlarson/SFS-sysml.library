@@ -40,7 +40,7 @@ standard library package Clocks {
 		 
 		private thisClock : Clock :>> self;
 		
-		var feature currentTime : NumericalValue[1] {
+		var feature currentTime : Instant[1] {
 			doc
 			/*
 			 * A scalar time reference that advances over the lifetime of the Clock. 

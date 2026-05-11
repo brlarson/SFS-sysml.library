@@ -15,6 +15,9 @@ standard library package SpatialFrames {
     private import Objects::Point;
     private import ControlFunctions::forAll;
     private import SequenceFunctions::includes;
+//SFS:
+    private import Regions::FrameOfReference;    
+    private import Regions::universalFrameOfReference;    
     
     private struct DefaultFrameLife[1] :> SpatialFrame, Life {
         doc
@@ -37,6 +40,7 @@ standard library package SpatialFrames {
          * acts as a frame of reference for defining the physical position and displacement 
          * vectors of Points over time.
          */
+        feature :>> frameOfReference : FrameOfReference default universalFrameOfReference;
     }
     
     abstract function PositionOf {

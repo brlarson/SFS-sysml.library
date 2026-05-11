@@ -22,3 +22,7 @@ preserve = false
 
 [lint]
 standard-library-package = "warning"
+
+[lsp.inlay-hints.implicit-specializations]
+standard-library = false
+toggle = "off"

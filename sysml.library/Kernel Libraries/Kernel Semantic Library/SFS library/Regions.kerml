@@ -10,12 +10,34 @@ library package Regions {
     private import Occurrences::Occurrence;
 	private import Assertion::Assert;
     private import Performances::BooleanEvaluation;
+    private import Clocks::Clock;
+    private import Clocks::universalClock;
+
+    type FrameOfReference specializes Base::Anything {
+        doc
+        /*
+        *  SFS:  A frame of reference serves as the reference for the location of an occurrence.
+        * All inertial frames-of-reference are completely equivalent for the formulation of the Laws of Physics. (relativity)
+        * A frame of reference has an existence independent of objects and processes occurring within it. (substantialism)
+        * Within a frame of reference, time progresses uniformly, and simultenaity is well-defined. (absolute time)
+        */
+        feature clock : Clock default universalClock;
+    }
+
+    feature universalFrameOfReference : FrameOfReference {
+        doc
+        /*
+        *  SFS:  universalFrameOfReference is a fixed frame of reference used as a universal default.
+        */
+        feature :>> clock = universalClock;
+    }
 
     type Region specializes Base::Anything {
         doc
         /*
         *  SFS:  Region is a metaphysical three-dimensional volume.
         */
+        feature frameOfReference : FrameOfReference default universalFrameOfReference;
     }
 
     type Point specializes Base::Anything {
@@ -23,6 +45,7 @@ library package Regions {
         /*
         *  SFS:  Point is a metaphysical 0-dimensional entity.
         */
+        feature frameOfReference : FrameOfReference default universalFrameOfReference;
     }
 
     type Surface specializes Base::Anything {
@@ -30,6 +53,7 @@ library package Regions {
         /*
         *  SFS:  Surface is the set of points at the boundary of a Region.
         */
+        feature frameOfReference : FrameOfReference default universalFrameOfReference;
     }
  
     /**
@@ -47,7 +71,9 @@ library package Regions {
         language "Domain" /* L : o : Occurrence := result */
         in o : Occurrence;
         return result : Region;
-        inv { o.isClosed and (o.innerSpaceDimension == 3) and (o.outerSpaceDimension == 3) }
+        inv { o.isClosed and o.innerSpaceDimension == 3 and o.outerSpaceDimension == 3
+            and o.frameOfReference == (result as Region).frameOfReference 
+            }
    }
 
     // SFS:  Two things having the same location are the same thing (df-lfu)
@@ -59,6 +85,9 @@ library package Regions {
         doc /* SFS: Point is contained in Region */
         in point : Point;
         in region : Region;
+        inv { point.frameOfReference == region.frameOfReference
+            and point.frameOfReference == region.frameOfReference 
+        }
         language "Domain" /* In : point~Point, region~Region : point in region */
     }
 
@@ -66,6 +95,7 @@ library package Regions {
         doc /* SFS: Point is on a Surface */
         in point : Point;
         in surface : Surface;
+        inv { point.frameOfReference == surface.frameOfReference }
         language "Domain" /* On : point~Point, surface~Surface : point on surface" */
     }
 
@@ -75,6 +105,7 @@ library package Regions {
             * Regions are disjoint if they don't overlap */
         in r1 : Region;
         in r2 : Region;
+        inv { r1.frameOfReference == r2.frameOfReference }
         language "Domain" /* O : r1~Region, r2~Region : exists p~Point that (In(p,r1) and In(p,r2)) */
     }
 
@@ -87,6 +118,7 @@ library package Regions {
             * This is the "C" relation (df-rco). */
         in r1 : Region;
         in r2 : Region;
+        inv { r1.frameOfReference == r2.frameOfReference }
         language "Domain" /* RegionContainment : r1~Region, r2~Region : forall p~Point are (In(p,r2) implies In(p,r1)) */
     }
 
@@ -112,6 +144,7 @@ library package Regions {
           * not on its surface */
         in r : Region;
         return result : Region;
+        inv { r.frameOfReference == (result as Region).frameOfReference}
         language "Domain" /* RegionInterior : r~Region := result~Region | 
           * exists s~Surface that forall p~Point are ( In(p,result) implies 
           * (In(p,r) and not On(p,RegionSurface(r))) ) */
@@ -121,6 +154,7 @@ library package Regions {
         doc /* SFS: The surface of a region is all the points on its boundary */
         in r : Region;
         return result : Surface;
+        inv { r.frameOfReference == (result as Region).frameOfReference}
         language "Domain" /* RegionSurface : r~Region := result~Surface | 
           * exists r1~Region that forall p~Point are ( On(p,result) implies 
           *   (In(p,r) and not In(p,RegionInterior(r))) ) */
@@ -130,6 +164,7 @@ library package Regions {
         doc /* SFS: The film of a region is a surface of which it's the interior */
         in r : Region;
         return result : Surface;
+        inv { r.frameOfReference == (result as Region).frameOfReference}
         language "Domain" /* RegionFilm : r~Region := result~Surface | 
           * exists r1~Region that forall p~Point are ( On(p,result) implies 
           *   (RegionInterior(r1)=r and RegionSurface(r1)=result) ) */
@@ -139,6 +174,7 @@ library package Regions {
         doc /* SFS:  This is the externally connected (EC) relation  of Region Connection Calculus */
         in r1 : Region;
         in r2 : Region;
+        inv { r1.frameOfReference == r2.frameOfReference }
         language "Domain" /* EC : r1~Region, r2~Region : 
           * exists p~Point that ( On(p,RegionSurface(r1)) and On(p,RegionSurface(r2)) ) */
     }
@@ -147,6 +183,7 @@ library package Regions {
         doc /* SFS:  This is neeeded for Occurences::JustOutsideOf. */
         in r1 : Region;
         in r2 : Region;
+        inv { r1.frameOfReference == r2.frameOfReference }
         language "Domain" /* FilmConnected : r1~Region, r2~Region : 
           * exists p~Point that ( On(p,RegionFilm(r1)) and On(p,RegionFilm(r2)) ) */
     }
