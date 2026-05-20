@@ -13,6 +13,10 @@ standard library package Transfers {
     private import ScalarValues::Boolean;
     private import ScalarValues::Natural;
     private import SequenceFunctions::*;
+//SFS:
+     private import ScalarValues::NumericalValue;
+     private import Triggers::TriggerAfter;
+   
     
     interaction Transfer specializes Performance, BinaryLink {
         doc
@@ -27,7 +31,7 @@ standard library package Transfers {
              * The entity whose output is the source of the payload to be transferred.
              */
 //SFS:  replace sourceOutput with Occurrence.outgoingBuffer        
-            feature sourceOutput: Anything[0..*];
+//            feature sourceOutput: Anything[0..*];
         }
         
         end feature target: Occurrence redefines BinaryLink::target {
@@ -36,7 +40,7 @@ standard library package Transfers {
              * The entity whose input is the target of the payload to be transferred.
              */
 //SFS:  replace targetInput with Occurrence.incomingBuffer        
-            feature targetInput: Anything[0..*];
+//            feature targetInput: Anything[0..*];
         }
         
         feature isInstant: Boolean[1] {
@@ -46,6 +50,13 @@ standard library package Transfers {
              */
         }
 
+        feature transferDuration: NumericalValue[1] default 0 {
+            doc
+            /*
+             * If isInstant is false, then transferDuration is the duration of the transfer.
+             */
+        }   
+
 //SFS:  make payload multiplicity 0 for AADL event, 1 for AADL event data        
         var feature payload: Anything[0..1] {
             doc
@@ -54,17 +65,22 @@ standard library package Transfers {
              */
         }
 
+        succession first getPayloadFromSource then delay;
+        succession first delay then putPayloadToTarget;
+
 //SFS:  add steps to move payload (may be empty)
         step getPayloadFromSource: source.outgoingBuffer.get {
             out payload;
         }
 //SFS:  don't know how to insert delay if not isInstant
-        step delay;        
+        step delay : TriggerAfter {
+            in delay = transferDuration;
+            in receiver = this;
+        } 
+
         step putPayloadToTarget: target.incomingBuffer.put {
             in payload;
         }   
-        succession first getPayloadFromSource then delay;
-        succession first delay then putPayloadToTarget;
 
         // feature payloadNum: Natural [1] = size(payload);
         
@@ -119,7 +135,7 @@ standard library package Transfers {
              */
         
             end [1] feature transferSource references source;
-            end [1] feature transferPayload references payload subsets transferSource.sourceOutput;
+            end [1] feature transferPayload references payload; // subsets transferSource.sourceOutput;
 //            end [payloadNum] feature transferPayload references payload subsets transferSource.sourceOutput;
         }
         
@@ -131,7 +147,7 @@ standard library package Transfers {
              */
         
             end [1] feature transferTarget references target;
-            end [1] feature transferPayload references payload subsets transferTarget.targetInput;
+            end [1] feature transferPayload references payload; // subsets transferTarget.targetInput;
 //            end [payloadNum] feature transferPayload references payload subsets transferTarget.targetInput;
         }
         
