@@ -16,10 +16,13 @@ library package Regions {
     type FrameOfReference specializes Base::Anything {
         doc
         /*
-        *  SFS:  A frame of reference serves as the reference for the location of an occurrence.
-        * All inertial frames-of-reference are completely equivalent for the formulation of the Laws of Physics. (relativity)
-        * A frame of reference has an existence independent of objects and processes occurring within it. (substantialism)
-        * Within a frame of reference, time progresses uniformly, and simultenaity is well-defined. (absolute time)
+        * SFS:  A frame of reference serves as the reference for the location of an occurrence.
+        * All inertial frames-of-reference are completely equivalent for the formulation of the 
+        * Laws of Physics. (relativity)
+        * A frame of reference has an existence independent of objects and processes occurring
+        * within it. (substantialism)
+        * Within a frame of reference, time progresses uniformly, and simultenaity is
+        * well-defined. (absolute time)
         */
         feature clock : Clock default universalClock;
     }
@@ -27,7 +30,8 @@ library package Regions {
     feature universalFrameOfReference : FrameOfReference {
         doc
         /*
-        *  SFS:  universalFrameOfReference is a fixed frame of reference used as a universal default.
+        * SFS: universalFrameOfReference is a fixed frame of reference used as a
+        * universal default.
         */
         feature :>> clock = universalClock;
     }
@@ -78,7 +82,7 @@ library package Regions {
 
     // SFS:  Two things having the same location are the same thing (df-lfu)
     language "Domain" /* forall x~Occurrence forall r1,r2~Region are
-        ( (L(x)=r1 and L(x)=r2) implies r1=r2 ) */
+      *  ( (L(x)=r1 and L(x)=r2) implies r1=r2 ) */
 
 
     predicate PointInRegion {

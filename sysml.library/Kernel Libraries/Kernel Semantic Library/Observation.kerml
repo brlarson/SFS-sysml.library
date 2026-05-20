@@ -20,6 +20,8 @@ standard library package Observation {
 //SFS:
 	private import Domain::SetNow;
 	private import Domain::GetChangeToTrue;
+	private import Performances::BooleanEvaluation;
+	private import Transfers::Transfer;
 
     private struct DefaultMonitorLife[1] :> ChangeMonitor, Life {
         doc
@@ -42,7 +44,7 @@ standard library package Observation {
 		 * changeCondition Expression changes from false to true.
 		 */
 
-		bool signalCondition {
+		bool signalCondition : BooleanEvaluation[1] {
 			doc
 			/*
 			 * A BooleanExpression whose result is being monitored.
@@ -83,27 +85,38 @@ standard library package Observation {
 		// 		in bool onOccurrence = changeSignal.signalCondition;
 		// 	}
 		// }		
-		composite step wait : GetChangeToTrue {
-			in bool redefines e {
-				not changeSignal.signalCondition()
+		composite step wait : GetChangeToTrue[1] {
+			in feature d = changeObserver {
+				feature :>> e = changeSignal.signalCondition as BooleanEvaluation;
 			}
 		}
 		
-		succession wait then transfer;
-		
-	    step transfer : TransferBefore[1] 
-	    	redefines outgoingTransfersFromSelf 
-	    	subsets changeObserver.incomingTransfers {
-	    	doc
-			/*
-			 * Then send changeSignal to changeObserver.
-			 */
-			 
-	    	end feature source {
-	    		feature redefines sourceOutput = changeSignal;
-	    	}
-	    	end feature target;
-	    }
+		succession wait then loadOutgoingBuffer;
+//SFS:  need to load outgoing buffer
+		step loadOutgoingBuffer : outgoingBuffer.put {
+			in value = changeSignal;
+		}
+
+		succession loadOutgoingBuffer then transfer;
+		step transfer : Transfer {
+			doc /* move changeSignal as payload to changeObserver */
+			end feature :>> source = this;
+			end feature :>> target = changeObserver;
+		}
+
+		// step transfer : TransferBefore[1] 
+		// 	redefines outgoingTransfersFromSelf 
+		// 	subsets changeObserver.incomingTransfers {
+		// 	doc
+		// /*
+		// 	* Then send changeSignal to changeObserver.
+		// 	*/
+			
+		// 	end feature source {
+		// 		feature redefines sourceOutput = changeSignal;
+		// 	}
+		// 	end feature target;
+		// }
 	}
 	
 //SFS: use SetNow instead of FeatureWritePerformance

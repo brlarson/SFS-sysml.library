@@ -25,9 +25,10 @@ standard library package Occurrences {
   private import Domain::*;
   private import Regions::*;
   private import Allen::*;
+	private import RunTimeServices::*;
 
 //SFS:  fundamental change of Occurrence to be Interval
-	abstract class Occurrence specializes Anything, Domain::Interval disjoint from DataValue {
+	abstract class Occurrence specializes Domain::Interval disjoint from DataValue {
 //	abstract class Occurrence specializes Anything disjoint from DataValue {
         doc
         /*
@@ -41,6 +42,14 @@ standard library package Occurrences {
          */
         
 		private import SequenceFunctions::*;
+
+		feature frameOfReference : FrameOfReference default universalFrameOfReference {
+			doc
+			/*
+			 * The frame of reference for this Occurrence, which is used as the default frame of
+			 * reference for all features of this Occurrence that have a frame of reference.
+			 */
+		}
 
 //SFS: all time shots become instants
 //		portion 
@@ -832,6 +841,11 @@ standard library package Occurrences {
 			 */
 		}
 		inv { isClosed == isEmpty((that as Occurrence).spaceBoundary) }
+
+//SFS:  use buffers rather than transfers for incoming and outgoing relationships between occurrences
+		var feature incomingBuffer : Buffer;
+
+		var feature outgoingBuffer : Buffer;
 
 		var feature incomingTransfers: Transfers::Transfer[0..*] subsets Transfers::transfers {
 			doc

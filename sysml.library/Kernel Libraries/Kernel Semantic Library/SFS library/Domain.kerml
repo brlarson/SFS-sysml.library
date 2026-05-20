@@ -68,30 +68,28 @@ library package Domain {
 		}
 		out feature v : Anything[0..1];  //values
 		language "Domain" /* ( I[[d::f,d::startShot]] <> I[[d::f,now]]
-		  * and forall t:Instant in d::startShot ., now are I[[d::f,t]] = I[[d::f,d::startShot]]) 
+		  * and forall t~Instant in d::startShot ., now are I[[d::f,t]] = I[[d::f,d::startShot]]) 
 			* implies v = I[[d::f,now]] */
 	}
 
-	behavior GetBooleanChange {
-		in feature e : BooleanEvaluation[1];
-		out feature b : Boolean[1];
-		language "Domain" /* ( I[[e::result,e::startShot]] <> I[[e::result,now]]
-		  * and forall t:Instant in e::startShot ., now are I[[e::result,t]] = I[[e::result,e::startShot]] )
-			* implies b = I[[e::result,now]] */
+	behavior GetBooleanChange :> GetChange {
+		in feature :>> d {
+			feature e : BooleanEvaluation[1] :>> f;
+		}
+		out feature b : Boolean[1] :>> v;
+		language "Domain" /* ( I[[d::e::result,d::startShot]] <> I[[d::e::result,now]]
+		  * and forall t~Instant in d::startShot ., now are I[[d::e::result,t]] = I[[d::e::result,d::startShot]] )
+			* implies b = I[[d::e::result,now]] */
 	}
 
-	behavior GetChangeToTrue {
-		in feature e : BooleanEvaluation[1];
-		out feature b : Boolean;
-		language "Domain" /* ( forall t:Instant in e::startShot ., now are I[[e::result,t]] = false  )
-			* and I[[e::result,now]] = true */
+	behavior GetChangeToTrue :> GetBooleanChange{
+		language "Domain" /* ( forall t~Instant in d::startShot ., now are I[[d::e::result,t]] = false  )
+			* and I[[d::e::result,now]] = true */
 	}
 
-	behavior GetChangeToFalse {
-		in feature e : BooleanEvaluation[1];
-		out feature b : Boolean[1];
-		language "Domain" /* ( forall t:Instant in e::startShot ., now are I[[e::result,t]] = true  )
-			* and I[[e::result,now]] = false */
+	behavior GetChangeToFalse :> GetBooleanChange{
+		language "Domain" /* ( forall t~Instant in d::startShot ., now are I[[d::e::result,t]] = true  )
+			* and I[[d::e::result,now]] = false */
 	}
 
 }

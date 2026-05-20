@@ -26,7 +26,7 @@ standard library package Transfers {
             /*
              * The entity whose output is the source of the payload to be transferred.
              */
-        
+//SFS:  replace sourceOutput with Occurrence.outgoingBuffer        
             feature sourceOutput: Anything[0..*];
         }
         
@@ -35,7 +35,7 @@ standard library package Transfers {
             /*
              * The entity whose input is the target of the payload to be transferred.
              */
-        
+//SFS:  replace targetInput with Occurrence.incomingBuffer        
             feature targetInput: Anything[0..*];
         }
         
@@ -45,23 +45,36 @@ standard library package Transfers {
              * If isInstance is true, then the transfer is instantaneous.
              */
         }
-        
-        feature payload: Anything[1..*] {
+
+//SFS:  make payload multiplicity 0 for AADL event, 1 for AADL event data        
+        var feature payload: Anything[0..1] {
             doc
             /*
-             * The things that are to be transferred.
+             * The thing that is to be transferred.
              */
         }
-        
-        feature payloadNum: Natural [1] = size(payload);
-        
-        private instantNum: Natural[1] = if isInstant? 1 else 0;
-        private binding instant[instantNum] of [0..1] startShot = [0..1] endShot {
-            doc
-            /*
-             * If isInstant is true, then the start and end of the transfer happen at the same time.
-             */
+
+//SFS:  add steps to move payload (may be empty)
+        step getPayloadFromSource: source.outgoingBuffer.get {
+            out payload;
         }
+//SFS:  don't know how to insert delay if not isInstant
+        step delay;        
+        step putPayloadToTarget: target.incomingBuffer.put {
+            in payload;
+        }   
+        succession first getPayloadFromSource then delay;
+        succession first delay then putPayloadToTarget;
+
+        // feature payloadNum: Natural [1] = size(payload);
+        
+        // private instantNum: Natural[1] = if isInstant? 1 else 0;
+        // private binding instant[instantNum] of [0..1] startShot = [0..1] endShot {
+        //     doc
+        //     /*
+        //      * If isInstant is true, then the start and end of the transfer happen at the same time.
+        //      */
+        // }
     }
     
     interaction MessageTransfer specializes Transfer {
@@ -96,59 +109,64 @@ standard library package Transfers {
              * at the source.
              */
         }
-        
-        connector sourceOutputLink: BinaryLinkObject[payloadNum] {
+
+//SFS:  remove payloadNum        
+        connector sourceOutputLink: BinaryLinkObject[1] {
+//        connector sourceOutputLink: BinaryLinkObject[payloadNum] {
             doc
             /*
              * The output of the payloads from the sourceOutput.
              */
         
             end [1] feature transferSource references source;
-            end [payloadNum] feature transferPayload references payload subsets transferSource.sourceOutput;
+            end [1] feature transferPayload references payload subsets transferSource.sourceOutput;
+//            end [payloadNum] feature transferPayload references payload subsets transferSource.sourceOutput;
         }
         
-        connector targetInputLink: BinaryLinkObject[payloadNum] {
+        connector targetInputLink: BinaryLinkObject[1] {
+//        connector targetInputLink: BinaryLinkObject[payloadNum] {
             doc
             /*
              * The input of the payload to the targetInput.
              */
         
             end [1] feature transferTarget references target;
-            end [payloadNum] feature transferPayload references payload subsets transferTarget.targetInput;
+            end [1] feature transferPayload references payload subsets transferTarget.targetInput;
+//            end [payloadNum] feature transferPayload references payload subsets transferTarget.targetInput;
         }
         
-        private connector sending: HappensDuring[payloadNum] from [1] startShot to [payloadNum] sourceOutputLink {
-          doc
-            /*
-             * The start of the transfer happens during the output of each of the payloads from the
-             * source. 
-             */
-        }
+        // private connector sending: HappensDuring[payloadNum] from [1] startShot to [payloadNum] sourceOutputLink {
+        //   doc
+        //     /*
+        //      * The start of the transfer happens during the output of each of the payloads from the
+        //      * source. 
+        //      */
+        // }
         
-        private connector moving: HappensWhile[0..*] from [0..*] sourceOutputLink.endShot to [0..1] startShot {
-            doc
-            /*
-             * If isMove is true, then all payloads leave the source at the start
-             * of the transfer.
-             */
-        }
-        private inv { isMove implies size(moving) == size(sourceOutputLink) }
+        // private connector moving: HappensWhile[0..*] from [0..*] sourceOutputLink.endShot to [0..1] startShot {
+        //     doc
+        //     /*
+        //      * If isMove is true, then all payloads leave the source at the start
+        //      * of the transfer.
+        //      */
+        // }
+        // private inv { isMove implies size(moving) == size(sourceOutputLink) }
         
-        private connector pushing: HappensWhile[0..*] from [0..*] sourceOutputLink.startShot to [0..1] startShot {
-            doc
-            /*
-             * If isPush is true, then the transfer begins when the payloads are available
-             * at the source.
-             */
-        }
-        private inv { isPush implies size(pushing) == size(sourceOutputLink) }
+        // private connector pushing: HappensWhile[0..*] from [0..*] sourceOutputLink.startShot to [0..1] startShot {
+        //     doc
+        //     /*
+        //      * If isPush is true, then the transfer begins when the payloads are available
+        //      * at the source.
+        //      */
+        // }
+        // private inv { isPush implies size(pushing) == size(sourceOutputLink) }
         
-        private connector delivering: HappensWhile[payloadNum] from [payloadNum] targetInputLink.startShot to [1] endShot {
-            doc
-            /*
-             * The input of each of the payloads to the target starts at the end of the transfer.
-             */
-        }
+        // private connector delivering: HappensWhile[payloadNum] from [payloadNum] targetInputLink.startShot to [1] endShot {
+        //     doc
+        //     /*
+        //      * The input of each of the payloads to the target starts at the end of the transfer.
+        //      */
+        // }
     }
     
     interaction TransferBefore specializes Transfer, HappensBefore intersects Transfer, HappensBefore {

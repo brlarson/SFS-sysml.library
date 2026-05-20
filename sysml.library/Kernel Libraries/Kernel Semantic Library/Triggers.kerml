@@ -12,6 +12,8 @@ standard library package Triggers {
 	
 	public import Clocks::*;
 	public import Observation::*;
+//SFS:
+	public import Performances::Computation;	
 	
 	struct TimeSignal :> ChangeSignal {
 		doc
@@ -44,8 +46,10 @@ standard library package Triggers {
 			signalClock.currentTime == signalTime
 		}
 	}
-	
-	function TriggerWhen {
+
+//SFS: make Computation to occur over time	
+	behavior TriggerWhen :> Computation {
+//	function TriggerWhen {
 		doc
 		/*
 		 * TriggerWhen returns a monitored ChangeSignal for a given condition,
@@ -88,7 +92,9 @@ standard library package Triggers {
 		}		
 	}
 	
-	function TriggerAt {
+//SFS: make Computation to occur over time	
+	behavior TriggerAt :> Computation {
+//	function TriggerAt {
 		doc
 		/*
 		 * TriggerAt returns a monitored TimeSignal to be sent to a receiver when
@@ -139,7 +145,9 @@ standard library package Triggers {
 		}
 	}
 	
-	function TriggerAfter {
+//SFS: make Computation to occur over time	
+	behavior TriggerAfter :> Computation {
+//	function TriggerAfter {
 		doc
 		/*
 		 * TriggerAfter returns a monitored TimeSignal to be sent to a receiver after
@@ -177,8 +185,8 @@ standard library package Triggers {
 			 */
 		}
 		
-		return signal : TimeSignal[1] = 
-			TriggerAt(clock.currentTime + delay, receiver, clock, monitor) {
+		return signal : TimeSignal[1] = new TimeSignal(clock.currentTime + delay, clock, monitor) {
+//			TriggerAt(clock.currentTime + delay, receiver, clock, monitor) {
 			doc
 			/*
 			 * The TimeSignal for the currentTime of the clock when the function is invoked
