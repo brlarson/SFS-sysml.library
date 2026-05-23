@@ -183,7 +183,8 @@ standard library package Actions {
 		 * actions is the base feature for all ActionUsages.
 		 */
 	}
-	
+
+//SFS:  actually move the payload from sender to receiver	
 	action def SendAction :> Action, SendPerformance {
 		doc
 		/*
@@ -191,11 +192,14 @@ standard library package Actions {
 		 * from a designated sender Occurrence with a given payload, optionally to a designated receiver.
 		 */
 	
-		in :>> payload [0..*];
-	    ref sentMessage :>> sentTransfer: MessageTransfer, MessageAction {
-	        in :>> MessageTransfer::payload, MessageAction::payload, Transfers::SendPerformance::sentTransfer::payload;
+		in :>> payload: Anything[0..*];
+		in :>> sender: Occurrence[1] default this;
+		in :>> receiver: Occurrence[1];
+
+//	    ref sentMessage :>> sentTransfer: MessageTransfer, MessageAction {
+//	        in :>> MessageTransfer::payload, MessageAction::payload, Transfers::SendPerformance::sentTransfer::payload;
 //	        in :>> MessageTransfer::payload, MessageAction::payload;
-	    }
+//	    }
 	}
 	
 	abstract action sendActions: SendAction[0..*] nonunique :> actions, sendPerformances {

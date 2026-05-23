@@ -16,6 +16,8 @@ standard library package Transfers {
 //SFS:
      private import ScalarValues::NumericalValue;
      private import Triggers::TriggerAfter;
+     private import Domain::GetChangeToFalse;
+    private import Performances::BooleanEvaluation;
    
     
     interaction Transfer specializes Performance, BinaryLink {
@@ -267,37 +269,84 @@ standard library package Transfers {
         end feature target: Occurrence redefines FlowTransferBefore::target, flowTransfers::target, transfersBefore::target;
     }
 
+//SFS:  new
     behavior SendPerformance specializes Performance  {
         doc
         /*
-         * SendPerformances are Performance that require an outgoingTransferFromSelf 
-         * from a designated sender Occurrence carrying a given payload, optionally to a designated receiver.
+         * SendPerformances are Performance that load a payload into the sender's outgoingBuffer
+         * then move it to the receiver with a MessageTransfer.
          */
     
-        in feature payload [0..*];
+        in feature payload[0..1];  //changed from [0..*]
         in feature sender: Occurrence[1] default this;
-        in feature receiver: Occurrence[0..1];
-        feature sentTransfer: MessageTransfer [1] subsets sender.outgoingTransfersFromSelf {
-            feature redefines payload = SendPerformance::payload;
-        }
-        binding [0..1] receiver.incomingTransfersToSelf = [1] sentTransfer;
+        in feature receiver: Occurrence[1];
 
-        succession self then sentTransfer;
+        succession loadOutgoingBuffer then sendTransfer;
+
+        step loadOutgoingBuffer : sender.outgoingBuffer.put {
+            in value = payload;
+        }
+        
+        step sendTransfer: MessageTransfer [1] {
+            feature redefines payload = SendPerformance::payload;
+            end feature redefines source = sender;
+            end feature redefines target = receiver;
+        }
+
     }
+
+    // behavior SendPerformance specializes Performance  {
+    //     doc
+    //     /*
+    //      * SendPerformances are Performance that require an outgoingTransferFromSelf 
+    //      * from a designated sender Occurrence carrying a given payload, optionally to a designated receiver.
+    //      */
+    //     in feature payload [0..*];
+    //     in feature sender: Occurrence[1] default this;
+    //     in feature receiver: Occurrence[0..1];
+    //     feature sentTransfer: MessageTransfer [1] subsets sender.outgoingTransfersFromSelf {
+    //         feature redefines payload = SendPerformance::payload;
+    //     }
+    //     binding [0..1] receiver.incomingTransfersToSelf = [1] sentTransfer;
+    //     succession self then sentTransfer;
+    // }
     
     behavior AcceptPerformance specializes Performance {
         doc
         /*
-         * AcceptPerformance is a performance that requires an incomingTransferToSelf
-         * of a desigated receiver Occurrence, providing its payload as output.
+         * A transfer automatically puts the payload in the target's incomingBuffer
+         * so AcceptPerformance waits for something in the receiver's incomingBuffer.
          */
-        inout feature payload[0..*];
+        inout feature payload[0..1];  //changed from [0..*]
         in feature receiver: Occurrence[1] default this;
-        feature acceptedTransfer: MessageTransfer[1] subsets receiver.incomingTransfersToSelf;
-        succession acceptedTransfer then self.endShot;
-        
-        binding payload = acceptedTransfer.payload;
+
+        succession first waitForTransfer then getPayloadFromBuffer;
+
+        step waitForTransfer : GetChangeToFalse {
+            in feature d = receiver {
+                feature :>> e : BooleanEvaluation[1] {
+                    out feature redefines result = receiver.incomingBuffer.isEmpty();
+                }
+            }
+        }
+       
+        step getPayloadFromBuffer : receiver.incomingBuffer.get  {
+            out feature :>> value = payload;
+        }
     }
+    
+    // behavior AcceptPerformance specializes Performance {
+    //     doc
+    //     /*
+    //      * AcceptPerformance is a performance that requires an incomingTransferToSelf
+    //      * of a desigated receiver Occurrence, providing its payload as output.
+    //      */
+    //     inout feature payload[0..*];
+    //     in feature receiver: Occurrence[1] default this;
+    //     feature acceptedTransfer: MessageTransfer[1] subsets receiver.incomingTransfersToSelf;
+    //     succession acceptedTransfer then self.endShot;
+    //     binding payload = acceptedTransfer.payload;
+    // }
 
     abstract step sendPerformances: SendPerformance[0..*] nonunique subsets performances {
         doc

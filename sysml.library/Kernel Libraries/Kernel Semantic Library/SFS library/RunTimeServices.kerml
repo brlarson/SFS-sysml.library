@@ -28,7 +28,7 @@
     } 
 
     step get {
-      out value : Anything[0..1] = if isEmpty()?  null else head(elements);
+      out var value : Anything[0..1] default if isEmpty()?  null else head(elements);
       step : remove {
         inout seq = elements;
         in values = value;
