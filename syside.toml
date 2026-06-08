@@ -1,0 +1,28 @@
+#:schema https://docs.sensmetry.com/schemas/latest/syside.schema.json
+
+std = "/Users/brianlarson/git-sysml.library/sysml.library"
+include = []
+exclude = ["lib", "out", "dist"]
+
+[lsp]
+completion-limit = 256
+edit = "all"
+
+[telemetry]
+crash-reports = "ignore"
+
+[format]
+line-width = 100
+tab-width = 2
+tabs = false
+
+[format.keywords.null]
+fallback = "null"
+preserve = false
+
+[lint]
+standard-library-package = "warning"
+
+[lsp.inlay-hints.implicit-specializations]
+standard-library = false
+toggle = "off"
