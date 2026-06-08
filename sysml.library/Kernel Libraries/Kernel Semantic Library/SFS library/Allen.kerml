@@ -9,6 +9,7 @@ library package Allen {
   
   
   predicate precedes {
+    @Assert{n="precedes"; f="<<precedes : x~Occurrence, y~Occurrence : death(x) < birth(y)";}
     language "Domain" /*  precedes(X,Y) := death(X) < birth(Y) */
     in x : Occurrence;
     in y : Occurrence;
