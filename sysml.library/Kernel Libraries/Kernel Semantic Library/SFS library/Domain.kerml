@@ -7,6 +7,7 @@ library package Domain {
 	private import SI::s;
 	private import Performances::BooleanEvaluation;
 	private import Base::Anything;
+  private import Assertion::Assert;
 
   datatype Time specializes Real;
   
@@ -34,6 +35,8 @@ library package Domain {
 
 	function Get { // replaces FeatureReferencingPerformances::FeatureReadEvaluation
 		doc /* Get(d,f,tau) returns the value of the feature d::f at time tau. */
+		@Assert{n="Get"; f="<<Get : d~Occurrence, f~Anything, tau~Instant := I[[d::f,tau]] >>"; 
+				t="df-model";}
 		in feature d : Occurrence[1] {  //onOccurrence
 		  feature f : Anything[1];  //accessedFeature
 		}
@@ -44,52 +47,63 @@ library package Domain {
 
 	function GetNow {
 		doc /* GetNow(d,f) returns the value of the feature d::f at the current time, now. */
+		@Assert{n="GetNow"; f="<<GetNow : d~Occurrence, f~Anything := I[[d::f,now]] >>"; 
+				t=("df-model","df-bl.nowrr");}
 		in feature d : Occurrence[1] {  //onOccurrence
 		  feature f : Anything[1];  //accessedFeature
 		}
 		return result : Anything[0..1] = Get(d, now);
-		language "Domain" /* GetNow(d,f) := I[[d::f,now]]*/
 	}
 
 	behavior SetNow {  // replaces FeatureReferencingPerformances::FeatureWritePerformance
 		doc /* SetNow(d,f,v) sets the value of the feature d::f to v at the current time, now. */
+		@Assert{n="SetNow"; f="<<SetNow : d~Occurrence, f~Anything : I[[d::f,now]] = v >>";
+				t="df-model";} 
 		in feature d : Occurrence[1] {  //onOccurrence
 		  feature f : Anything[1];  //accessedFeature
 		}
 		in feature v : Anything[1];  //replacementValues
-		language "Domain" /* I[[d::f,now]] = v */
 	}
 
   behavior GetChange {
-		doc /* GetChange(d,f) returns the change in value of the feature d::f 
-		     * from its value at d::startShot. */
+		doc /* GetChange(d,f) waits for value of the feature d::f to change
+		     * from its value at time tau. */
+		@Assert{n="GetChange"; f="<<GetChange : d~Occurrence, f~Anything, tau~Instant : "+
+				"(I[[d::f,tau]] <> I[[d::f,now]] and forall t~Instant in tau ., now are I[[d::f,t]] = I[[d::f,tau]])"+ 
+				"implies v = I[[d::f,now]]"; 
+				t="df-bl.changed";}
 		in feature d : Occurrence[1] {  //onOccurrence
 		  feature f : Anything[1];  //accessedFeature
 		}
+		in feature tau : Instant[1];   //startingAt    
 		out feature v : Anything[0..1];  //values
-		language "Domain" /* ( I[[d::f,d::startShot]] <> I[[d::f,now]]
-		  * and forall t~Instant in d::startShot ., now are I[[d::f,t]] = I[[d::f,d::startShot]]) 
-			* implies v = I[[d::f,now]] */
 	}
 
 	behavior GetBooleanChange :> GetChange {
+		doc /* GetBooleanChange, like GetChange, waits for d::e to toggle */
+		@Assert{n="GetBooleanChange"; f="<<GetBooleanChange : d~Occurrence, e~BooleanEvaluation, tau~Instant : "+
+				"(I[[d::f,tau]] <> I[[d::e,now]] and forall t~Instant in tau ., now are I[[d::e,t]] = I[[d::e,tau]])"+ 
+				"implies b = I[[d::f,now]]"; 
+				t="df-bl.changed";}
 		in feature :>> d {
 			feature e : BooleanEvaluation[1] :>> f;
 		}
+		in feature tau : Instant[1];   //startingAt    
 		out feature b : Boolean[1] :>> v;
-		language "Domain" /* ( I[[d::e::result,d::startShot]] <> I[[d::e::result,now]]
-		  * and forall t~Instant in d::startShot ., now are I[[d::e::result,t]] = I[[d::e::result,d::startShot]] )
-			* implies b = I[[d::e::result,now]] */
 	}
 
 	behavior GetChangeToTrue :> GetBooleanChange{
-		language "Domain" /* ( forall t~Instant in d::startShot ., now are I[[d::e::result,t]] = false  )
-			* and I[[d::e::result,now]] = true */
+		doc /* GetChangeToTrue does not wait if d::e is already true */
+		@Assert{n="GetChangeToTrue"; f="<<GetChangeToTrue : d~Occurrence, e~BooleanEvaluation, tau~Instant : "+
+				"(I[[d::e,now]] and forall t~Instant in tau ., now are not I[[d::e,t]] )"+ 
+				"implies b = true";}
 	}
 
 	behavior GetChangeToFalse :> GetBooleanChange{
-		language "Domain" /* ( forall t~Instant in d::startShot ., now are I[[d::e::result,t]] = true  )
-			* and I[[d::e::result,now]] = false */
+		doc /* GetChangeToFalse does not wait if d::e is already false */
+		@Assert{n="GetChangeToFalse"; f="<<GetChangeToFalse : d~Occurrence, e~BooleanEvaluation, tau~Instant : "+
+				"(not I[[d::e,now]] and forall t~Instant in tau ., now are I[[d::e,t]] )"+ 
+				"implies b = false";}
 	}
 
 }
