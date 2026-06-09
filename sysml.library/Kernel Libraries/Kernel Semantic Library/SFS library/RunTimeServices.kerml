@@ -10,6 +10,7 @@
   private import Base::Anything;
   private import ScalarValues::Boolean;
   private import SequenceFunctions::*;
+	private import Assertion::Assert;
 
   struct Buffer {
     doc /* FIFO buffer */
@@ -18,6 +19,16 @@
     function isEmpty {
       return : Boolean[1] = elements == null;
     }
+
+    @Assert{ doc /* any get returns was put previously */
+      n="GetWhatsPut"; f="<< GetWhatsPut : : forall t1~Instant are get(v)@t1 <> null "+
+        " implies exists t2~Instant in t2<t1 that put(v)@t2 >>"; }
+
+    @Assert{ doc /* buffer is first-in first-out*/
+      n="FIFO"; f="<< FIFO : : forall t1,t2~Instant in t1<t2 are "+
+        " (get(v1)@t1 and get(v2)@t2) implies "+
+        " exists t3~Instant in t3<t1 that exists t4~Instant in t4<t2 that "+
+        " (t3<t4 and put(v1)@t3 and put(v2)@t4) >>";}
 
     step put {
       in value : Anything[1];
@@ -34,13 +45,8 @@
         in values = value;
       }
       doc /* when get returns a value, that value was put previously */
-      language "Domain" /* get(v)@t1 <> null implies exists t2 in t2<t1 that put(v)@t2 */ 
     } 
 
-    language "Domain" 
-      /* (get(v1)@t1 and get(v2)@t2 and t1<t2) implies
-      * exists t3 in t3<t1 that exists t4 in t4<t2 that
-      * (t3<t4 and put(v1)@t3 and put(v2)@t4) */
   }
 
 
