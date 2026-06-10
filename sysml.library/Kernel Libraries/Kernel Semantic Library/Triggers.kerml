@@ -79,7 +79,7 @@ standard library package Triggers {
 			 */
 		}
 		
-		return feature changeSignal : ChangeSignal[1] = new ChangeSignal(condition, monitor) {
+		out feature changeSignal : ChangeSignal[1] :>> result = new ChangeSignal(condition, monitor) {
 			doc
 			/*
 			 * The ChangeSignal for the condition, as monitored by the monitor.
@@ -132,7 +132,7 @@ standard library package Triggers {
 			 */
 		}
 		
-		return feature timeSignal : TimeSignal[1] = new TimeSignal(timeInstant, clock, monitor) {
+		out feature timeSignal : TimeSignal[1] :>> result = new TimeSignal(timeInstant, clock, monitor) {
 			doc
 			/*
 			 * The TimeSignal for the given timeInstant, as monitored by the monitor.
@@ -185,7 +185,7 @@ standard library package Triggers {
 			 */
 		}
 		
-		return signal : TimeSignal[1] = new TimeSignal(clock.currentTime + delay, clock, monitor) {
+		out feature signal : TimeSignal[1] :>> result = new TimeSignal(clock.currentTime + delay, clock, monitor) {
 //			TriggerAt(clock.currentTime + delay, receiver, clock, monitor) {
 			doc
 			/*

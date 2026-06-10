@@ -20,7 +20,10 @@ standard library package Objects {
 	private import CollectionFunctions::contains;
 	private import ScalarValues::Integer;
 	private import ScalarValues::Natural;
-	
+//SFS:
+	private import Assertion::Assert;
+
+
 	abstract struct Object specializes Occurrence {
 		doc
 		/*
@@ -44,14 +47,14 @@ standard library package Objects {
 			 */
 		}
 		
-//SFS: 	feature timeEnclosedOccurrences replaced by function timeEnclosedOccurrences
+//SFS: 	feature timeEnclosedOccurrences replaced by function timeEnclosedOccurrence
 		abstract step enactedPerformances: Performance[0..*] subsets involvingPerformances //, timeEnclosedOccurrences intersects involvingPerformances, timeEnclosedOccurrences 
 			{
 			doc
 			/*
 			 * Performances that are enacted by this object.
 			 */
-			language "Domain" /* forall ep in enactedPerformances are self.timeEnclosedOccurrence(ep) */
+			@Assert{f="forall ep~Performance in enactedPerformances are self.timeEnclosedOccurrence(ep)";}
 		}
 		
 //SFS: 	feature timeEnclosedOccurrences replaced by function timeEnclosedOccurrences,
@@ -63,6 +66,7 @@ standard library package Objects {
 			/*
 			 * Performances that are owned by this object.
 			 */
+			@Assert{f="<< forall op~Performance in ownedPerformances are self.timeEnclosedOccurrence(ep) >>";}
 			language "Domain" /* forall op in ownedPerformances are self->
 			  * (timeEnclosedOccurrence(ep) and Mereology::PartOf(op,self) */
 			 

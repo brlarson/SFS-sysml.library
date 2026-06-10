@@ -1,7 +1,7 @@
 standard library package KerML {
 
 //SFS:  Changes in Expression and Function to make them immediate are not included in the abstract syntax.
-//  Consequently, there may be unexpected error from use of metaclass reflaection
+//  Consequently, there may be unexpected error from use of metaclass reflection
 
 	doc 
 	/*

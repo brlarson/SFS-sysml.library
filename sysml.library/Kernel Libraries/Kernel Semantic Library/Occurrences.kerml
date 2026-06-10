@@ -445,7 +445,7 @@ standard library package Occurrences {
 		bool justOutsideOfOccurrence {
 			doc /* SFS:  true when this is just outside of o */
 			in o : Occurrence;
-			FilmConnected(Location(this),Location(o))
+			ExternallyConnected(Location(this),Location(o))
 		}
 
 //SFS:  use matesWithOccurrence bool instead of matingOccurrences feature

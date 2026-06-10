@@ -14,9 +14,9 @@ standard library package Transfers {
     private import ScalarValues::Natural;
     private import SequenceFunctions::*;
 //SFS:
-     private import ScalarValues::NumericalValue;
-     private import Triggers::TriggerAfter;
-     private import Domain::GetChangeToFalse;
+    private import ScalarValues::NumericalValue;
+    private import Triggers::TriggerAfter;
+    private import Domain::GetChangeToFalse;
     private import Performances::BooleanEvaluation;
    
     
@@ -319,12 +319,14 @@ standard library package Transfers {
          */
         inout feature payload[0..1];  //changed from [0..*]
         in feature receiver: Occurrence[1] default this;
-
+        feature acceptedTransfer: MessageTransfer[1];
         succession first waitForTransfer then getPayloadFromBuffer;
 
         step waitForTransfer : GetChangeToFalse {
             in feature d = receiver {
                 feature :>> e : BooleanEvaluation[1] {
+//SFS:  get error:  Invocation expression must invoke a `Behavior` or a feature typed by a single `Behavior`sysideinvocation-expression-instantiated-type
+//  believe that this error will disappear when functions become immediate                    
                     out feature redefines result = receiver.incomingBuffer.isEmpty();
                 }
             }
