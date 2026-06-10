@@ -67,8 +67,6 @@ standard library package Objects {
 			 * Performances that are owned by this object.
 			 */
 			@Assert{f="<< forall op~Performance in ownedPerformances are self.timeEnclosedOccurrence(ep) >>";}
-			language "Domain" /* forall op in ownedPerformances are self->
-			  * (timeEnclosedOccurrence(ep) and Mereology::PartOf(op,self) */
 			 
 			feature redefines this default that {
 				doc
