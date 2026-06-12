@@ -8,10 +8,11 @@ library package Domain {
 	private import Performances::BooleanEvaluation;
 	private import Base::Anything;
   private import Assertion::Assert;
+  private import ISQSpaceTime::TimeValue;
 
-  datatype Time specializes Real;
+//  datatype Time specializes Real;
   
-  type Instant specializes Time {
+  type Instant specializes TimeValue {
     doc /* an instant of time */
   }
   
