@@ -1,6 +1,6 @@
 #:schema https://docs.sensmetry.com/schemas/latest/syside.schema.json
 
-std = "/Users/brianlarson/git-sysml.library/sysml.library"
+std = "sysml.library"
 include = []
 exclude = ["lib", "out", "dist"]
 

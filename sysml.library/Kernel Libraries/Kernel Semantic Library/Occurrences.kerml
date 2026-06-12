@@ -53,13 +53,13 @@ standard library package Occurrences {
 
 //SFS: all time shots become instants
 //		portion 
-		feature startShot: Instant[1] :>> lowerBound {
+		feature startShot: Instant[1] subsets snapshots :>> lowerBound {
 			doc
 			/* The snapshot representing the start of the occurrence in time. */
 		}
 
 //		portion 
-		feature endShot: Instant[1] :>> upperBound {
+		feature endShot: Instant[1] subsets snapshots  :>> upperBound {
 			doc
 			/* The snapshot at the end of the occurrence in time. */
 
@@ -538,6 +538,9 @@ standard library package Occurrences {
 		// 	subset timeSlicedOccurrence.timeSliceOf subsets timeSliceOccurrence.timeSliceOf;
 		// }
 
+//SFS:  snapshots replaced by instants, has at least startShot and endShot
+		feature snapshots : Instant[2..*] subsets snapShots;
+
 		// portion feature all snapshots: Occurrence[1..*] subsets timeSlices {
 		// 	doc
 		// 	/*
@@ -547,8 +550,6 @@ standard library package Occurrences {
 		// 	binding [1] startShot = [1] endShot;
 		// }
 //		inv { snapshots == union(startShot, union(middleTimeSlice.snapshots, endShot)) }
-
-//SFS:  snapshots replaced by instants, so snapshots and snapshotOf features removed
 		// feature snapshotOf : Occurrence[0..*] subsets timeSliceOf inverse of snapshots {
 		// 	doc
 		// 	/*
@@ -853,10 +854,8 @@ standard library package Occurrences {
 			 * The incoming transfers received by this occurrence.
 			 */
 
-			end feature source;
-			end feature target;
-//			end feature redefines source;
-//			end feature redefines target;
+			end feature redefines source, Transfers::transfers::source;
+			end feature redefines target, Transfers::transfers::target;
 		}
 		
 		feature isDispatch : Boolean[1] default false {
@@ -939,7 +938,10 @@ standard library package Occurrences {
 	// }
 
 	abstract feature occurrences: Occurrence[0..*] nonunique subsets things;
-	
+
+//SFS:  
+	abstract feature snapShots: Instant[0..*] nonunique subsets things;
+
 	predicate IncomingTransferSort specializes Performances::BooleanEvaluation {    
 		in t1: Transfers::Transfer [1];
 		in t2: Transfers::Transfer [1];  
