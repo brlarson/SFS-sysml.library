@@ -46,15 +46,17 @@ standard library package Flows {
         ref payload :>> MessageAction::payload, Transfer::payload;
         
         private ref action thisConnection = self;
-        
-        in event occurrence sourceEvent [1] default thisConnection.start {
+
+//SFS:  remove default, because thisConnection.start is now startShot which is an Instant        
+        in event occurrence sourceEvent [1] {  //default thisConnection.start {
             doc
             /* 
              * An occurrence happening during the source of this message
              * that is either the start of the mssage or happens before it.
              */
         }
-        in event occurrence targetEvent [1] default thisConnection.done {
+ //SFS:  remove default, because thisConnection.done is now endShot which is an Instant        
+       in event occurrence targetEvent [1] {  //default thisConnection.done {
             doc
             /* 
              * An occurrence happening during the target of this message
@@ -115,7 +117,8 @@ standard library package Flows {
         // end occurrence source: Occurrence :>> Flow::source, messages::source, flowTransfers::source;
         // end occurrence target: Occurrence :>> Flow::target, messages::target, flowTransfers::target;
     }
-    
+
+//SFS:  if the comma below means union, then it includes all non-succession flows, too    
     abstract flow successionFlows: SuccessionFlow[0..*] nonunique :> flows, flowTransfersBefore {
         doc
         /*

@@ -16,7 +16,7 @@
     doc /* FIFO buffer */
     private var feature elements[0..*] : Anything := ();
 
-    predicate isEmpty {
+    bool isEmpty {
       return : Boolean[1] = elements == null;
     }
 

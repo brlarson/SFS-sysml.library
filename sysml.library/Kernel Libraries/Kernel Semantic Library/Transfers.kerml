@@ -18,6 +18,7 @@ standard library package Transfers {
     private import Triggers::TriggerAfter;
     private import Domain::GetChangeToFalse;
     private import Performances::BooleanEvaluation;
+    private import ISQBase::DurationValue;
    
     
     interaction Transfer specializes Performance, BinaryLink {
@@ -49,18 +50,20 @@ standard library package Transfers {
             doc
             /*
              * If isInstance is true, then the transfer is instantaneous.
+             * Alternatively, set transferDuration to 0
              */
         }
 
-        feature transferDuration: NumericalValue[1] default 0 {
+//SFS:  change from NumericValue to DurationValue which requires a time unit
+        feature transferDuration: DurationValue[1] default 0 [SI::s] {
             doc
             /*
              * If isInstant is false, then transferDuration is the duration of the transfer.
              */
         }   
 
-//SFS:  make payload multiplicity 0 for AADL event, 1 for AADL event data        
-        var feature payload: Anything[0..1] {
+//SFS:  make payload multiplicity 1        
+        var feature payload: Anything[1] {
             doc
             /*
              * The thing that is to be transferred.
@@ -70,11 +73,11 @@ standard library package Transfers {
         succession first getPayloadFromSource then delay;
         succession first delay then putPayloadToTarget;
 
-//SFS:  add steps to move payload (may be empty)
+//SFS:  add steps to move payload 
         step getPayloadFromSource: source.outgoingBuffer.get {
             out payload;
         }
-//SFS:  don't know how to insert delay if not isInstant
+
         step delay : TriggerAfter {
             in delay = transferDuration;
             in receiver = this;
@@ -277,7 +280,7 @@ standard library package Transfers {
          * then move it to the receiver with a MessageTransfer.
          */
     
-        in feature payload[0..1];  //changed from [0..*]
+        in feature payload[1];  //changed from [0..*]
         in feature sender: Occurrence[1] default this;
         in feature receiver: Occurrence[1];
 
@@ -310,14 +313,15 @@ standard library package Transfers {
     //     binding [0..1] receiver.incomingTransfersToSelf = [1] sentTransfer;
     //     succession self then sentTransfer;
     // }
-    
+
+//SFS:  new    
     behavior AcceptPerformance specializes Performance {
         doc
         /*
          * A transfer automatically puts the payload in the target's incomingBuffer
          * so AcceptPerformance waits for something in the receiver's incomingBuffer.
          */
-        inout feature payload[0..1];  //changed from [0..*]
+        out feature payload[1];  //changed from [0..*]
         in feature receiver: Occurrence[1] default this;
         feature acceptedTransfer: MessageTransfer[1];
         succession first waitForTransfer then getPayloadFromBuffer;
@@ -325,8 +329,6 @@ standard library package Transfers {
         step waitForTransfer : GetChangeToFalse {
             in feature d = receiver {
                 feature :>> e : BooleanEvaluation[1] {
-//SFS:  get error:  Invocation expression must invoke a `Behavior` or a feature typed by a single `Behavior`sysideinvocation-expression-instantiated-type
-//  believe that this error will disappear when functions become immediate                    
                     out feature redefines result = receiver.incomingBuffer.isEmpty();
                 }
             }
