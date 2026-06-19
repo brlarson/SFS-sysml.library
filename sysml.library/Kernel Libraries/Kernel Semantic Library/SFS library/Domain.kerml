@@ -71,7 +71,7 @@ library package Domain {
 		     * from its value at time tau. */
 		@Assert{n="GetChange"; f="<<GetChange : d~Occurrence, f~Anything, tau~Instant : "+
 				"(I[[d::f,tau]] <> I[[d::f,now]] and forall t~Instant in tau ., now are I[[d::f,t]] = I[[d::f,tau]])"+ 
-				"implies v = I[[d::f,now]]"; 
+				"implies v = I[[d::f,now]] >>"; 
 				t="df-bl.changed";}
 		in feature d : Occurrence[1] {  //onOccurrence
 		  feature f : Anything[1];  //accessedFeature
@@ -84,7 +84,7 @@ library package Domain {
 		doc /* GetBooleanChange, like GetChange, waits for d::e to toggle */
 		@Assert{n="GetBooleanChange"; f="<<GetBooleanChange : d~Occurrence, e~BooleanEvaluation, tau~Instant : "+
 				"(I[[d::f,tau]] <> I[[d::e,now]] and forall t~Instant in tau ., now are I[[d::e,t]] = I[[d::e,tau]])"+ 
-				"implies b = I[[d::f,now]]"; 
+				"implies b = I[[d::f,now]] >>"; 
 				t="df-bl.changed";}
 		in feature :>> d {
 			feature e : BooleanEvaluation[1] :>> f;
@@ -97,7 +97,7 @@ library package Domain {
 		doc /* GetChangeToTrue does not wait if d::e is already true */
 		@Assert{n="GetChangeToTrue"; f="<<GetChangeToTrue : d~Occurrence, e~BooleanEvaluation, tau~Instant : "+
 				"(I[[d::e,now]] and forall t~Instant in tau ., now are not I[[d::e,t]] )"+ 
-				"implies b = true";}
+				"implies b = true >>";}
 	}
 
 	behavior GetChangeToFalse :> GetBooleanChange{

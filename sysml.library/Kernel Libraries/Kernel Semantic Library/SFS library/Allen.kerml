@@ -11,7 +11,7 @@ library package Allen {
   
   
   predicate precedes {
-    @Assert{n="precedes"; f="<<precedes : x~Occurrence, y~Occurrence : death(x) < birth(y)";}
+    @Assert{n="precedes"; f="<<precedes : x~Occurrence, y~Occurrence : death(x) < birth(y)>>";}
     in x : Occurrence;
     in y : Occurrence;
     x.endShot < y.startShot
@@ -26,14 +26,14 @@ library package Allen {
   }
 
   predicate overlaps {
-    @Assert{n="overlaps"; f="<<overlaps : x~Occurrence, y~Occurrence : birth(y) <  death(x)";}
+    @Assert{n="overlaps"; f="<<overlaps : x~Occurrence, y~Occurrence : birth(y) <  death(x)>>";}
     in x : Occurrence;
     in y : Occurrence;
     y.startShot < x.endShot 
   }
 
   predicate starts {
-    @Assert{n="starts"; f="<<starts : x~Occurrence, y~Occurrence : birth(x) = birth(y) and death(y) < death(x)"+
+    @Assert{n="starts"; f="<<starts : x~Occurrence, y~Occurrence : birth(x) = birth(y) and death(y) < death(x)>>"+
         "and x.openLeft = y.openLeft";}
     doc /* both should be the same for open-left */
     in x : Occurrence;
@@ -43,14 +43,14 @@ library package Allen {
   }
 
   predicate during {
-    @Assert{n="during"; f="<<during : x~Occurrence, y~Occurrence : birth(y) <= birth(x)) and death(x) <= death(y)";}
+    @Assert{n="during"; f="<<during : x~Occurrence, y~Occurrence : birth(y) <= birth(x)) and death(x) <= death(y)>>";}
     in x : Occurrence;
     in y : Occurrence;
     (y.startShot <= x.startShot) and (x.endShot <= y.endShot)
   }
 
   predicate finishes {
-    @Assert{n="finishes"; f="<<finishes : x~Occurrence, y~Occurrence : birth(y) < birth(x)) and death(x) = death(y)"+
+    @Assert{n="finishes"; f="<<finishes : x~Occurrence, y~Occurrence : birth(y) < birth(x)) and death(x) = death(y)>>"+
         "and x.openRight = y.openRight";}
     doc /* both should be the same for open-right */
     in x : Occurrence;
@@ -60,7 +60,7 @@ library package Allen {
   }
 
   predicate coincident {
-    @Assert{n="coincident"; f="<<coincident : x~Occurrence, y~Occurrence : birth(y) = birth(x)) and death(x) = death(y)"+
+    @Assert{n="coincident"; f="<<coincident : x~Occurrence, y~Occurrence : birth(y) = birth(x)) and death(x) = death(y)>>"+
         "and x.openLeft = y.openLeft and x.openRight = y.openRight" ;}
     doc /* both should be the same for open-left and open-right */
     in x : Occurrence;
@@ -70,14 +70,14 @@ library package Allen {
   }
 
   predicate nonoverlaps {
-    @Assert{n="nonoverlaps"; f="<<nonoverlaps : x~Occurrence, y~Occurrence : birth(y) > death(x)) or birth(x) > death(y)";}
+    @Assert{n="nonoverlaps"; f="<<nonoverlaps : x~Occurrence, y~Occurrence : birth(y) > death(x)) or birth(x) > death(y)>>";}
     in x : Occurrence;
     in y : Occurrence;
     (y.startShot > x.endShot) and (x.startShot > y.endShot)
   }
   
   predicate nearlyMeets {
-    @Assert{n="nearlyMeets"; f="<<nearlyMeets : x~Occurrence, y~Occurrence : birth(y) = death(x) and (x.openRight or y.openLeft)";}
+    @Assert{n="nearlyMeets"; f="<<nearlyMeets : x~Occurrence, y~Occurrence : birth(y) = death(x) and (x.openRight or y.openLeft)>>";}
     doc /*  don't meet, but no instants between the end-shot of x and the start-shot of y
      * x is open-right; y is open-left, or both
      */

@@ -75,7 +75,7 @@ library package Regions {
         * This is the "L" exact location primitive. 
         * Uses o.frameOfReference as the frame-of-reference for the region.
         */
-        @Assert{t="Location"; f="<< Location : o~Occurrence := result~Region | o L region";
+        @Assert{t="Location"; f="<< Location : o~Occurrence := result~Region | o L region >>";
             comment /* Location is a function, but "L" is a binary operator, so "|" (such that)  notation is used */ }
         in o : Occurrence;
         return result : Region;
