@@ -11,14 +11,14 @@ library package Allen {
   
   
   predicate precedes {
-    @Assert{n="precedes"; f="<<precedes : x~Occurrence, y~Occurrence : death(x) < birth(y)>>";}
+    @Assert{n="precedes"; f="<<precedes : x~Occurrence, y~Occurrence : death(x) < birth(y) >>";}
     in x : Occurrence;
     in y : Occurrence;
     x.endShot < y.startShot
   }
   
   predicate meets {
-    @Assert{n="meets"; f="<<meets : x~Occurrence, y~Occurrence : death(x) = birth(y)";}
+    @Assert{n="meets"; f="<<meets : x~Occurrence, y~Occurrence : death(x) = birth(y) >>";}
     doc /* x must not be open-right, and y must not be open-left */
     in x : Occurrence;
     in y : Occurrence;
@@ -33,8 +33,8 @@ library package Allen {
   }
 
   predicate starts {
-    @Assert{n="starts"; f="<<starts : x~Occurrence, y~Occurrence : birth(x) = birth(y) and death(y) < death(x)>>"+
-        "and x.openLeft = y.openLeft";}
+    @Assert{n="starts"; f="<<starts : x~Occurrence, y~Occurrence : birth(x) = birth(y) and death(y) < death(x)"+
+        "and x.openLeft = y.openLeft >>";}
     doc /* both should be the same for open-left */
     in x : Occurrence;
     in y : Occurrence;
@@ -50,8 +50,8 @@ library package Allen {
   }
 
   predicate finishes {
-    @Assert{n="finishes"; f="<<finishes : x~Occurrence, y~Occurrence : birth(y) < birth(x)) and death(x) = death(y)>>"+
-        "and x.openRight = y.openRight";}
+    @Assert{n="finishes"; f="<<finishes : x~Occurrence, y~Occurrence : birth(y) < birth(x)) and death(x) = death(y)"+
+        "and x.openRight = y.openRight >>";}
     doc /* both should be the same for open-right */
     in x : Occurrence;
     in y : Occurrence;
@@ -60,8 +60,8 @@ library package Allen {
   }
 
   predicate coincident {
-    @Assert{n="coincident"; f="<<coincident : x~Occurrence, y~Occurrence : birth(y) = birth(x)) and death(x) = death(y)>>"+
-        "and x.openLeft = y.openLeft and x.openRight = y.openRight" ;}
+    @Assert{n="coincident"; f="<<coincident : x~Occurrence, y~Occurrence : birth(y) = birth(x)) and death(x) = death(y)"+
+        "and x.openLeft = y.openLeft and x.openRight = y.openRight >>" ;}
     doc /* both should be the same for open-left and open-right */
     in x : Occurrence;
     in y : Occurrence;

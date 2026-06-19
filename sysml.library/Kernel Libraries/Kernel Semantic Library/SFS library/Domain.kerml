@@ -104,7 +104,7 @@ library package Domain {
 		doc /* GetChangeToFalse does not wait if d::e is already false */
 		@Assert{n="GetChangeToFalse"; f="<<GetChangeToFalse : d~Occurrence, e~BooleanEvaluation, tau~Instant : "+
 				"(not I[[d::e,now]] and forall t~Instant in tau ., now are I[[d::e,t]] )"+ 
-				"implies b = false";}
+				"implies b = false >>";}
 	}
 
 }
