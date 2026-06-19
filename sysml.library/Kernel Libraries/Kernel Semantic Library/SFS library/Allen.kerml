@@ -34,7 +34,7 @@ library package Allen {
 
   predicate starts {
     @Assert{n="starts"; f="<<starts : x~Occurrence, y~Occurrence : birth(x) = birth(y) and death(y) < death(x)"+
-        "and x.openLeft = y.openLeft >>";}
+        " and x.openLeft = y.openLeft >>";}
     doc /* both should be the same for open-left */
     in x : Occurrence;
     in y : Occurrence;
@@ -43,15 +43,15 @@ library package Allen {
   }
 
   predicate during {
-    @Assert{n="during"; f="<<during : x~Occurrence, y~Occurrence : birth(y) <= birth(x)) and death(x) <= death(y)>>";}
+    @Assert{n="during"; f="<<during : x~Occurrence, y~Occurrence : birth(y) <= birth(x) and death(x) <= death(y)>>";}
     in x : Occurrence;
     in y : Occurrence;
     (y.startShot <= x.startShot) and (x.endShot <= y.endShot)
   }
 
   predicate finishes {
-    @Assert{n="finishes"; f="<<finishes : x~Occurrence, y~Occurrence : birth(y) < birth(x)) and death(x) = death(y)"+
-        "and x.openRight = y.openRight >>";}
+    @Assert{n="finishes"; f="<<finishes : x~Occurrence, y~Occurrence : birth(y) < birth(x) and death(x) = death(y)"+
+        " and x.openRight = y.openRight >>";}
     doc /* both should be the same for open-right */
     in x : Occurrence;
     in y : Occurrence;
@@ -60,8 +60,8 @@ library package Allen {
   }
 
   predicate coincident {
-    @Assert{n="coincident"; f="<<coincident : x~Occurrence, y~Occurrence : birth(y) = birth(x)) and death(x) = death(y)"+
-        "and x.openLeft = y.openLeft and x.openRight = y.openRight >>" ;}
+    @Assert{n="coincident"; f="<<coincident : x~Occurrence, y~Occurrence : birth(y) = birth(x) and death(x) = death(y)"+
+        " and x.openLeft = y.openLeft and x.openRight = y.openRight >>" ;}
     doc /* both should be the same for open-left and open-right */
     in x : Occurrence;
     in y : Occurrence;
@@ -70,7 +70,7 @@ library package Allen {
   }
 
   predicate nonoverlaps {
-    @Assert{n="nonoverlaps"; f="<<nonoverlaps : x~Occurrence, y~Occurrence : birth(y) > death(x)) or birth(x) > death(y)>>";}
+    @Assert{n="nonoverlaps"; f="<<nonoverlaps : x~Occurrence, y~Occurrence : birth(y) > death(x) or birth(x) > death(y)>>";}
     in x : Occurrence;
     in y : Occurrence;
     (y.startShot > x.endShot) and (x.startShot > y.endShot)

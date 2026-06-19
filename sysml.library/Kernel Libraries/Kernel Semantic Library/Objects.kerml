@@ -66,7 +66,7 @@ standard library package Objects {
 			/*
 			 * Performances that are owned by this object.
 			 */
-			@Assert{f="<< forall op~Performance in ownedPerformances are self.timeEnclosedOccurrence(ep) >>";}
+			@Assert{f="<< forall op~Performance in ownedPerformances are self.timeEnclosedOccurrence(op) >>";}
 			 
 			feature redefines this default that {
 				doc
