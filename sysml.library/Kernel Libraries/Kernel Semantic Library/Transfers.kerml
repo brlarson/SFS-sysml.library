@@ -34,7 +34,7 @@ standard library package Transfers {
              * The entity whose output is the source of the payload to be transferred.
              */
 //SFS:  replace sourceOutput with Occurrence.outgoingBuffer        
-//            feature sourceOutput: Anything[0..*];
+            feature sourceOutput: Anything[0..*];
         }
         
         end feature target: Occurrence redefines BinaryLink::target {
@@ -43,7 +43,7 @@ standard library package Transfers {
              * The entity whose input is the target of the payload to be transferred.
              */
 //SFS:  replace targetInput with Occurrence.incomingBuffer        
-//            feature targetInput: Anything[0..*];
+            feature targetInput: Anything[0..*];
         }
         
         feature isInstant: Boolean[1] {
@@ -321,7 +321,7 @@ standard library package Transfers {
          * A transfer automatically puts the payload in the target's incomingBuffer
          * so AcceptPerformance waits for something in the receiver's incomingBuffer.
          */
-        out feature payload[1];  //changed from [0..*]
+        inout feature payload[1];  //changed from [0..*]
         in feature receiver: Occurrence[1] default this;
         feature acceptedTransfer: MessageTransfer[1];
         succession first waitForTransfer then getPayloadFromBuffer;

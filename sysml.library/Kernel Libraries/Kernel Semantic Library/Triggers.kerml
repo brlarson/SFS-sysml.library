@@ -13,7 +13,9 @@ standard library package Triggers {
 	public import Clocks::*;
 	public import Observation::*;
 //SFS:
-	public import Performances::Computation;	
+	public import Performances::Computation;
+  private import ISQBase::DurationValue;
+
 	
 	struct TimeSignal :> ChangeSignal {
 		doc
@@ -154,7 +156,7 @@ standard library package Triggers {
 		 * a certain time delay relative to a given Clock.
 		 */
 	
-		in feature delay : NumericalValue[1] {
+		in feature delay : DurationValue[1] {
 			doc
 			/*
 			 * The time duration, relative to the clock, after which the TimeSignal is sent.
