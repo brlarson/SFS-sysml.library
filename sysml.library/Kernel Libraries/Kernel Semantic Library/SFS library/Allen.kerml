@@ -2,21 +2,23 @@
 
 
 library package Allen {
-  doc /* SFS:  Allen's Intervals */
+  doc /* SFS:  Allen's Intervals 
+    * "death" from df-bl.death; "birth" from df-bl.birth
+    */
   
   private import Assertion::Assert;
   private import Occurrences::Occurrence;
   
   
   predicate precedes {
-    language "Domain" /*  precedes(X,Y) := death(X) < birth(Y) */
+    @Assert{n="precedes"; f="<<precedes : x~Occurrence, y~Occurrence : death(x) < birth(y)>>";}
     in x : Occurrence;
     in y : Occurrence;
     x.endShot < y.startShot
   }
   
   predicate meets {
-    language "Domain" /*  meets(X,Y) := (death(X) = birth(Y)) */
+    @Assert{f="<< meets(X,Y) := (death(X) = birth(Y)) >>";}
     doc /* x must not be open-right, and y must not be open-left */
     in x : Occurrence;
     in y : Occurrence;
@@ -24,14 +26,14 @@ library package Allen {
   }
 
   predicate overlaps {
-    language "Domain" /*  overlaps(X,Y) :=  birth(Y) < death(X) */
+    @Assert{f="<< overlaps(X,Y) :=  birth(Y) < death(X) >>";}
     in x : Occurrence;
     in y : Occurrence;
     y.startShot < x.endShot 
   }
 
   predicate starts {
-    language "Domain" /*  starts(X,Y) :=  (birth(X) = birth(Y)) and (death(Y) < death(X)) */
+    @Assert{f="<< starts(X,Y) :=  (birth(X) = birth(Y)) and (death(Y) < death(X)) >>";}
     doc /* both should be the same for open-left */
     in x : Occurrence;
     in y : Occurrence;
@@ -40,14 +42,14 @@ library package Allen {
   }
 
   predicate during {
-    language "Domain" /*  during(X,Y) :=  (birth(Y) <= birth(X)) and (death(X) <= death(Y)) */
+    @Assert{f="<< during(X,Y) :=  (birth(Y) <= birth(X)) and (death(X) <= death(Y)) >>";}
     in x : Occurrence;
     in y : Occurrence;
     (y.startShot <= x.startShot) and (x.endShot <= y.endShot)
   }
 
   predicate finishes {
-    language "Domain" /*  finishes(X,Y) :=  (birth(Y) < birth(X)) and (death(X) = death(Y)) */
+    @Assert{f="<< finishes(X,Y) :=  (birth(Y) < birth(X)) and (death(X) = death(Y)) >>";}
     in x : Occurrence;
     in y : Occurrence;
     y.startShot < x.startShot and x.endShot == y.endShot
@@ -55,7 +57,7 @@ library package Allen {
   }
 
   predicate coincident {
-    language "Domain" /*  coincident(X,Y) :=  (birth(Y) = birth(X)) and (death(X) = death(Y)) */
+    @Assert{f="<< coincident(X,Y) :=  (birth(Y) = birth(X)) and (death(X) = death(Y)) >>";}
     in x : Occurrence;
     in y : Occurrence;
     y.startShot == x.startShot and x.endShot == y.endShot
@@ -63,14 +65,14 @@ library package Allen {
   }
 
   predicate nonoverlaps {
-    language "Domain" /*  nonoverlaps(X,Y) :=  (birth(Y) > death(X)) or (birth(X) > death(Y)) */
+    @Assert{f="<< nonoverlaps(X,Y) :=  (birth(Y) > death(X)) or (birth(X) > death(Y)) >>";}
     in x : Occurrence;
     in y : Occurrence;
     (y.startShot > x.endShot) and (x.startShot > y.endShot)
   }
   
   abstract predicate nearlyMeets {
-    language "Domain" /* nearlyMeets(X,Y) := (death(X) = birth(Y)) and (X.openRight or Y.openLeft) */
+    @Assert{f="<< nearlyMeets(X,Y) := (death(X) = birth(Y)) and (X.openRight or Y.openLeft) >>";}
     doc /*  don't meet, but no instants between 
      * the end-shot of x and the start-shot of y
      * "abstract" because this can't be executed

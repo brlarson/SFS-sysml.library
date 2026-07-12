@@ -39,7 +39,7 @@ library package Domain {
 		}
 		in feature tau : Instant[1];   //startingAt    
 		return result : Anything[0..1];
-		language "Domain" /* Get(d,f,tau) := I[[d::f,tau]]*/
+		@Assert{f="<< Get(d,f,tau) := I[[d::f,tau]] >>";}
 	}
 
 	function GetNow {
@@ -48,7 +48,7 @@ library package Domain {
 		  feature f : Anything[1];  //accessedFeature
 		}
 		return result : Anything[0..1] = Get(d, now);
-		language "Domain" /* GetNow(d,f) := I[[d::f,now]]*/
+		@Assert{f="<< GetNow(d,f) := I[[d::f,now]] >>";}
 	}
 
 	behavior SetNow {  // replaces FeatureReferencingPerformances::FeatureWritePerformance
@@ -57,7 +57,7 @@ library package Domain {
 		  feature f : Anything[1];  //accessedFeature
 		}
 		in feature v : Anything[1];  //replacementValues
-		language "Domain" /* I[[d::f,now]] = v */
+		@Assert{f="<< I[[d::f,now]] = v >>";}
 	}
 
   behavior GetChange {
@@ -67,9 +67,9 @@ library package Domain {
 		  feature f : Anything[1];  //accessedFeature
 		}
 		out feature v : Anything[0..1];  //values
-		language "Domain" /* ( I[[d::f,d::startShot]] <> I[[d::f,now]]
-		  * and forall t~Instant in d::startShot ., now are I[[d::f,t]] = I[[d::f,d::startShot]]) 
-			* implies v = I[[d::f,now]] */
+		@Assert{f="<< ( I[[d::f,d::startShot]] <> I[[d::f,now]]"+
+		  " and forall t~Instant in d::startShot ., now are I[[d::f,t]] = I[[d::f,d::startShot]])"+
+			" implies v = I[[d::f,now]] >>";}
 	}
 
 	behavior GetBooleanChange :> GetChange {
@@ -77,19 +77,19 @@ library package Domain {
 			feature e : BooleanEvaluation[1] :>> f;
 		}
 		out feature b : Boolean[1] :>> v;
-		language "Domain" /* ( I[[d::e::result,d::startShot]] <> I[[d::e::result,now]]
-		  * and forall t~Instant in d::startShot ., now are I[[d::e::result,t]] = I[[d::e::result,d::startShot]] )
-			* implies b = I[[d::e::result,now]] */
+		@Assert{f="<< ( I[[d::e::result,d::startShot]] <> I[[d::e::result,now]]"+
+		  " and forall t~Instant in d::startShot ., now are I[[d::e::result,t]] = I[[d::e::result,d::startShot]] )"+
+			" implies b = I[[d::e::result,now]] >>";}
 	}
 
 	behavior GetChangeToTrue :> GetBooleanChange{
-		language "Domain" /* ( forall t~Instant in d::startShot ., now are I[[d::e::result,t]] = false  )
-			* and I[[d::e::result,now]] = true */
+		@Assert{f="<< ( forall t~Instant in d::startShot ., now are I[[d::e::result,t]] = false  )"+
+			" and I[[d::e::result,now]] = true >>";}
 	}
 
 	behavior GetChangeToFalse :> GetBooleanChange{
-		language "Domain" /* ( forall t~Instant in d::startShot ., now are I[[d::e::result,t]] = true  )
-			* and I[[d::e::result,now]] = false */
+		@Assert{f="<< ( forall t~Instant in d::startShot ., now are I[[d::e::result,t]] = true  )"+
+			" and I[[d::e::result,now]] = false >>";}
 	}
 
 }

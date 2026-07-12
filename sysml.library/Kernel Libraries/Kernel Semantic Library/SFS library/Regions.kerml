@@ -72,7 +72,7 @@ library package Regions {
         * This is the "L" exact location primitive. (df-lfu)
         * Uses o.frameOfReference as the frame-of-reference for the region.
         */
-        language "Domain" /* L : o : Occurrence := result */
+        @Assert{f="<< L : o : Occurrence := result >>";}
         in o : Occurrence;
         return result : Region;
         inv { o.isClosed and o.innerSpaceDimension == 3 and o.outerSpaceDimension == 3
@@ -81,8 +81,8 @@ library package Regions {
    }
 
     // SFS:  Two things having the same location are the same thing (df-lfu)
-    language "Domain" /* forall x~Occurrence forall r1,r2~Region are
-      *  ( (L(x)=r1 and L(x)=r2) implies r1=r2 ) */
+    @Assert{f="<< forall x~Occurrence forall r1,r2~Region are"+
+      "  ( (L(x)=r1 and L(x)=r2) implies r1=r2 ) >>";}
 
 
     predicate PointInRegion {
@@ -92,7 +92,7 @@ library package Regions {
         inv { point.frameOfReference == region.frameOfReference
             and point.frameOfReference == region.frameOfReference 
         }
-        language "Domain" /* In : point~Point, region~Region : point in region */
+        @Assert{f="<< In : point~Point, region~Region : point in region >>";}
     }
 
     predicate PointOnSurface {
@@ -100,7 +100,7 @@ library package Regions {
         in point : Point;
         in surface : Surface;
         inv { point.frameOfReference == surface.frameOfReference }
-        language "Domain" /* On : point~Point, surface~Surface : point on surface" */
+        @Assert{f="<< On : point~Point, surface~Surface : point on surface >>";}
     }
 
     predicate RegionOverlap {
@@ -110,12 +110,12 @@ library package Regions {
         in r1 : Region;
         in r2 : Region;
         inv { r1.frameOfReference == r2.frameOfReference }
-        language "Domain" /* O : r1~Region, r2~Region : exists p~Point that (In(p,r1) and In(p,r2)) */
+        @Assert{f="<< O : r1~Region, r2~Region : exists p~Point that (In(p,r1) and In(p,r2)) >>";}
     }
 
         doc /* SFS: Regions overlap only if one contains the other. This property is called no interpenetration. */
-        language "Domain" /* forall r1,r1~Region are 
-          O(r1,r2) implies (RegionContainment(r1,r2) or RegionContainment(r2,r1)) */
+        @Assert{f="<< forall r1,r2~Region are"+
+          " O(r1,r2) implies (RegionContainment(r1,r2) or RegionContainment(r2,r1)) >>";}
 
     predicate RegionContainment {
         doc /* SFS:  A region contains another, when it contains all of its points. 
@@ -123,25 +123,25 @@ library package Regions {
         in r1 : Region;
         in r2 : Region;
         inv { r1.frameOfReference == r2.frameOfReference }
-        language "Domain" /* RegionContainment : r1~Region, r2~Region : forall p~Point are (In(p,r2) implies In(p,r1)) */
+        @Assert{f="<< RegionContainment : r1~Region, r2~Region : forall p~Point are (In(p,r2) implies In(p,r1)) >>";}
     }
 
         doc /* SFS: Parthood implies regional containment. This property is called expansivity. */
-        language "Domain" /* forall x,y~Classifier forall r1,r1~Region are 
-          ( (L(x)=r1 and L(y)=r2 and PartOf(x,y)) implies RegionContainment(r1,r2) */
+        @Assert{f="<< forall x,y~Classifier forall r1,r2~Region are"+
+          " ( (L(x)=r1 and L(y)=r2 and PartOf(x,y)) implies RegionContainment(r1,r2) ) >>";}
 
     predicate AtomicRegion {
         doc /* SFS:  A region is atomic, Ar , when it contains no other regions (in the location relation).
          * This is the "A" operator (df-rat). */
         in r : Region;
-        language "Domain" /* A : r~Region : forall r1~Region are ( RegionContainment(r,r1) implies r = r1 ) */
+        @Assert{f="<< A : r~Region : forall r1~Region are ( RegionContainment(r,r1) implies r = r1 ) >>";}
     } 
 
     // Atomic regions are disjoint (df-rdi)  
-    language "Domain" /* AtomicRegionDisjoint : : 
-        * forall r1~Region r2~Region are 
-        *   ( (AtomicRegion(r1) and AtomicRegion(r2)) implies
-        *   (not RegionOverlap(r1,r2) or r1=r2) ) */ 
+    @Assert{f="<< AtomicRegionDisjoint : :"+
+        " forall r1~Region r2~Region are"+
+        "   ( (AtomicRegion(r1) and AtomicRegion(r2)) implies"+
+        "   (not RegionOverlap(r1,r2) or r1=r2) ) >>";}
     
     function RegionInterior {
         doc /* SFS:  The interior of a region includes all the points in a region 
@@ -149,9 +149,9 @@ library package Regions {
         in r : Region;
         return result : Region;
         inv { r.frameOfReference == (result as Region).frameOfReference}
-        language "Domain" /* RegionInterior : r~Region := result~Region | 
-          * exists s~Surface that forall p~Point are ( In(p,result) implies 
-          * (In(p,r) and not On(p,RegionSurface(r))) ) */
+        @Assert{f="<< RegionInterior : r~Region := result~Region |"+
+          " exists s~Surface that forall p~Point are ( In(p,result) implies"+
+          " (In(p,r) and not On(p,RegionSurface(r))) ) >>";}
     }
 
     function RegionSurface {
@@ -159,9 +159,9 @@ library package Regions {
         in r : Region;
         return result : Surface;
         inv { r.frameOfReference == (result as Region).frameOfReference}
-        language "Domain" /* RegionSurface : r~Region := result~Surface | 
-          * exists r1~Region that forall p~Point are ( On(p,result) implies 
-          *   (In(p,r) and not In(p,RegionInterior(r))) ) */
+        @Assert{f="<< RegionSurface : r~Region := result~Surface |"+
+          " exists r1~Region that forall p~Point are ( On(p,result) implies"+
+          "   (In(p,r) and not In(p,RegionInterior(r))) ) >>";}
     }
 
     function RegionFilm {
@@ -169,9 +169,9 @@ library package Regions {
         in r : Region;
         return result : Surface;
         inv { r.frameOfReference == (result as Region).frameOfReference}
-        language "Domain" /* RegionFilm : r~Region := result~Surface | 
-          * exists r1~Region that forall p~Point are ( On(p,result) implies 
-          *   (RegionInterior(r1)=r and RegionSurface(r1)=result) ) */
+        @Assert{f="<< RegionFilm : r~Region := result~Surface |"+
+          " exists r1~Region that forall p~Point are ( On(p,result) implies"+
+          "   (RegionInterior(r1)=r and RegionSurface(r1)=result) ) >>";}
     }
 
     predicate ExternallyConnected {
@@ -179,8 +179,8 @@ library package Regions {
         in r1 : Region;
         in r2 : Region;
         inv { r1.frameOfReference == r2.frameOfReference }
-        language "Domain" /* EC : r1~Region, r2~Region : 
-          * exists p~Point that ( On(p,RegionSurface(r1)) and On(p,RegionSurface(r2)) ) */
+        @Assert{f="<< EC : r1~Region, r2~Region :"+
+          " exists p~Point that ( On(p,RegionSurface(r1)) and On(p,RegionSurface(r2)) ) >>";}
     }
 
      predicate FilmConnected {
@@ -188,8 +188,8 @@ library package Regions {
         in r1 : Region;
         in r2 : Region;
         inv { r1.frameOfReference == r2.frameOfReference }
-        language "Domain" /* FilmConnected : r1~Region, r2~Region : 
-          * exists p~Point that ( On(p,RegionFilm(r1)) and On(p,RegionFilm(r2)) ) */
+        @Assert{f="<< FilmConnected : r1~Region, r2~Region :"+
+          " exists p~Point that ( On(p,RegionFilm(r1)) and On(p,RegionFilm(r2)) ) >>";}
     }
    
 }

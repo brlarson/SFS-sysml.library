@@ -12,6 +12,7 @@ standard library package Performances {
 	private import Objects::Object;
 	private import Links::BinaryLink;
 	private import Metaobjects::Metaobject;
+	private import Assertion::Assert;
 	private import Transfers::Transfer;
 	private import Transfers::transfers;
 	private import Transfers::TransferBefore;
@@ -52,7 +53,7 @@ standard library package Performances {
 			/*
 			 * timeEnclosedOccurrences of this Performance that are also Performances.
 			 */
-			language "Domain" /* forall ep in enclosedPerformances are during(ep,thisPerformance) */
+			@Assert{f="<< forall ep in enclosedPerformances are during(ep,thisPerformance) >>";}
 		}
 		
 		feature thisPerformance: Performance [1] default self {
@@ -60,7 +61,7 @@ standard library package Performances {
 			/*
 			 * Defaults to the root of the subperformance composition tree.
 			 */
-			language "Domain" /* during(self, thisPerformance) */
+			@Assert{f="<< during(self, thisPerformance) >>";}
 		}
 //SFS:	connector unnecessary because:  during(self, thisPerformance) 	
 //		connector :HappensDuring from [1] self to [1] thisPerformance; 
@@ -103,8 +104,7 @@ standard library package Performances {
 		doc
 		/*
 		 * Computation is a specialization of Performance and Evaluation for the case of computing a result.
-		 */
-			
+		 */	
 	}
 
 //SFS:  BooleanEvaluation is now immediate

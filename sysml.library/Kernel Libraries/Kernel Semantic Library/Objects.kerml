@@ -20,6 +20,7 @@ standard library package Objects {
 	private import CollectionFunctions::contains;
 	private import ScalarValues::Integer;
 	private import ScalarValues::Natural;
+	private import Assertion::Assert;
 	
 	abstract struct Object specializes Occurrence {
 		doc
@@ -51,7 +52,7 @@ standard library package Objects {
 			/*
 			 * Performances that are enacted by this object.
 			 */
-			language "Domain" /* forall ep in enactedPerformances are self.timeEnclosedOccurrence(ep) */
+			@Assert{f="<< forall ep in enactedPerformances are self.timeEnclosedOccurrence(ep) >>";}
 		}
 		
 //SFS: 	feature timeEnclosedOccurrences replaced by function timeEnclosedOccurrences,
@@ -63,8 +64,8 @@ standard library package Objects {
 			/*
 			 * Performances that are owned by this object.
 			 */
-			language "Domain" /* forall op in ownedPerformances are self->
-			  * (timeEnclosedOccurrence(ep) and Mereology::PartOf(op,self) */
+			@Assert{f="<< forall op in ownedPerformances are self->"+
+			  "(timeEnclosedOccurrence(op) and Mereology::PartOf(op,self)) >>";}
 			 
 			feature redefines this default that {
 				doc
@@ -79,8 +80,8 @@ standard library package Objects {
 			/*
 			 * A space boundary that is a structured space object.
 			 */
-			language "Domain" /* not structuredSpaceBoundary->empty implies
-			  * Regions::RegionSurface(Regions::Location(self)) = structuredSpaceBoundary */
+			@Assert{f="<< not structuredSpaceBoundary->empty implies"+
+			  " Regions::RegionSurface(Regions::Location(self)) = structuredSpaceBoundary >>";}
 		}
 	}
 	

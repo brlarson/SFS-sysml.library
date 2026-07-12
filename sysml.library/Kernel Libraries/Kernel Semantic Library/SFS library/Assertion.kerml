@@ -1,7 +1,5 @@
 library package Assertion {
 
-// use language "Domain" instead
-
 private import Metaobjects::Metaobject;
 private import ScalarValues::String;
 
