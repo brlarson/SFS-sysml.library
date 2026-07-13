@@ -81,8 +81,8 @@ standard library package Objects {
 			/*
 			 * A space boundary that is a structured space object.
 			 */
-			language "Domain" /* not structuredSpaceBoundary->empty implies
-			  * Regions::RegionSurface(Regions::Location(self)) = structuredSpaceBoundary */
+			@Assert{f="<< not structuredSpaceBoundary->empty implies"+
+			  " Regions::RegionSurface(Regions::Location(self)) = structuredSpaceBoundary >>";}
 		}
 	}
 	

@@ -7,7 +7,6 @@ library package Domain {
 	private import SI::s;
 	private import Performances::BooleanEvaluation;
 	private import Base::Anything;
-  private import Assertion::Assert;
   private import ISQSpaceTime::TimeValue;
 
 //  datatype Time specializes Real;
@@ -43,7 +42,6 @@ library package Domain {
 		}
 		in feature tau : Instant[1];   //startingAt    
 		return result : Anything[0..1];
-		language "Domain" /* Get(d,f,tau) := I[[d::f,tau]]*/
 	}
 
 	function GetNow {

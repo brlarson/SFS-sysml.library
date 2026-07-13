@@ -81,7 +81,7 @@ standard library package Occurrences {
 			 * SFS:  middleTimeSlice is the open interval between startShot and endShot. 
        * If startShot=endShot then middleTimeSlice does not exist. 
 			 */
-    language "Domain" /* middleTimeSlice = startShot ,, endShot" */
+    @Assert{f="<< middleTimeSlice = startShot ,, endShot >>";}
       :>> lowerBound = startShot;
       :>> upperBound = endShot;
       :>> openLeft = true;
@@ -107,8 +107,8 @@ standard library package Occurrences {
 //SFS new
 		expr getLife {
 			doc /* Life is top-level Occurrence, suboccurrence of no other */
-			language "Domain" /* during(this,result) and
-			   not exists o : Occurrence in o<>this that during(o,result) */	
+			@Assert{f="<< during(this,result) and"+
+			   " not exists o : Occurrence in o<>this that during(o,result) >>";}
 			return result : Life[1];
 			if superoccurrence->isEmpty() ? this as Life
 			  else superoccurrence->head().getLife	
@@ -149,8 +149,8 @@ standard library package Occurrences {
 			 * Composite suboccurrences of this Occurrence.
 			 */
 
-      language "Domain" /* forall s in suboccurrences are during(life(s),life(self))
-			  * and PartOf(s,self) */
+      @Assert{f="<< forall s in suboccurrences are during(life(s),life(self))"+
+			  " and PartOf(s,self) >>";}
 
 			 feature redefines localClock default (that as Occurrence).localClock {
 			 	doc
@@ -219,7 +219,7 @@ standard library package Occurrences {
 
 		feature immediatePredecessors: Occurrence[0..*] subsets occurrences //predecessors 
 		{
-      language "Domain" /* forall i in immediatePredecessors are nearlyMeets(i,this) */
+      @Assert{f="<< forall i in immediatePredecessors are nearlyMeets(i,this) >>";}
 			doc
 			/*
 			 * Occurrences that end just before this occurrence starts, with no
@@ -236,7 +236,7 @@ standard library package Occurrences {
 
 		feature immediateSuccessors: Occurrence[0..*] subsets occurrences // successors 
 		  inverse of immediatePredecessors {
-      language "Domain" /* forall i in immediateSuccessors are nearlyMeets(this,i) */
+      @Assert{f="<< forall i in immediateSuccessors are nearlyMeets(this,i) >>";}
 			doc
 			/*
 			 * Occurrences that start just after this occurrence ends, with no
@@ -739,7 +739,7 @@ standard library package Occurrences {
 			 * of the same inner space dimension as this occurrence, except if it is zero,
 			 * whereupon there is no space interior.
 			 */
-			language "Domain" /* innerSpaceDimension = 3 implies Location(spaceInterior) = RegionInterior(Location(this))*/ 
+			@Assert{f="<< innerSpaceDimension = 3 implies Location(spaceInterior) = RegionInterior(Location(this)) >>";}
 		}
 
 		feature spaceInteriorOf: Occurrence[0..1] subsets spaceSliceOf inverse of spaceInterior {
@@ -747,7 +747,7 @@ standard library package Occurrences {
 			/*
 			 * An Occurrence of which this one is the space interior.
 			 */
-			language "Domain" /* innerSpaceDimension = 3 implies Location(this) = RegionInterior(Location(spaceInteriorOf))*/ 
+			@Assert{f="<< innerSpaceDimension = 3 implies Location(this) = RegionInterior(Location(spaceInteriorOf)) >>";}
 		}
 
 		inv { notEmpty(spaceInterior) implies spaceInterior.innerSpaceDimension == innerSpaceDimension }
@@ -761,7 +761,7 @@ standard library package Occurrences {
 			 * into space slices that also have no spaceBoundary, where the outer one surrounds
 			 * the inner ones.
 			 */
-			language "Domain" /* innerSpaceDimension = 3 implies RegionSurface(this) = spaceBoundary */
+			@Assert{f="<< innerSpaceDimension = 3 implies RegionSurface(this) = spaceBoundary >>";}
 			inv { isClosed == true }
 
 			feature spaceBounder: Occurrence [1] subsets self;
@@ -1012,7 +1012,7 @@ standard library package Occurrences {
 		 * same time as) some snapshot of the longerOccurrence. Note that this means every
 		 * Occurrence HappensDuring itself and that HappensDuring is transitive.
 		 */
-		language "Domain" /* during(shorterOccurrence, longerOccurrence) */
+		@Assert{f="<< during(shorterOccurrence, longerOccurrence) >>";}
 		end feature shorterOccurrence: Occurrence redefines sourceOccurrence; // crosses longerOccurrence.timeEnclosedOccurrences;
 		end //happensDuring [1..*] 
 			feature longerOccurrence: Occurrence redefines targetOccurrence;
@@ -1026,7 +1026,7 @@ standard library package Occurrences {
 		 * HappensWhile asserts that two occurrences happen during each other, that is, they
 		 * each start at the same time and end at the same time.
 		 */
-		language "Domain" /* coincident(thisOccurrence, thatOccurrence) */
+		@Assert{f="<< coincident(thisOccurrence, thatOccurrence) >>";}
 		end feature thisOccurrence: Occurrence redefines shorterOccurrence;  // crosses thatOccurrence.timeCoincidentOccurrences;
 		end // happensWhile [1..*] subsets timeCoincidentOccurrences 
 		  feature thatOccurrence: Occurrence redefines longerOccurrence;
@@ -1056,7 +1056,7 @@ standard library package Occurrences {
 		 * smallerSpace are in the spatial extent of the largerSpace. Note that this means every
 		 * Occurrence is InsideOf itself and that InsideOf is transitive.
 		 */
-		language "Domain" /* RegionContainment(Location(smallerSpace), Location(largerSpace)) */
+		@Assert{f="<< RegionContainment(Location(smallerSpace), Location(largerSpace)) >>";}
 		end feature smallerSpace: Occurrence redefines sourceOccurrence;  // crosses largerSpace.spaceEnclosedOccurrences;
 		end //insideOf [1..*] 
 			feature largerSpace: Occurrence redefines targetOccurrence;
@@ -1072,8 +1072,8 @@ standard library package Occurrences {
 		 * during and are included in the space of the largerOccurrence. This means every occurrence
 		 * is Within itself and Within is transitive.
 		 */
-		language "Domain" /* RegionContainment(Location(smallerOccurrence), Location(largerOccurrence)) 
-		 * and during(smallerOccurrence, largerOccurrence) */
+		@Assert{f="<< RegionContainment(Location(smallerOccurrence), Location(largerOccurrence))"+
+		 " and during(smallerOccurrence, largerOccurrence) >>";}
 		end feature smallerOccurrence: Occurrence redefines shorterOccurrence, smallerSpace;
 		  // crosses largerOccurrence.spaceTimeEnclosedOccurrences;
 		end //within [1..*] 
@@ -1089,9 +1089,9 @@ standard library package Occurrences {
 		 * same four dimensional region.  Note that this means every Occurrence is WithinBoth with
 		 * itself and transitive.
 		 */ 
-		language "Domain" /* coincident(thisOccurrence, thatOccurrence) 
-		 * and RegionContainment(Location(thisOccurrence), Location(thatOccurrence)) 
-		 * and RegionContainment(Location(thatOccurrence), Location(thisOccurrence)) */
+		@Assert{f="<< coincident(thisOccurrence, thatOccurrence)"+
+		 " and RegionContainment(Location(thisOccurrence), Location(thatOccurrence))"+
+		 " and RegionContainment(Location(thatOccurrence), Location(thisOccurrence)) >>";}
 		end feature thisOccurrence redefines smallerOccurrence, HappensWhile::thisOccurrence;
 		  // crosses thatOccurrence.spaceTimeCoincidentOccurrences;
 		end // withinBoth subsets spaceTimeCoincidentOccurrences 
@@ -1166,8 +1166,8 @@ standard library package Occurrences {
 		 * either space or time, or both, between two occurrences.  That is, no four dimensional
 		 * points are in both occurrences. Note that this means no Occurrence is Without itself.
 		 */
-		language "Domain" /* nonoverlaps(separateOccurrenceToo, separateOccurrence)
-		 * or not RegionOverlap(Location(separateOccurrenceToo), Location(separateOccurrence)) */
+		@Assert{f="<< nonoverlaps(separateOccurrenceToo, separateOccurrence)"+
+		 " or not RegionOverlap(Location(separateOccurrenceToo), Location(separateOccurrence)) >>";}
 		end feature separateOccurrenceToo: Occurrence redefines BinaryLink::source;
 //		  crosses separateOccurrence.withoutOccurrences;
 		end feature separateOccurrence: Occurrence redefines BinaryLink::target;
@@ -1188,7 +1188,7 @@ standard library package Occurrences {
 		 * and startShot of the laterOccurrence. Note that this means no Occurrence HappensBefore
 		 * itself.
 		 */
-		language "Domain" /* precedes(earlierOccurrence, laterOccurrence) */
+		@Assert{f="<< precedes(earlierOccurrence, laterOccurrence) >>";}
 		end feature earlierOccurrence: Occurrence redefines sourceOccurrence; //, separateOccurrenceToo; 
 //			crosses laterOccurrence.predecessors;
 		end feature laterOccurrence: Occurrence redefines targetOccurrence; //, separateOccurrence; 
@@ -1203,7 +1203,7 @@ standard library package Occurrences {
 		 * HappensJustBefore is HappensBefore asserting that there is no possibility of another
 		 * occurrences happening in the time between the earlierOccurrence and laterOccurrence.
 		 */
-		language "Domain" /* nearlyMeets(earlierOccurrence, laterOccurrence) */
+		@Assert{f="<< nearlyMeets(earlierOccurrence, laterOccurrence) >>";}
 		end feature redefines earlierOccurrence: Occurrence;  // crosses laterOccurrence.immediatePredecessors;
 		end feature redefines laterOccurrence: Occurrence;  // crosses earlierOccurrence.immediateSuccessors;
 	}
@@ -1230,7 +1230,7 @@ standard library package Occurrences {
 		 * see HappensBefore).	That is, no four dimensional points of the occurrences are in the
 		 * spatial extent of both of them. This means no Occurrence is OutsideOf itself.
 		 */
-		language "Domain" /* not RegionOverlap(Location(separateSpaceToo), Location(separateSpace)) */
+		@Assert{f="<< not RegionOverlap(Location(separateSpaceToo), Location(separateSpace)) >>";}
 		end feature separateSpaceToo: Occurrence redefines sourceOccurrence; //, separateOccurrenceToo;
 //			crosses separateSpace.outsideOfOccurrences;
 		end feature separateSpace: Occurrence redefines targetOccurrence; //, separateOccurrence;
@@ -1245,7 +1245,7 @@ standard library package Occurrences {
 		 * JustOutsideOf is an OutsideOf asserting that two occurrences have some space slices with
 		 * no space between them.
 		 */
-		language "Domain" /* FilmConnected(Location(separateSpaceToo), Location(separateSpace)) */
+		@Assert{f="<< FilmConnected(Location(separateSpaceToo), Location(separateSpace)) >>";}
 		end feature redefines separateSpaceToo: Occurrence;
 //			crosses separateSpace.justOutsideOfOccurrences;
 		end feature redefines separateSpace: Occurrence;
@@ -1274,7 +1274,7 @@ standard library package Occurrences {
 		 * InnerSpaceOf is an OutsideOf asserting that the space surrounded by an inner space boundary
 		 * of one occurrence (outer space) is completely occupied by another occurrence (inner space).
 		 */
-		language "Domain" /* Location(innerSpace) = RegionInterior(Location(outerSpace))*/
+		@Assert{f="<< Location(innerSpace) = RegionInterior(Location(outerSpace)) >>";}
 		end feature outerSpace: Occurrence redefines sourceOccurrence;
 		end feature innerSpace: Occurrence redefines targetOccurrence crosses outerSpace.innerSpaceOccurrences;
 	}
@@ -1288,7 +1288,7 @@ standard library package Occurrences {
 	// 	 * SurroundedBy is an OutsideOf asserting that one occurrence (surrounded space) is included
 	// 	 * in space by an inner space occurrence of another (surrounding space).
 	// 	 */
-	// 	language "Domain" /* RegionContainment(Location(surroundedSpace), Location(surroundingSpace)) */
+	// 	@Assert{f="<< RegionContainment(Location(surroundedSpace), Location(surroundingSpace)) >>";}
 	// 	end feature surroundedSpace: Occurrence redefines sourceOccurrence;
 	// 	end feature surroundingSpace: Occurrence redefines targetOccurrence crosses surroundedSpace.surroundedByOccurrences;
 	// }

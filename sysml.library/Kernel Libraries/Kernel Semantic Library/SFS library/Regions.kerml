@@ -150,8 +150,7 @@ library package Regions {
         @Assert{n="AtomicRegion"; f="<< AtomicRegion : r~Region : "+
                 "forall r1~Region are ( RegionContainment(r,r1) implies r = r1 ) >>"; t="df-rat";}
         in r : Region;
-        language "Domain" /* A : r~Region : forall r1~Region are ( RegionContainment(r,r1) implies r = r1 ) */
-    } 
+    }
 
     // Atomic regions are disjoint (df-rdi)
     @Assert{n="AtomicRegionDisjoint"; f="<< AtomicRegionDisjoint : :"+ 
@@ -206,8 +205,6 @@ library package Regions {
         in r1 : Region;
         in r2 : Region;
         inv { r1.frameOfReference == r2.frameOfReference }
-        language "Domain" /* EC : r1~Region, r2~Region : 
-          * exists p~Point that ( On(p,RegionSurface(r1)) and On(p,RegionSurface(r2)) ) */
     }
 
     //  predicate FilmConnected {
@@ -215,8 +212,8 @@ library package Regions {
     //     in r1 : Region;
     //     in r2 : Region;
     //     inv { r1.frameOfReference == r2.frameOfReference }
-    //     language "Domain" /* FilmConnected : r1~Region, r2~Region : 
-    //       * exists p~Point that ( On(p,RegionFilm(r1)) and On(p,RegionFilm(r2)) ) */
+    //     @Assert{f="<< FilmConnected : r1~Region, r2~Region :"+
+    //       " exists p~Point that ( On(p,RegionFilm(r1)) and On(p,RegionFilm(r2)) ) >>";}
     // }
    
 }
