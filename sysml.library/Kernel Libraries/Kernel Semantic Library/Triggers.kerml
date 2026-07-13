@@ -13,7 +13,9 @@ standard library package Triggers {
 	public import Clocks::*;
 	public import Observation::*;
 //SFS:
-	public import Performances::Computation;	
+	public import Performances::Computation;
+  private import ISQBase::DurationValue;
+
 	
 	struct TimeSignal :> ChangeSignal {
 		doc
@@ -79,7 +81,7 @@ standard library package Triggers {
 			 */
 		}
 		
-		return feature changeSignal : ChangeSignal[1] = new ChangeSignal(condition, monitor) {
+		out feature changeSignal : ChangeSignal[1] :>> result = new ChangeSignal(condition, monitor) {
 			doc
 			/*
 			 * The ChangeSignal for the condition, as monitored by the monitor.
@@ -132,7 +134,7 @@ standard library package Triggers {
 			 */
 		}
 		
-		return feature timeSignal : TimeSignal[1] = new TimeSignal(timeInstant, clock, monitor) {
+		out feature timeSignal : TimeSignal[1] :>> result = new TimeSignal(timeInstant, clock, monitor) {
 			doc
 			/*
 			 * The TimeSignal for the given timeInstant, as monitored by the monitor.
@@ -154,7 +156,7 @@ standard library package Triggers {
 		 * a certain time delay relative to a given Clock.
 		 */
 	
-		in feature delay : NumericalValue[1] {
+		in feature delay : DurationValue[1] {
 			doc
 			/*
 			 * The time duration, relative to the clock, after which the TimeSignal is sent.
@@ -185,7 +187,7 @@ standard library package Triggers {
 			 */
 		}
 		
-		return signal : TimeSignal[1] = new TimeSignal(clock.currentTime + delay, clock, monitor) {
+		out feature signal : TimeSignal[1] :>> result = new TimeSignal(clock.currentTime + delay, clock, monitor) {
 //			TriggerAt(clock.currentTime + delay, receiver, clock, monitor) {
 			doc
 			/*

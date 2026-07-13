@@ -40,14 +40,17 @@ standard library package Actions {
 		ref action self: Action :>> Performance::self;
 		ref action incomingTransfers :>> Performance::incomingTransfers;
 		
-		action start: Action :>> startShot {
+		//SFS:  keep start and done Instants
+		start :>> startShot {
+//		action start: Action :>> startShot {
 			doc
 			/*
 			 * The starting snapshot of an Action. 
 			 */
 		}
 		
-		action done: Action :>> endShot {
+		done :>> endShot {
+//		action done: Action :>> endShot {
 			doc
 			/*
 			 * The ending snapshot of an Action.
@@ -192,7 +195,7 @@ standard library package Actions {
 		 * from a designated sender Occurrence with a given payload, optionally to a designated receiver.
 		 */
 	
-		in :>> payload: Anything[0..*];
+		in :>> payload: Anything[1];
 		in :>> sender: Occurrence[1] default this;
 		in :>> receiver: Occurrence[1];
 
@@ -215,7 +218,7 @@ standard library package Actions {
 		 * An AcceptMessageAction is an Action that identifies an incomingTransferToSelf
 		 * of a designated receiver Occurrence, providing its payload as output.
 		 */
-		inout :>> payload;
+		out :>> payload;
 		ref acceptedMessage :>> acceptedTransfer: MessageTransfer, MessageAction {
             in :>> MessageTransfer::payload, MessageAction::payload;
         }
@@ -228,11 +231,11 @@ standard library package Actions {
 		 * not accepters for TransitionActions. It waits for a payload or message of the specified 
 		 * kind to be accepted by a nested state transition.
 		 */
-		ref :>> acceptedMessage = aState.aTransition.accepter.acceptedMessage;
-		state aState  {
-			transition aTransition first start accept apayload: Anything via receiver then done;
-		}
-		bind payload = aState.aTransition.apayload;
+		// ref :>> acceptedMessage = aState.aTransition.accepter.acceptedMessage;
+		// state aState  {
+		// 	transition aTransition first start accept apayload: Anything via receiver then done;
+		// }
+		// bind payload = aState.aTransition.apayload;
 	}
 	
 	abstract action acceptActions: AcceptAction[0..*] nonunique :> actions, acceptPerformances {
