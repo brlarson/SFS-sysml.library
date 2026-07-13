@@ -98,6 +98,7 @@ standard library package Observation {
 		}
 
 		succession loadOutgoingBuffer then transfer;
+//SFS:  use Transfer instead of TransferBefore because there's already a succession		
 		step transfer : Transfer {
 			doc /* move changeSignal as payload to changeObserver */
 			end feature :>> source = this;
@@ -129,6 +130,7 @@ standard library package Observation {
 		 */
 
 		private thisMonitor : ChangeMonitor redefines self;
+//SFS:  does this need to be a var?		
 		private composite feature observations[0..*] : ObserveChange;
 		
 		// private behavior AssignObservations specializes FeatureWritePerformance {
@@ -145,6 +147,7 @@ standard library package Observation {
 		// 	}
 		// 	inout feature redefines replacementValues[0..*] : ObserveChange;
 		// }
+		
 		private behavior AssignObservations specializes SetNow {
 			in feature monitor : ChangeMonitor redefines d {
 				feature observations redefines f;

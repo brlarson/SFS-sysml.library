@@ -191,7 +191,7 @@ standard library package Actions {
 	action def SendAction :> Action, SendPerformance {
 		doc
 		/*
-		 * A SendAction is an Action used to type SendActionUsages. It initiates an outgoingTransferFromSelf 
+		 * A SendAction is an Action used to type SendActionUsages. It initiates a Transfer
 		 * from a designated sender Occurrence with a given payload, optionally to a designated receiver.
 		 */
 	
@@ -211,19 +211,23 @@ standard library package Actions {
 		 * sendActions is the base feature for all SendActionUsages.
 		 */
 	}
-	
+
+//SFS:  get payload from receiver's incomingBuffer	
 	action def AcceptMessageAction :> Action, AcceptPerformance {
 		doc
 		/*
 		 * An AcceptMessageAction is an Action that identifies an incomingTransferToSelf
-		 * of a designated receiver Occurrence, providing its payload as output.
+		 * a designated receiver Occurrence, retreiving its payload from the receiver's incomingBuffer.
 		 */
-		out :>> payload;
+		inout :>> payload: Anything[0..1];  //changed from [0..*]
+		in :>> receiver: Occurrence[1];
 		ref acceptedMessage :>> acceptedTransfer: MessageTransfer, MessageAction {
             in :>> MessageTransfer::payload, MessageAction::payload;
         }
 	}
-	
+
+//SFS:  don't see why transition actions are different from other actions
+//  nor why a state with a transition is needed	
 	action def AcceptAction :> AcceptMessageAction {
 		doc
 		/*

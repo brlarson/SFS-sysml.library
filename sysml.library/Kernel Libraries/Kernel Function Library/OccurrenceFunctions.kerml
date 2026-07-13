@@ -16,6 +16,9 @@ standard library package OccurrenceFunctions {
 	private import SequenceFunctions::remove;
 	private import SequenceFunctions::removeAt;
 	private import ControlFunctions::forAll;
+
+//SFS:
+	private import Allen::during;	
 	 
 	function '==='  specializes BaseFunctions::'===' { 
 		doc
@@ -37,12 +40,13 @@ standard library package OccurrenceFunctions {
 		/*
 		 * Test whether a performance of this function happens during the input occurrence.
 		 */
-		
+//SFS:  need to pass "this" parameter because a function is not an Occurrence		 
+		in this: Occurrence[1];
 		in occ: Occurrence[1];
+		return : Boolean[1] = during(this,occ);
+		// private connector all during: HappensDuring[0..1] from self to occ;
 		
-		private connector all during: HappensDuring[0..1] from self to occ;
-		
-		return : Boolean[1] = notEmpty(during);
+		// return : Boolean[1] = notEmpty(during);
 	}
 	
 	function create {
