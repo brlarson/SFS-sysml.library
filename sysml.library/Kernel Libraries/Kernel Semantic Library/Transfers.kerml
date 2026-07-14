@@ -19,6 +19,7 @@ standard library package Transfers {
     private import Domain::GetChangeToFalse;
     private import Performances::BooleanEvaluation;
     private import ISQBase::DurationValue;
+    private import ControlFunctions::select;
    
     
     interaction Transfer specializes Performance, BinaryLink {
@@ -335,14 +336,18 @@ standard library package Transfers {
             in feature d = receiver {
                 feature :>> e : BooleanEvaluation[1] {
                     out feature redefines result =
-                        isEmpty(receiver.incomingBuffer.peekSelect({in x; x istype payload}));
+                        isEmpty(receiver.incomingBuffer.elements->select{in x : Anything; x istype payload});
                 }
             }
         }
 
-        step getPayloadFromBuffer : receiver.incomingBuffer.select {
-            in selector = {in x; x istype payload};
-            out feature :>> value = payload;
+        step getPayloadFromBuffer {
+            private feature matched : Anything[0..1] =
+                head(receiver.incomingBuffer.elements->select{in x : Anything; x istype payload});
+            step : receiver.incomingBuffer.evict {
+                in value = matched;
+            }
+            binding payload = matched;
         }
     }
     
