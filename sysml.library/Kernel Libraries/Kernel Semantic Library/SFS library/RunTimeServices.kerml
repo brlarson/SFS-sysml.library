@@ -11,6 +11,7 @@
   private import ScalarValues::Boolean;
   private import SequenceFunctions::*;
 	private import Assertion::Assert;
+	private import ControlFunctions::select;
 
   struct Buffer {
     doc /* FIFO buffer */
@@ -45,7 +46,29 @@
         in values = value;
       }
       doc /* when get returns a value, that value was put previously */
-    } 
+    }
+
+    function peekSelect {
+      doc /* returns the first element of the buffer satisfying selector, without
+           * removing it; implements the "select" semantics of SysML v2 8.4.13.6
+           * for AcceptPerformance. */
+      in expr selector[0..1] { in argument: Anything[1]; return : Boolean[1]; }
+      return : Anything[0..1] default
+        if isEmpty(elements->select(selector))? null else head(elements->select(selector));
+    }
+
+    step select {
+      doc /* selects and removes the first element of the buffer satisfying selector;
+           * implements the "select" semantics of SysML v2 8.4.13.6 for
+           * AcceptPerformance. */
+      in expr selector[0..1] { in argument: Anything[1]; return : Boolean[1]; }
+      out var value : Anything[0..1] default
+        if isEmpty(elements->select(selector))? null else head(elements->select(selector));
+      step : remove {
+        inout seq = elements;
+        in values = value;
+      }
+    }
 
   }
 

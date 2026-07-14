@@ -318,8 +318,13 @@ standard library package Transfers {
     behavior AcceptPerformance specializes Performance {
         doc
         /*
-         * A transfer automatically puts the payload in the target's incomingBuffer
-         * so AcceptPerformance waits for something in the receiver's incomingBuffer.
+         * A transfer automatically puts the payload in the target's incomingBuffer, so
+         * AcceptPerformance waits until the receiver's incomingBuffer contains something
+         * conforming to the type of payload, then selects and removes that item. This
+         * implements SysML v2 8.4.13.6: the semantics of AcceptPerformance is to select
+         * an incomingTransfer whose transferred values conform to its acceptedItem
+         * parameter, rather than unconditionally taking whatever is at the head of the
+         * buffer.
          */
         inout feature payload[1];  //changed from [0..*]
         in feature receiver: Occurrence[1] default this;
@@ -329,12 +334,14 @@ standard library package Transfers {
         step waitForTransfer : GetChangeToFalse {
             in feature d = receiver {
                 feature :>> e : BooleanEvaluation[1] {
-                    out feature redefines result = receiver.incomingBuffer.isEmpty();
+                    out feature redefines result =
+                        isEmpty(receiver.incomingBuffer.peekSelect({in x; x istype payload}));
                 }
             }
         }
-       
-        step getPayloadFromBuffer : receiver.incomingBuffer.get  {
+
+        step getPayloadFromBuffer : receiver.incomingBuffer.select {
+            in selector = {in x; x istype payload};
             out feature :>> value = payload;
         }
     }
