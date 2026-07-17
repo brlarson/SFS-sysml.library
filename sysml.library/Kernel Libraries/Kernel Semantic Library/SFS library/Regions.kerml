@@ -207,13 +207,13 @@ library package Regions {
         inv { r1.frameOfReference == r2.frameOfReference }
     }
 
-    //  predicate FilmConnected {
-    //     doc /* SFS:  This is neeeded for Occurences::JustOutsideOf. */
-    //     in r1 : Region;
-    //     in r2 : Region;
-    //     inv { r1.frameOfReference == r2.frameOfReference }
-    //     @Assert{f="<< FilmConnected : r1~Region, r2~Region :"+
-    //       " exists p~Point that ( On(p,RegionFilm(r1)) and On(p,RegionFilm(r2)) ) >>";}
-    // }
+    predicate FilmConnected {
+        doc /* SFS:  This is needed for Occurrences::JustOutsideOf. */
+        @Assert{n="FilmConnected"; f="<< FilmConnected : r1~Region, r2~Region :"+
+          " exists p~Point that ( PointOnSurface(p,RegionFilm(r1)) and PointOnSurface(p,RegionFilm(r2)) ) >>";}
+        in r1 : Region;
+        in r2 : Region;
+        inv { r1.frameOfReference == r2.frameOfReference }
+    }
    
 }
