@@ -31,6 +31,14 @@
         " exists t3~Instant in t3<t1 that exists t4~Instant in t4<t2 that "+
         " (t3<t4 and put(v1)@t3 and put(v2)@t4) >>";}
 
+    @Assert{ doc /* anything evicted was put previously */
+      n="EvictWhatsPut"; f="<< EvictWhatsPut : : forall v~Anything, t1~Instant are (v <> null and evict(v)@t1) "+
+        " implies exists t2~Instant in t2<t1 that put(v)@t2 >>"; }
+
+    @Assert{ doc /* anything returned by matching was put previously */
+      n="MatchingWhatsPut"; f="<< MatchingWhatsPut : : forall v~Anything, sample~Anything, t1~Instant are "+
+        " (v in matching(sample)@t1) implies exists t2~Instant in t2<t1 that put(v)@t2 >>"; }
+
     step put {
       in value : Anything[1];
       step : add {
