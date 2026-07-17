@@ -335,15 +335,19 @@ standard library package Transfers {
         step waitForTransfer : GetChangeToFalse {
             in feature d = receiver {
                 feature :>> e : BooleanEvaluation[1] {
-                    out feature redefines result =
-                        isEmpty(receiver.incomingBuffer.elements->select{in x : Anything; x istype payload});
+                    step matching : receiver.incomingBuffer.matching {
+                        in sample = payload;
+                    }
+                    out feature redefines result = isEmpty(matching.matched);
                 }
             }
         }
 
         step getPayloadFromBuffer {
-            private feature matched : Anything[0..1] =
-                head(receiver.incomingBuffer.elements->select{in x : Anything; x istype payload});
+            step matching : receiver.incomingBuffer.matching {
+                in sample = payload;
+            }
+            private feature matched : Anything[0..1] = head(matching.matched);
             step : receiver.incomingBuffer.evict {
                 in value = matched;
             }

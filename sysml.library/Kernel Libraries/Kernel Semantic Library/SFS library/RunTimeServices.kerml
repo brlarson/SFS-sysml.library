@@ -10,11 +10,12 @@
   private import Base::Anything;
   private import ScalarValues::Boolean;
   private import SequenceFunctions::*;
+  private import ControlFunctions::select;
 	private import Assertion::Assert;
 
   struct Buffer {
     doc /* FIFO buffer */
-    var feature elements[0..*] : Anything := ();
+    private var feature elements[0..*] : Anything := ();
 
     bool isEmpty {
       return : Boolean[1] = elements == null;
@@ -54,6 +55,12 @@
         inout seq = elements;
         in values = value;
       }
+    }
+
+    step matching {
+      doc /* the elements currently in the buffer that conform to the type of sample */
+      in sample : Anything[1];
+      out matched : Anything[0..*] ordered nonunique default elements->select{in x : Anything; x istype sample};
     }
 
   }
