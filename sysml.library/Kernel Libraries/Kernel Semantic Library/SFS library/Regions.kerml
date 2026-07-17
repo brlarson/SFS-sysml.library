@@ -142,7 +142,7 @@ library package Regions {
 
     doc /* SFS: Parthood implies regional containment. This property is called expansivity. */
     @Assert{n="EXPNS"; f="<< EXPNS : : forall x,y~Classifier forall r1,r2~Region are "+
-           "( (Location(x)=r1 and Location(y)=r2 and PartOf(x,y)) implies RegionContainment(r2,r1) ) >>"; t="";}
+           "( (Location(x)=r1 and Location(y)=r2 and PartOf(x,y)) implies RegionContainment(r2,r1) ) >>"; t="df-pex";}
 
     predicate AtomicRegion {
         doc /* SFS:  A region is atomic, Ar , when it contains no other regions (in the location relation).
