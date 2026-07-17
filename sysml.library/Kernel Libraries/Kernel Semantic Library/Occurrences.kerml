@@ -108,7 +108,7 @@ standard library package Occurrences {
 		expr getLife {
 			doc /* Life is top-level Occurrence, suboccurrence of no other */
 			@Assert{f="<< during(this,result) and"+
-			   " not exists o : Occurrence in o<>this that during(o,result) >>";}
+			   " not exists o~Occurrence in o<>this that during(o,result) >>";}
 			return result : Life[1];
 			if superoccurrence->isEmpty() ? this as Life
 			  else superoccurrence->head().getLife	
@@ -149,7 +149,7 @@ standard library package Occurrences {
 			 * Composite suboccurrences of this Occurrence.
 			 */
 
-      @Assert{f="<< forall s in suboccurrences are during(life(s),life(self))"+
+      @Assert{f="<< forall s~Occurrence in suboccurrences are during(life(s),life(self))"+
 			  " and PartOf(s,self) >>";}
 
 			 feature redefines localClock default (that as Occurrence).localClock {
@@ -219,7 +219,7 @@ standard library package Occurrences {
 
 		feature immediatePredecessors: Occurrence[0..*] subsets occurrences //predecessors 
 		{
-      @Assert{f="<< forall i in immediatePredecessors are nearlyMeets(i,this) >>";}
+      @Assert{f="<< forall i~Occurrence in immediatePredecessors are nearlyMeets(i,this) >>";}
 			doc
 			/*
 			 * Occurrences that end just before this occurrence starts, with no
@@ -236,7 +236,7 @@ standard library package Occurrences {
 
 		feature immediateSuccessors: Occurrence[0..*] subsets occurrences // successors 
 		  inverse of immediatePredecessors {
-      @Assert{f="<< forall i in immediateSuccessors are nearlyMeets(this,i) >>";}
+      @Assert{f="<< forall i~Occurrence in immediateSuccessors are nearlyMeets(this,i) >>";}
 			doc
 			/*
 			 * Occurrences that start just after this occurrence ends, with no

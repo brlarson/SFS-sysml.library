@@ -53,7 +53,7 @@ standard library package Performances {
 			/*
 			 * timeEnclosedOccurrences of this Performance that are also Performances.
 			 */
-			@Assert{f="<< forall ep in enclosedPerformances are during(ep,thisPerformance) >>";}
+			@Assert{f="<< forall ep~Performance in enclosedPerformances are during(ep,thisPerformance) >>";}
 		}
 		
 		feature thisPerformance: Performance [1] default self {

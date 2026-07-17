@@ -154,7 +154,7 @@ library package Regions {
 
     // Atomic regions are disjoint (df-rdi)
     @Assert{n="AtomicRegionDisjoint"; f="<< AtomicRegionDisjoint : :"+ 
-        "forall r1~Region r2~Region are "+
+        "forall r1,r2~Region are "+
         "   ( (AtomicRegion(r1) and AtomicRegion(r2)) implies "+
         "     (not RegionOverlap(r1,r2) or r1=r2) ) >>"; t="df-rdi";}  
 
