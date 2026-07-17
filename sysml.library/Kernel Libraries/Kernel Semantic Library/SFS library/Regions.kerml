@@ -87,12 +87,12 @@ library package Regions {
      // SFS:  Two things having the same location are the same thing (df-lfu)
     @Assert{n="locational functionality"; 
         f="<< LFU : : forall x~Occurrence forall r1,r2~Region are"+
-          " ( (L(x)=r1 and L(x)=r2) implies r1=r2 ) >>"; t="df-lfu";}
+          " ( (Location(x)=r1 and Location(x)=r2) implies r1=r2 ) >>"; t="df-lfu";}
 
     // SFS:  No two things share an exact location.
     @Assert{n="injectivity of location"; 
         f="<< LIN : : forall x,y~Occurrence forall r~Region are"+
-          " ( (L(x)=r and L(y)=r) implies x=y ) >>"; t="df-lin";}
+          " ( (Location(x)=r and Location(y)=r) implies x=y ) >>"; t="df-lin";}
 
 
     predicate PointInRegion {
@@ -130,7 +130,7 @@ library package Regions {
             *  true when r1 contains r2 
             * This is the "C" relation (df-rco). */
         @Assert{n="RegionContainment"; f="<< RegionContainment : r1~Region, r2~Region :"+
-                "exists p~Point that (PointInRegion(p,r2) implies PointInRegion(p,r1)) >>"; t="df-rco";}
+                "forall p~Point are (PointInRegion(p,r2) implies PointInRegion(p,r1)) >>"; t="df-rco";}
         in r1 : Region;
         in r2 : Region;
         inv { r1.frameOfReference == r2.frameOfReference }
@@ -141,7 +141,7 @@ library package Regions {
             "RegionOverlap(r1,r2) implies (RegionContainment(r1,r2) or RegionContainment(r2,r1)) >>"; t="df-rni";}
 
     doc /* SFS: Parthood implies regional containment. This property is called expansivity. */
-    @Assert{n="EXPNS"; f="<< EXPNS : : forall x,y~Classifier forall r1,r2~Region are "+
+    @Assert{n="EXPNS"; f="<< EXPNS : : forall x,y~Occurrence forall r1,r2~Region are "+
            "( (Location(x)=r1 and Location(y)=r2 and PartOf(x,y)) implies RegionContainment(r2,r1) ) >>"; t="df-pex";}
 
     predicate AtomicRegion {
@@ -168,8 +168,8 @@ library package Regions {
     function RegionSurface {
         doc /* SFS: The surface of a region is all the points on its boundary */
         @Assert{n="RegionSurface"; f="<< RegionSurface : r~Region := result~Surface | "+
-                "forall p~Point are (PointOnSurface(p,result) and PointInRegion(p,r) implies "+
-                "  exists p2~Point that ( p2 in Adj(p) and not PointInRegion(p2,r) ) ) >>"; t="df-rsurf";}
+                "forall p~Point are (PointOnSurface(p,result) iff (PointInRegion(p,r) and "+
+                "  exists p2~Point that ( p2 in Adj(p) and not PointInRegion(p2,r) ))) >>"; t="df-rsurf";}
         in r : Region;
         return result : Surface;
         inv { r.frameOfReference == (result as Surface).frameOfReference}
@@ -179,7 +179,7 @@ library package Regions {
         doc /* SFS:  The interior of a region includes all the points in a region 
           * not on its surface */
         @Assert{n="RegionInterior"; f="<< RegionInterior : r~Region := result~Region | "+
-            "forall p~Point are (PointInRegion(p,result) implies "+
+            "forall p~Point are (PointInRegion(p,result) iff "+
             "  (PointInRegion(p,r) and not PointOnSurface(p,RegionSurface(r))) ) >>"; t="df-rint";}
         in r : Region;
         return result : Region;
@@ -189,7 +189,7 @@ library package Regions {
     function RegionFilm {
         doc /* SFS: The film of a region is a surface of which it's the interior */
         @Assert{n="RegionFilm"; f="<< RegionFilm : r~Region := result~Surface | "+
-            " forall p~Point are ( PointOnSurface(p,result) implies "+
+            " forall p~Point are ( PointOnSurface(p,result) iff "+
             " (not PointInRegion(p,r) and exists p2~Point that "+
             "    (PointOnSurface(p2,RegionSurface(r)) and p2 in Adj(p)))) >>"; t="df-rfilm";}
         in r : Region;
