@@ -27,7 +27,7 @@
 
     @Assert{ doc /* buffer is first-in first-out*/
       n="FIFO"; f="<< FIFO : : forall v1,v2~Anything, t1,t2~Instant in t1<t2 are "+
-        " (get(v1)@t1 and get(v2)@t2) implies "+
+        " (v1 <> null and v2 <> null and get(v1)@t1 and get(v2)@t2) implies "+
         " exists t3~Instant in t3<t1 that exists t4~Instant in t4<t2 that "+
         " (t3<t4 and put(v1)@t3 and put(v2)@t4) >>";}
 
