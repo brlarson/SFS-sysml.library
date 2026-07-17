@@ -199,9 +199,9 @@ library package Regions {
 
     predicate ExternallyConnected {
         doc /* SFS:  This is the externally connected (EC) relation  of Region Connection Calculus
-          * some point on the film of r1 is on the surface of r2 */
+          * r1 and r2 don't overlap, but some point on the film of r1 is in r2 */
         @Assert{n="ExternallyConnected"; f="<< ExternallyConnected : r1~Region, r2~Region : "+
-            " exists p~Point that ( PointOnSurface(p,RegionFilm(r1)) and PointOnSurface(p,RegionSurface(r2)) ) >>"; t="df-rec";}
+            " not RegionOverlap(r1,r2) and exists p~Point that ( PointOnSurface(p,RegionFilm(r1)) and PointInRegion(p,r2) ) >>"; t="df-rec";}
         in r1 : Region;
         in r2 : Region;
         inv { r1.frameOfReference == r2.frameOfReference }
