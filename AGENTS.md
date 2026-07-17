@@ -18,7 +18,8 @@ Supplemental Formal Semantics (SFS) for KerML and SysML v2 — a modified fork o
 
 ## Conventions
 
-- **Use `@Assert` metadata** (from `Assert.sysml`) for formal annotations. Do **not** use the older `language "Domain"` annotation style or `Assertion::Assert` (KerML metaclass in `Assertion.kerml` — deprecated).
+- **Use `@Assert` metadata** for formal annotations — pick the definition matching the file's language, not "whichever is newer": `.kerml` files import and use `Assertion::Assert` (a `metaclass` in `Assertion.kerml`, since KerML has no `metadata def`); `.sysml` files import and use `Assert::Assert` (a `metadata def` in `Assert.sysml`). Do **not** use the older `language "Domain"` annotation style.
+- In an `@Assert` formula's `<<Name : var~Type, ... : body>>` header, only declare identifiers that aren't otherwise resolvable. An identifier already visible in the lexical scope where the `@Assert` appears (e.g. an `in`/`out feature` of the same or an inherited behavior/function) does not need to be re-listed as a formula parameter — only genuinely free variables need `forall`/`exists` quantification or a header declaration.
 - `Domain::Instant` specializes `ISQSpaceTime::TimeValue`, not `Real`.
 - `.index.json` is **auto-generated** (280k+ lines) — do not hand-edit.
 - `.gitignore` excludes `/bin/` and `/output/`.

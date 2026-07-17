@@ -73,7 +73,7 @@ library package Allen {
     @Assert{n="nonoverlaps"; f="<<nonoverlaps : x~Occurrence, y~Occurrence : birth(y) > death(x) or birth(x) > death(y)>>";}
     in x : Occurrence;
     in y : Occurrence;
-    (y.startShot > x.endShot) and (x.startShot > y.endShot)
+    (y.startShot > x.endShot) or (x.startShot > y.endShot)
   }
   
   predicate nearlyMeets {

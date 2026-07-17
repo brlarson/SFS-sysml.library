@@ -75,8 +75,8 @@ library package Regions {
         * This is the "L" exact location primitive. 
         * Uses o.frameOfReference as the frame-of-reference for the region.
         */
-        @Assert{t="Location"; f="<< Location : o~Occurrence := result~Region | o L region >>";
-            comment /* Location is a function, but "L" is a binary operator, so "|" (such that)  notation is used */ }
+        // Location is a function, but "L" is a binary operator, so "|" (such that) notation is used
+        @Assert{n="Location"; f="<< Location : o~Occurrence := result~Region | o L result >>";}
         in o : Occurrence;
         return result : Region;
         inv { o.isClosed and o.innerSpaceDimension == 3 and o.outerSpaceDimension == 3
@@ -137,11 +137,11 @@ library package Regions {
     }
 
     doc /* SFS: Regions overlap only if one contains the other. This property is called no interpenetration. */
-    @Assert{n="NOINTP"; f="<< NOINTP : : forall r1,r1~Region are"+ 
+    @Assert{n="NOINTP"; f="<< NOINTP : : forall r1,r2~Region are"+
             "RegionOverlap(r1,r2) implies (RegionContainment(r1,r2) or RegionContainment(r2,r1)) >>"; t="df-rni";}
 
     doc /* SFS: Parthood implies regional containment. This property is called expansivity. */
-    @Assert{n="EXPNS"; f="<< EXPNS : : forall x,y~Classifier forall r1,r1~Region are "+
+    @Assert{n="EXPNS"; f="<< EXPNS : : forall x,y~Classifier forall r1,r2~Region are "+
            "( (Location(x)=r1 and Location(y)=r2 and PartOf(x,y)) implies RegionContainment(r2,r1) ) >>"; t="";}
 
     predicate AtomicRegion {
@@ -159,7 +159,7 @@ library package Regions {
         "     (not RegionOverlap(r1,r2) or r1=r2) ) >>"; t="df-rdi";}  
 
     // Atomic parts have atomic regions
-    @Assert{n="APAR"; f="<< APAR : : forall x~Occurrence forall r~Region :"+
+    @Assert{n="APAR"; f="<< APAR : : forall x~Occurrence forall r~Region are"+
             "(Location(x)=r and AtomicPart(x)) implies AtomicRegion(r) >>"; t="df-apar";}
  
     // Adjacent points are infinitessimly close, the set of adjacent points to p

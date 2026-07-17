@@ -57,7 +57,7 @@ library package Domain {
 	behavior SetNow {  // replaces FeatureReferencingPerformances::FeatureWritePerformance
 		doc /* SetNow(d,f,v) sets the value of the feature d::f to v at the current time, now. */
 		@Assert{n="SetNow"; f="<<SetNow : d~Occurrence, f~Anything : I[[d::f,now]] = v >>";
-				t="df-model";} 
+				t="df-model";}
 		in feature d : Occurrence[1] {  //onOccurrence
 		  feature f : Anything[1];  //accessedFeature
 		}
@@ -81,8 +81,8 @@ library package Domain {
 	behavior GetBooleanChange :> GetChange {
 		doc /* GetBooleanChange, like GetChange, waits for d::e to toggle */
 		@Assert{n="GetBooleanChange"; f="<<GetBooleanChange : d~Occurrence, e~BooleanEvaluation, tau~Instant : "+
-				"(I[[d::f,tau]] <> I[[d::e,now]] and forall t~Instant in tau ., now are I[[d::e,t]] = I[[d::e,tau]])"+ 
-				" implies b = I[[d::f,now]] >>"; 
+				"(I[[d::e,tau]] <> I[[d::e,now]] and forall t~Instant in tau ., now are I[[d::e,t]] = I[[d::e,tau]])"+
+				" implies b = I[[d::e,now]] >>";
 				t="df-bl.changed";}
 		in feature :>> d {
 			feature e : BooleanEvaluation[1] :>> f;
