@@ -18,7 +18,7 @@ standard library package Actions {
 	private import Transfers::sendPerformances;
 	private import Transfers::AcceptPerformance;
 	private import Transfers::acceptPerformances;
-	private import FeatureReferencingPerformances::FeatureWritePerformance;
+//	private import FeatureReferencingPerformances::FeatureWritePerformance;
 	private import ControlPerformances::MergePerformance;
 	private import ControlPerformances::DecisionPerformance;
 	private import ControlPerformances::IfThenPerformance;
@@ -29,6 +29,9 @@ standard library package Actions {
 	private import Transfers::MessageTransfer;
 	private import Flows::MessageAction;
 	private import OccurrenceFunctions::destroy;
+
+//SFS
+	private import Domain::SetNow;	
 	
 	abstract action def Action :> Performance {
 		doc
@@ -380,17 +383,19 @@ standard library package Actions {
 		 * transitionActions is the base feature for all TransitionUsages.
 		 */
 	}
-	
-	action def AssignmentAction :> FeatureWritePerformance, Action {
+
+//SFS replace FeatureWritePerformance with SetNow	
+	action def AssignmentAction :> SetNow, //FeatureWritePerformance, 
+			Action {
 		doc
 		/*
 		 * An AssignmentAction is an Action, used to type an AssignmentActionUsage. It is also a
-		 * FeatureWritePerformance that updates the accessedFeature of its target Occurrence with
+		 * SetNow that updates the accessedFeature of its target Occurrence with
 		 * the given replacementValues.
 		 */
 	
 		in target : Occurrence[1];
-		inout replacementValues : Anything[0..*] nonunique;
+		in replacementValues : Anything[1];
 	}
 	
 	abstract action assignmentActions : AssignmentAction[0..*] nonunique :> actions {

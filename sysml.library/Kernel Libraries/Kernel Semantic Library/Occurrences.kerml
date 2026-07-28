@@ -466,9 +466,9 @@ standard library package Occurrences {
 		// }
 //SFS new
 		bool matesWithOccurrence {
-			doc /* SFS:  true when self is just outside of o and o is contained in that */
+			doc /* SFS:  true when self is just outside of o and they touch without overlapping */
 			in o : Occurrence;
-			justOutsideOfOccurrence(o) and RegionContainment(Location(that),Location(o))
+			justOutsideOfOccurrence(o)
 		}	
 
 		feature innerSpaceDimension : Natural [1] {

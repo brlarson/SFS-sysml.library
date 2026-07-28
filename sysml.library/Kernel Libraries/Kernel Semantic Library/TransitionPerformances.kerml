@@ -53,7 +53,8 @@ standard library package TransitionPerformances {
 		feature isTriggerAfter: Boolean default true;
 		private succession [1] transitionLinkSource then [1] Performance::self;
 		private feature taNum: Natural [1] = if isTriggerAfter ? size(trigger) else 0;
-		private succession triggerAfter [taNum] first [0..1] transitionLinkSource then [*] trigger.endShot;
+//SFS
+//		private succession triggerAfter [taNum] first [0..1] transitionLinkSource then [*] trigger.endShot;
 				
 		private succession all [*] guard then [0..1] transitionLink.laterOccurrence;
 	}

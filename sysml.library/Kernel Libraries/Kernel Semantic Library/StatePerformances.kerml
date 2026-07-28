@@ -43,7 +43,8 @@ standard library package StatePerformances {
 		step nonDoMiddle[*] subsets middle = middle->excluding(do);
 
 		private succession [1] entry then [*] middle;
-		private succession [1] do.startShot then [*] nonDoMiddle.startShot;
+		private succession [1] do then [*] nonDoMiddle;
+//		private succession [1] do.startShot then [*] nonDoMiddle.startShot;
 		private succession [*] middle then [1] exit;
 
 
@@ -142,7 +143,8 @@ standard library package StatePerformances {
 		}
 		
 		private feature tdNum: Natural [1] = if not isTriggerDuring ? 0 else size(trigger);
-		private connector linkTriggerDuring: HappensDuring[tdNum] from [*] trigger.endShot to [0..1] transitionLinkSource;
+//SFS
+//		private connector linkTriggerDuring: HappensDuring[tdNum] from [*] trigger.endShot to [0..1] transitionLinkSource;
 		
 		private succession all [*] acceptable then [*] guard;
 		private succession [*] guard then [1] transitionLinkSource.exit;

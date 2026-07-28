@@ -41,7 +41,7 @@ library package Mereology {
 
     abstract predicate ImproperPart specializes BooleanEvaluation {
         doc /* SFS: ImproperPart is the improper part relation xIPy */
-        @Assert{n="ImproperPart"; f="<< ImproperPart : x~Class, y~Class : PartOf(x,y) or x=y >>";}
+        @Assert{n="ImproperPart"; f="<< ImproperPart : x~Class, y~Class : PartOf(x,y) or x=y >>"; t="df-pim";}
         in x : Class;
         in y : Class;
     }
