@@ -66,9 +66,9 @@
     }
 
     step matching {
-      doc /* the elements currently in the buffer that conform to the type of sample */
+      doc /* the first element currently in the buffer that conforms to the type of sample, if any */
       in sample : Anything[1];
-      out matched : Anything[0..*] ordered nonunique default elements->select{in x : Anything; x istype sample};
+      out matched : Anything[0..1] default head(elements->select{in x : Anything; x istype sample});
     }
 
   }

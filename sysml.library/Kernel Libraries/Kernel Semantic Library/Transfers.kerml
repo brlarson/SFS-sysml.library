@@ -347,7 +347,7 @@ standard library package Transfers {
             step matching : receiver.incomingBuffer.matching {
                 in sample = payload;
             }
-            private feature matched : Anything[0..1] = head(matching.matched);
+            private feature matched : Anything[0..1] = matching.matched;
             step : receiver.incomingBuffer.evict {
                 in value = matched;
             }
