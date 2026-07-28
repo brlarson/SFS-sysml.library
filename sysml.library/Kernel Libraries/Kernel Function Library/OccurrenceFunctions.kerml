@@ -58,7 +58,7 @@ standard library package OccurrenceFunctions {
 		
 		inout occ: Occurrence[1];
 			
-		private connector : HappensDuring from occ.startShot to self;	
+//		private connector : HappensDuring from occ.startShot to self;	
 		
 		return : Occurrence[1] = occ;
 	}
@@ -72,7 +72,7 @@ standard library package OccurrenceFunctions {
 
 		inout occ: Occurrence[0..1];
 		
-		private connector : HappensDuring from [0..1] occ.endShot to self;
+//		private connector : HappensDuring from [0..1] occ.endShot to self;
 		
 		return : Occurrence[0..1] = occ;
 	}
