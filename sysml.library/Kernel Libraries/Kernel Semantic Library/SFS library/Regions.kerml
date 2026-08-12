@@ -137,7 +137,7 @@ library package Regions {
     }
 
     doc /* SFS: Regions overlap only if one contains the other. This property is called no interpenetration. */
-    @Assert{n="NOINTP"; f="<< NOINTP : : forall r1,r2~Region are"+
+    @Assert{n="NOINTP"; f="<< NOINTP : : forall r1,r2~Region are "+
             "RegionOverlap(r1,r2) implies (RegionContainment(r1,r2) or RegionContainment(r2,r1)) >>"; t="df-rni";}
 
     doc /* SFS: Parthood implies regional containment. This property is called expansivity. */
@@ -159,7 +159,7 @@ library package Regions {
         "     (not RegionOverlap(r1,r2) or r1=r2) ) >>"; t="df-rdi";}  
 
     // Atomic parts have atomic regions
-    @Assert{n="APAR"; f="<< APAR : : forall x~Occurrence forall r~Region are"+
+    @Assert{n="APAR"; f="<< APAR : : forall x~Occurrence forall r~Region are "+
             "(Location(x)=r and AtomicPart(x)) implies AtomicRegion(r) >>"; t="df-apar";}
  
     // Adjacent points are infinitessimly close, the set of adjacent points to p

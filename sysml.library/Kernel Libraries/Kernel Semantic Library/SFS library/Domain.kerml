@@ -35,7 +35,7 @@ library package Domain {
 
 	predicate next {
 		doc /* tau1 precedes tau2 and there are no instants in between */
-		@Assert{n="next"; f="<<next : tau1~Instant, tau1~Instant : (tau1 < tau2 and "+
+		@Assert{n="next"; f="<<next : tau1~Instant, tau2~Instant : (tau1 < tau2 and "+
 			" not exists tau~Instant that (tau1 < tau and tau < tau2) )  >>"; 
 				t="df-bl.next";}
 		in feature tau1 : Instant;
