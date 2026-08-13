@@ -79,6 +79,9 @@ infix:50 " ≼ " => tprecEq
 theorem df_bl_beforeeq {t1 t2 : Instant} (_ : t1 ∈ TIME) (_ : t2 ∈ TIME) :
     (t1 ≼ t2) ↔ (t1 < t2 ∨ t1 = t2) := le_iff_lt_or_eq
 
+/-- SFS.mm `bl.nowt`: `now` is itself a time. -/
+theorem bl_nowt : now ∈ TIME := ⟨now_nonneg, le_refl now⟩
+
 /-! ## Temporal values and predicates (SFS.mm lines 1177-1560, "BLESS LOGIC MODELS") -/
 
 /-- A BLESS-logic temporal value: what SFS.mm's `A` denotes when read as varying
@@ -119,6 +122,57 @@ is actually constant) is not restated as an axiom since it is not needed to make
 of the value-side distribution facts below provable. -/
 def interpValAt {α} (A : TVal α) (t0 : Instant) : α := A t0
 def interpVal {α} (A : TVal α) : α := A 0
+
+/-! ### Temporal interval quantification (SFS.mm lines 1100-1174)
+
+`bl.alldd`/`bl.allcd`/`bl.allcc`/`bl.alldc` just unfold what membership in a
+closed/open-left/open/open-right interval means arithmetically -- already exactly
+Mathlib's `Set.mem_Icc`/`Set.mem_Ioc`/`Set.mem_Ioo`/`Set.mem_Ico`, so no `t1, t2 ∈
+TIME` hypothesis is actually needed (SFS.mm carries the hypothesis along regardless,
+matching the surrounding theorems' style; omitted here as genuinely unnecessary).
+`bl.exdd`/`bl.excc`/`bl.excd`/`bl.exdc` are the same generic classical fact
+(`∃x,Px ↔ ¬∀x,¬Px`) instantiated at each of the four intervals in turn -- proved
+once below (`exists_iff_not_forall_not`), not four times. -/
+
+theorem bl_alldd (t1 t2 : Instant) (φ : TProp) :
+    (∀ x ∈ TIME, x ∈ Set.Icc t1 t2 ∧ φ x) ↔ (∀ x ∈ TIME, t1 ≤ x ∧ x ≤ t2 ∧ φ x) := by
+  simp [Set.mem_Icc, and_assoc]
+
+theorem bl_allcd (t1 t2 : Instant) (φ : TProp) :
+    (∀ x ∈ TIME, x ∈ Set.Ioc t1 t2 ∧ φ x) ↔ (∀ x ∈ TIME, t1 < x ∧ x ≤ t2 ∧ φ x) := by
+  simp [Set.mem_Ioc, and_assoc]
+
+theorem bl_allcc (t1 t2 : Instant) (φ : TProp) :
+    (∀ x ∈ TIME, x ∈ Set.Ioo t1 t2 ∧ φ x) ↔ (∀ x ∈ TIME, t1 < x ∧ x < t2 ∧ φ x) := by
+  simp [Set.mem_Ioo, and_assoc]
+
+theorem bl_alldc (t1 t2 : Instant) (φ : TProp) :
+    (∀ x ∈ TIME, x ∈ Set.Ico t1 t2 ∧ φ x) ↔ (∀ x ∈ TIME, t1 ≤ x ∧ x < t2 ∧ φ x) := by
+  simp [Set.mem_Ico, and_assoc]
+
+/-- The common shape behind `bl.exdd`/`bl.excc`/`bl.excd`/`bl.exdc`: plain classical
+De Morgan, nothing interval-specific about it. -/
+theorem exists_iff_not_forall_not {D : Type*} (P : D → Prop) : (∃ x, P x) ↔ ¬ ∀ x, ¬ P x := by
+  constructor
+  · rintro ⟨x, hx⟩ h; exact h x hx
+  · intro h; by_contra hne; exact h (fun x hx => hne ⟨x, hx⟩)
+
+/-- SFS.mm `bl.exdd`. -/
+theorem bl_exdd (t1 t2 : Instant) (φ : TProp) :
+    (∃ x, x ∈ Set.Icc t1 t2 ∧ φ x) ↔ ¬ ∀ x, ¬ (x ∈ Set.Icc t1 t2 ∧ φ x) :=
+  exists_iff_not_forall_not _
+/-- SFS.mm `bl.excc`. -/
+theorem bl_excc (t1 t2 : Instant) (φ : TProp) :
+    (∃ x, x ∈ Set.Ioo t1 t2 ∧ φ x) ↔ ¬ ∀ x, ¬ (x ∈ Set.Ioo t1 t2 ∧ φ x) :=
+  exists_iff_not_forall_not _
+/-- SFS.mm `bl.excd`. -/
+theorem bl_excd (t1 t2 : Instant) (φ : TProp) :
+    (∃ x, x ∈ Set.Ioc t1 t2 ∧ φ x) ↔ ¬ ∀ x, ¬ (x ∈ Set.Ioc t1 t2 ∧ φ x) :=
+  exists_iff_not_forall_not _
+/-- SFS.mm `bl.exdc`. -/
+theorem bl_exdc (t1 t2 : Instant) (φ : TProp) :
+    (∃ x, x ∈ Set.Ico t1 t2 ∧ φ x) ↔ ¬ ∀ x, ¬ (x ∈ Set.Ico t1 t2 ∧ φ x) :=
+  exists_iff_not_forall_not _
 
 /-! ### Logic operators, pointwise (SFS.mm's `boldI`-distribution sections) -/
 
