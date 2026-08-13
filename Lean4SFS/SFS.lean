@@ -26,15 +26,31 @@ i.e. things true at every instant -- the standard modal *necessity* (`□`) read
 which this file implements literally as `interp φ := ∀ t, φ t`. Under that reading
 (the only one consistent with SFS.mm's own commentary), `□` distributes over `∧`/`∀`
 both ways (`df-bl.an`, `df-bl.al` are sound) but, as with any normal modal box
-operator, only *one direction* is valid for `∨`/`→`/`↔`/`∃` in general (classic
-K-axiom asymmetry). SFS.mm nonetheless states `df-bl.or`, `df-bl.im`, `df-bl.bi`,
-and (via `bl.dfrex2`) `bl.ex` as full, unconditional biconditionals. Below, each of
-these is witnessed by a two-instant counterexample showing the "extra" direction is
-false in general, so only the sound direction is proved -- this file does not
-axiomatize the unsound direction. This is the same character of issue as the
+operator, only *one direction* is valid for `∨`/`¬`/`→`/`↔`/`∃` in general (classic
+K-axiom asymmetry). SFS.mm nonetheless states `df-bl.or`, `df-bl.not`, `df-bl.im`,
+`df-bl.bi`, and (via `bl.dfrex2`) `bl.ex` as full, unconditional biconditionals. Below,
+each of these is witnessed by a two-instant counterexample showing the "extra"
+direction is false in general, so only the sound direction is proved -- this file does
+not axiomatize the unsound direction. This is the same character of issue as the
 pre-existing `df-exc`/`df-flmc` class-typed-existential bug documented in
 `reference_metamath_sfs_toolchain.md`: a `$a` axiom that doesn't survive contact with
 a concrete model. Not in scope to fix in SFS.mm itself here.
+
+## Second-pass audit (2026-08-13)
+
+A full cross-check of every SFS.mm `$a`/`$p` label in the in-scope range against this
+file found: the entire "Distribute `^.` over logic/arithmetic/relations/quantifiers"
+section (SFS.mm lines ~2896-3070ish) had been silently skipped (the first pass read up
+through `bl.tscomci` and stopped); `@`/`^.` distributing over `=`/`<`/`≤`/`∀`/`∃`; the
+`@`/value congruence axioms `df-bl.atbi`/`df-bl.ateqc`; `ax-bl.bi`/`ax-bl.eq`;
+`bl.ty`/`bl.tyt`; `df-bl.ralt`/`df-bl.rext`; `bl.3an`; untimed value arithmetic for
+`-`/`×`/`÷`/negation (only `+` had been done); and `df-pch` in Mereology. All are now
+present below, each tagged with the SFS.mm label(s) it covers. Left deliberately out of
+scope, same reasoning as the first pass: anything depending on the skipped multiterm-
+list plumbing (`bl.atad`/`atmul`/`tsani`/`tsori`/`tsadi`/`tsmuli` and friends), and `@`/
+`^.` distributing over `sum_`/`prod_`/`if` (`df-bl.atsum`/`atprod`/`atqq` and their
+`^.` analogues, plus the `bl.tsoi` side-condition helper) -- these would need real
+`Finset.sum`/conditional-expression integration, not just unfolding a `def`.
 -/
 import Mathlib
 
@@ -52,6 +68,15 @@ abbrev Instant := ℝ
 def TIME : Set Instant := Set.Icc 0 now
 
 theorem TIME_nonempty : (0 : Instant) ∈ TIME := ⟨le_refl 0, now_nonneg⟩
+
+-- SFS.mm `ctops` (`$c tops $.`/`class tops`) is declared but never used anywhere
+-- else in SFS.mm -- no defining axiom, no citations -- so there is nothing to
+-- translate.
+-- SFS.mm `bl.rt`/`bl.ert`/`bl.etir`/`bl.etial0`/`bl.etiamn` (`TIME ⊆ ℝ`/`ℝ*`, and
+-- every time is a real `≥ 0`) are all vacuous here: `Instant := ℝ` already, and
+-- `TIME := Set.Icc 0 now` is a `Set ℝ` by construction, so `TIME ⊆ ℝ` isn't a fact
+-- to separately state or prove, and "every `t1 ∈ TIME` is real and `≥ 0`" is just
+-- `Set.mem_Icc`, unfolded automatically wherever a `t1 ∈ TIME` hypothesis is used.
 
 /-- SFS.mm `wtp`/`df-bl.before`: temporal precedence, defined directly as `<` on all
 of `ℝ` rather than only characterized on `TIME`. Consequently its Leibniz congruence
@@ -109,9 +134,28 @@ Metamath wff `ph`, embedded as a `TProp` via the constant function, is trivially
 `interp`-true once any instant exists. -/
 theorem ax_bl_taut {p : Prop} : p → interp (fun (_ : Instant) => p) := fun h _ => h
 
+/-- SFS.mm `bl.ty` (SFS.mm's own `$= ?`, unproven there). Same constant-embedding
+argument as `ax_bl_taut`: a plain set-membership fact `A ∈ B` is trivially
+`interp`-true once embedded. -/
+theorem bl_ty {α} {A : α} {B : Set α} : A ∈ B → interp (fun (_ : Instant) => A ∈ B) :=
+  ax_bl_taut
+
 /-- SFS.mm `ax-bl.models`. -/
 theorem ax_bl_models {φ : TProp} {t0 : Instant} (_ : t0 ∈ TIME) :
     interp φ → interpAt φ t0 := fun h => h t0
+
+/-- SFS.mm `bl.tyt` (SFS.mm's own `$= ?`, unproven there). Timed counterpart of
+`bl.ty`, same argument, now trivially both directions since `interpAt` is literal
+evaluation. -/
+theorem bl_tyt {α} {A : α} {B : Set α} {t0 : Instant} : A ∈ B ↔ interpAt (fun _ => A ∈ B) t0 := Iff.rfl
+
+/-- SFS.mm `ax-bl.bi`. Read with `ph`/`ps` as ordinary (non-temporally-varying) Props,
+embedded the same constant way as `ax_bl_taut`/`bl.ty` -- the only reading under which
+the axiom's antecedent `(ph <-> ps)`, a bare untimed biconditional with no `boldI`
+wrapper at all, is well-formed independent of any instant. Under that reading it is
+`Iff.rfl`, not a fresh axiom. -/
+theorem ax_bl_bi {p q : Prop} {t1 t2 : Instant} (_ : t1 ∈ TIME) (_ : t2 ∈ TIME) (_ : t1 = t2) :
+    (p ↔ q) ↔ (interpAt (fun (_ : Instant) => p) t1 ↔ interpAt (fun (_ : Instant) => q) t2) := Iff.rfl
 
 /-- SFS.mm `wboldic`/`wboldict`: untimed and timed interpretation of *values*.
 Timed is again literal evaluation; untimed is anchored at instant `0` (`0 ∈ TIME` via
@@ -122,6 +166,12 @@ is actually constant) is not restated as an axiom since it is not needed to make
 of the value-side distribution facts below provable. -/
 def interpValAt {α} (A : TVal α) (t0 : Instant) : α := A t0
 def interpVal {α} (A : TVal α) : α := A 0
+
+/-- SFS.mm `ax-bl.eq`, the value-level counterpart of `ax_bl_bi` above, same reading
+(`A`/`B` as ordinary, non-temporally-varying values). -/
+theorem ax_bl_eq {α} {A B : α} {t1 t2 : Instant} (_ : t1 ∈ TIME) (_ : t2 ∈ TIME) (_ : t1 = t2) :
+    (A = B) ↔ (interpValAt (fun (_ : Instant) => A) t1 = interpValAt (fun (_ : Instant) => B) t2) :=
+  Iff.rfl
 
 /-! ### Temporal interval quantification (SFS.mm lines 1100-1174)
 
@@ -208,6 +258,27 @@ two `∀`s is always valid. -/
 theorem df_bl_al {D : Type*} (φ : D → TProp) : interp (fun t => ∀ x, φ x t) ↔ ∀ x, interp (φ x) :=
   forall_comm
 
+/-- SFS.mm `bl.3an` (untimed, three terms): a direct corollary of `df_bl_an`
+(applied to the flat right-associated shape), not a fresh axiom. -/
+theorem bl_3an (φ ψ ch : TProp) : interp (φ ∧ₜ ψ ∧ₜ ch) ↔ (interp φ ∧ interp ψ ∧ interp ch) := by
+  simp only [interp, tand, forall_and]
+
+/-- SFS.mm `bl.dfrex2` (untimed). Unlike `bl.ex` below, this one *is* sound: it
+compares `interp` of two *pointwise*-equivalent `TProp`s (`∃x∈A,φxt` and
+`¬∀x∈A,¬φxt` are classically equivalent for every fixed `t`, no swap of `∀t` past
+`∃x` involved), so it is a congruence fact, not a K-axiom-asymmetry one. -/
+theorem bl_dfrex2 {D : Type*} (A : Set D) (φ : D → TProp) :
+    interp (fun t => ∃ x ∈ A, φ x t) ↔ interp (fun t => ¬ ∀ x ∈ A, ¬ φ x t) := by
+  apply forall_congr'
+  intro t
+  constructor
+  · rintro ⟨x, hx, hφ⟩ h
+    exact h x hx hφ
+  · intro h
+    by_contra hne
+    push Not at hne
+    exact h hne
+
 /-- SFS.mm `df-bl.or` (untimed), sound direction only. The converse
 (`interp (φ ∨ₜ ψ) → interp φ ∨ interp ψ`) is **false** in general: witnessed on
 `TIME` as soon as it has two distinct instants `t1 ≠ t2` by `φ := (· = t1)`,
@@ -220,6 +291,14 @@ theorem bl_or_sound (φ ψ : TProp) : (interp φ ∨ interp ψ) → interp (φ �
   · exact Or.inl (h t)
   · exact Or.inr (h t)
 
+/-- SFS.mm `bl.3or` (untimed, three terms), sound direction only -- same asymmetry
+as `df-bl.or`, one level deeper. -/
+theorem bl_3or_sound (φ ψ ch : TProp) : (interp φ ∨ interp ψ ∨ interp ch) → interp (φ ∨ₜ ψ ∨ₜ ch) := by
+  rintro (h | h | h) t
+  · exact Or.inl (h t)
+  · exact Or.inr (Or.inl (h t))
+  · exact Or.inr (Or.inr (h t))
+
 -- Witness that the converse of `df-bl.or` (untimed) is not derivable: two instants
 -- `0 ≠ 1`, `φ` true only at `0`, `ψ` true only at `1`. `φ ∨ₜ ψ` is a tautology on
 -- `{0,1}` but neither `φ` nor `ψ` alone is.
@@ -231,6 +310,18 @@ example : ¬ ∀ t ∈ ({0, 1} : Set Instant), (fun t : Instant => t = 0) t := b
 
 example : ¬ ∀ t ∈ ({0, 1} : Set Instant), (fun t : Instant => t = 1) t := by
   intro h; have := h 0 (by simp); simp at this
+
+/-- SFS.mm `df-bl.not` (untimed), sound direction only: `interp(¬ₜφ) → ¬interp φ`
+is the valid direction (if `φ` fails at every instant it certainly doesn't hold at
+every instant). The converse is **false** in general, same K-axiom-asymmetry
+character as `df-bl.or`: reusing `φ := (·=0)` on `{0,1}`, `¬interp φ` holds (`φ`
+fails at `1`, example above) but `interp(¬ₜφ)` does not (`φ` holds, doesn't fail, at
+`0`). Not restated as a full axiom; see the file-level doc comment. -/
+theorem bl_not_sound (φ : TProp) : interp (¬ₜφ) → ¬ interp φ :=
+  fun h hall => h 0 (hall 0)
+
+example : ¬ ∀ t ∈ ({0, 1} : Set Instant), ¬ (fun t : Instant => t = 0) t := by
+  intro h; exact h 0 (by simp) rfl
 
 /-- SFS.mm `df-bl.im` (untimed), sound direction only (the modal K-axiom shape). The
 converse fails by the same two-instant shape as `df-bl.or` (take `ψ := fun _ => False`
@@ -247,22 +338,35 @@ theorem bl_ex_sound {D : Type*} (φ : D → TProp) :
     (∃ x, interp (φ x)) → interp (fun t => ∃ x, φ x t) :=
   fun ⟨x, hx⟩ t => ⟨x, hx t⟩
 
+/-- SFS.mm `df-bl.ralt`, timed restricted universal quantification: `rfl`, same
+reason every other timed fact is -- `interpAt` is literal evaluation. -/
+theorem df_bl_ralt {D : Type*} (φ : D → TProp) (A : Set D) (t0 : Instant) :
+    interpAt (fun t => ∀ x ∈ A, φ x t) t0 ↔ ∀ x, x ∈ A → interpAt (φ x) t0 := Iff.rfl
+
+/-- SFS.mm `df-bl.rext`, timed restricted existential quantification. -/
+theorem df_bl_rext {D : Type*} (φ : D → TProp) (A : Set D) (t0 : Instant) :
+    interpAt (fun t => ∃ x ∈ A, φ x t) t0 ↔ ∃ x, x ∈ A ∧ interpAt (φ x) t0 := Iff.rfl
+
 /-! ### Value-level operators (SFS.mm's arithmetic `boldI`-distribution sections) -/
 
-/-- SFS.mm `df-bl.addt`/`df-bl.add` and all analogous `-`/`×`/`÷`/`-u` timed *and*
-untimed distribution axioms: all `rfl`. `interpVal`/`interpValAt` are point
-evaluation (at `0`, resp. `t0`) of ordinary Mathlib `Pi`-instance pointwise
+/-- SFS.mm `df-bl.addt`/`df-bl.add`/`df-bl.subt`/`df-bl.sub`/`df-bl.mult`/`df-bl.mul`/
+`df-bl.divt`/`df-bl.div`/`df-bl.umt`/`df-bl.um`: all `rfl`. `interpVal`/`interpValAt`
+are point evaluation (at `0`, resp. `t0`) of ordinary Mathlib `Pi`-instance pointwise
 arithmetic on `Instant → ℝ`, and point evaluation always commutes with pointwise
 operators -- no constancy assumption needed, unlike the predicate case above. -/
 example (A B : TVal ℝ) (t0 : Instant) : interpValAt (A + B) t0 = interpValAt A t0 + interpValAt B t0 := rfl
 example (A B : TVal ℝ) : interpVal (A + B) = interpVal A + interpVal B := rfl
 example (A B : TVal ℝ) (t0 : Instant) : interpValAt (A - B) t0 = interpValAt A t0 - interpValAt B t0 := rfl
+example (A B : TVal ℝ) : interpVal (A - B) = interpVal A - interpVal B := rfl
 example (A B : TVal ℝ) (t0 : Instant) : interpValAt (A * B) t0 = interpValAt A t0 * interpValAt B t0 := rfl
+example (A B : TVal ℝ) : interpVal (A * B) = interpVal A * interpVal B := rfl
 example (A B : TVal ℝ) (t0 : Instant) : interpValAt (A / B) t0 = interpValAt A t0 / interpValAt B t0 := rfl
+example (A B : TVal ℝ) : interpVal (A / B) = interpVal A / interpVal B := rfl
 example (A : TVal ℝ) (t0 : Instant) : interpValAt (-A) t0 = -interpValAt A t0 := rfl
+example (A : TVal ℝ) : interpVal (-A) = -interpVal A := rfl
 
-/-- SFS.mm `df-bl.eq`/`df-bl.lt`/`df-bl.am` and their timed counterparts: relations
-between temporal values, lifted pointwise the same way. -/
+/-- SFS.mm `df-bl.eq`/`df-bl.eqt`/`df-bl.lt`/`df-bl.ltt`/`df-bl.am`/`df-bl.amt`:
+relations between temporal values, lifted pointwise the same way. -/
 def teq (A B : TVal ℝ) : TProp := fun t => A t = B t
 def tlt (A B : TVal ℝ) : TProp := fun t => A t < B t
 def tle (A B : TVal ℝ) : TProp := fun t => A t ≤ B t
@@ -270,6 +374,11 @@ def tle (A B : TVal ℝ) : TProp := fun t => A t ≤ B t
 example (A B : TVal ℝ) (t0 : Instant) : interpAt (teq A B) t0 ↔ interpValAt A t0 = interpValAt B t0 := Iff.rfl
 example (A B : TVal ℝ) (t0 : Instant) : interpAt (tlt A B) t0 ↔ interpValAt A t0 < interpValAt B t0 := Iff.rfl
 example (A B : TVal ℝ) (t0 : Instant) : interpAt (tle A B) t0 ↔ interpValAt A t0 ≤ interpValAt B t0 := Iff.rfl
+
+/-- SFS.mm `bl.bitrit`: transitivity of timed `boldI`-biconditional -- literally
+`Iff.trans`, not a fresh fact, since `interpAt` is just evaluation. -/
+theorem bl_bitrit {φ ψ ch : TProp} {t0 : Instant} (h1 : interpAt (φ ↔ₜ ψ) t0)
+    (h2 : interpAt (ψ ↔ₜ ch) t0) : interpAt (φ ↔ₜ ch) t0 := h1.trans h2
 
 /-! ## The `@` operator (SFS.mm lines 1560-2067) -/
 
@@ -308,10 +417,14 @@ theorem bl_atintro {φ : TProp} {t0 : Instant} (_ : t0 ∈ TIME) : interp φ →
 theorem atP_binop (g : Prop → Prop → Prop) (φ ψ : TProp) (t0 : Instant) :
     atP (fun t => g (φ t) (ψ t)) t0 = fun _ => g (φ t0) (ψ t0) := rfl
 
+/-- SFS.mm `df-bl.atan2`/`bl.atan2i`. -/
 theorem atP_and (φ ψ : TProp) (t0 : Instant) : atP (φ ∧ₜ ψ) t0 = atP φ t0 ∧ₜ atP ψ t0 := rfl
+/-- SFS.mm `df-bl.ator2`/`bl.ator2i`. -/
 theorem atP_or (φ ψ : TProp) (t0 : Instant) : atP (φ ∨ₜ ψ) t0 = atP φ t0 ∨ₜ atP ψ t0 := rfl
+/-- SFS.mm `df-bl.atnot`/`bl.atnoti`. -/
 theorem atP_not (φ : TProp) (t0 : Instant) : atP (¬ₜφ) t0 = ¬ₜ(atP φ t0) := rfl
 theorem atP_imp (φ ψ : TProp) (t0 : Instant) : atP (φ →ₜ ψ) t0 = atP φ t0 →ₜ atP ψ t0 := rfl
+/-- SFS.mm `df-bl.atbid`/`bl.atbidi`. -/
 theorem atP_iff (φ ψ : TProp) (t0 : Instant) : atP (φ ↔ₜ ψ) t0 = atP φ t0 ↔ₜ atP ψ t0 := rfl
 /- Three-term, and any-nesting, conjunction/disjunction all fall out of `atP_and`/
 `atP_or` for free (SFS.mm `bl.atan3i`/`bl.atan3ri`/`bl.atan3li`/`bl.ator3i`/
@@ -320,11 +433,70 @@ so `atP_and` applied twice covers it, no separate lemma needed. -/
 example (φ ψ ch : TProp) (t0 : Instant) :
     atP (φ ∧ₜ ψ ∧ₜ ch) t0 = atP φ t0 ∧ₜ atP ψ t0 ∧ₜ atP ch t0 := rfl
 
+/-- SFS.mm `df-bl.atad2`/`bl.atad2i`. -/
 theorem atC_add (A B : TVal ℝ) (t0 : Instant) : atC (A + B) t0 = atC A t0 + atC B t0 := rfl
+/-- SFS.mm `df-bl.atsub`/`bl.atsubi`. -/
 theorem atC_sub (A B : TVal ℝ) (t0 : Instant) : atC (A - B) t0 = atC A t0 - atC B t0 := rfl
+/-- SFS.mm `df-bl.atmul2`/`bl.atmul2i`. -/
 theorem atC_mul (A B : TVal ℝ) (t0 : Instant) : atC (A * B) t0 = atC A t0 * atC B t0 := rfl
+/-- SFS.mm `df-bl.atdiv`/`bl.atdivi`. -/
 theorem atC_div (A B : TVal ℝ) (t0 : Instant) : atC (A / B) t0 = atC A t0 / atC B t0 := rfl
+/-- SFS.mm `df-bl.atum`/`bl.atumi`. -/
 theorem atC_neg (A : TVal ℝ) (t0 : Instant) : atC (-A) t0 = -atC A t0 := rfl
+
+-- SFS.mm `bl.atad3`/`bl.atad3l`/`bl.atad`/`bl.atmul3`/`bl.atmul3l`/`bl.atmul` (the
+-- 3-term and "generic list" `+(cl_1,cl_2)x`/`*(cl_1,cl_2)x` variants) depend on the
+-- multiterm-arithmetic-list machinery from SFS.mm's skipped lines 1-970; out of
+-- scope for the same reason those lines are. `atC_add`/`atC_mul` already give the
+-- 2-term case, and the 3-term case is `atC_add`/`atC_mul` applied twice, same as
+-- the `@`-over-conjunction 3-term case above.
+
+/-- SFS.mm `df-bl.ateq`/`bl.ateq`. -/
+theorem atP_teq (A B : TVal ℝ) (t0 : Instant) : atP (teq A B) t0 = teq (atC A t0) (atC B t0) := rfl
+/-- SFS.mm `df-bl.atlt`/`bl.atlti`. -/
+theorem atP_tlt (A B : TVal ℝ) (t0 : Instant) : atP (tlt A B) t0 = tlt (atC A t0) (atC B t0) := rfl
+/-- SFS.mm `bl.atami`. -/
+theorem atP_tle (A B : TVal ℝ) (t0 : Instant) : atP (tle A B) t0 = tle (atC A t0) (atC B t0) := rfl
+
+/-- SFS.mm `df-bl.atal`, `@` distributing over restricted universal quantification. -/
+theorem atP_ralt {D : Type*} (φ : D → TProp) (A : Set D) (t0 : Instant) :
+    atP (fun t => ∀ x ∈ A, φ x t) t0 = fun t => ∀ x ∈ A, atP (φ x) t0 t := rfl
+
+/-- SFS.mm `df-bl.atexi`, `@` distributing over restricted existential quantification. -/
+theorem atP_rext {D : Type*} (φ : D → TProp) (A : Set D) (t0 : Instant) :
+    atP (fun t => ∃ x ∈ A, φ x t) t0 = fun t => ∃ x ∈ A, atP (φ x) t0 t := rfl
+
+-- SFS.mm `df-bl.atsum`/`df-bl.atprod`/`df-bl.atqq` (`@` distributing over `sum_`/
+-- `prod_`/conditional expressions) are out of scope: unlike every fact above, these
+-- would need real `Finset.sum`/`if`-`then`-`else` integration, not just unfolding a
+-- `def`, and are a different (and larger) undertaking from the rest of this section.
+
+/-- SFS.mm `df-bl.atbi`: `@`-congruence for predicates. `ph`/`ps` read as pointwise-
+equivalent `TProp`s (`interp (φ ↔ₜ ψ)`), the same convention as `ax_bl_bi`/`ax_bl_eq`
+extended to genuinely temporal (not just constant-embedded) predicates -- this is
+what "`(ph<->ps)`, no `boldI` wrapper, no time index" must mean for `ph`/`ps` that
+*do* vary with time, since a bare `<->` between two `Instant → Prop`s doesn't
+otherwise typecheck as a single `Prop`. SFS.mm's `bl.atbii` is the same fact with
+its hypotheses spelled out as separate premises; not restated separately. -/
+theorem df_bl_atbi {φ ψ : TProp} {t1 t2 : Instant} (ht : t1 = t2) (hpq : interp (φ ↔ₜ ψ)) :
+    interp (atP φ t1) ↔ interp (atP ψ t2) := by
+  rw [df_bl_at, df_bl_at, ht]
+  exact hpq t2
+
+/-- SFS.mm `df-bl.ateqc`: `@`-congruence for values, literal substitution (`A = B`
+and `t1 = t2` as actual equalities, unlike `df_bl_atbi`'s pointwise-iff reading,
+since values genuinely can be compared by `=`). SFS.mm's `bl.ateqci` is the same
+fact with hypotheses spelled out separately; not restated. -/
+theorem df_bl_ateqc {α} {A B : TVal α} {t1 t2 : Instant} (ht : t1 = t2) (hAB : A = B) :
+    interpVal (atC A t1) = interpVal (atC B t2) := by subst ht; subst hAB; rfl
+
+-- SFS.mm `bl.atintroc` and `df-bl.atrt` are not restated: `bl.atintroc` ("a constant
+-- value's `@`-frozen value is still that constant") needs the same "`A` is actually
+-- constant" side condition `ax-bl.modelsc` needed and wasn't restated for (see the
+-- `interpVal`/`interpValAt` doc comment above) -- `atC A t0`'s value only matches
+-- `interpVal A`'s *anchor-at-`0`* value when `A` doesn't vary, which isn't assumed
+-- here. `df-bl.atrt` ("applying `@` retains type") is automatic in a typed setting:
+-- if `A : TVal α` then `atC A t0 : TVal α` by construction, nothing to prove.
 
 /-! ## The `^.` operator (SFS.mm lines 2067-2726) -/
 
@@ -339,6 +511,9 @@ constrain when the shifted predicate denotes a meaningful timed interpretation o
 theorem df_bl_ts (φ : TProp) (D : ℝ) (n : ℤ) (t0 : Instant) :
     interpAt (shiftP φ D n) t0 ↔ interpAt φ (t0 + D * n) := Iff.rfl
 
+-- SFS.mm `bl.tsi`/`bl.tsci` are `df_bl_ts`/`df_bl_tsc` with their `A ∈ ZZ`/`D ∈ ℝ`/
+-- `t0 ∈ TIME`/`(t0+D*A) ∈ TIME` hypotheses spelled out as separate premises; not
+-- restated, since `df_bl_ts`/`df_bl_tsc` already hold unconditionally (stronger).
 theorem df_bl_tsc {α} (A : TVal α) (D : ℝ) (n : ℤ) (t0 : Instant) :
     interpValAt (shiftC A D n) t0 = interpValAt A (t0 + D * n) := rfl
 
@@ -367,6 +542,75 @@ theorem bl_tscomci {α} (A : TVal α) (D : ℝ) (m n : ℤ) :
   congr 1
   push_cast
   ring
+
+/-- SFS.mm `bl.tsbii`: `^.`-congruence for predicates, same pointwise-iff convention
+as `df_bl_atbi`. Unlike `@` (which freezes to a constant), `shiftP` is plain
+precomposition (`φ ∘ (· + D*n)`), so its distribution facts below hold for the same
+reason `atP`'s did: precomposition commutes with any pointwise-defined operator. -/
+theorem bl_tsbii {φ ψ : TProp} {D : ℝ} {m n : ℤ} (hpq : interp (φ ↔ₜ ψ)) (hmn : m = n)
+    (t0 : Instant) : interpAt (shiftP φ D m ↔ₜ shiftP ψ D n) t0 := by
+  subst hmn; exact hpq (t0 + D * m)
+
+/-- SFS.mm `bl.tseqi`: `^.`-congruence for values. -/
+theorem bl_tseqi {α} {A B : TVal α} {D : ℝ} {m n : ℤ} (hAB : A = B) (hmn : m = n) (t0 : Instant) :
+    interpValAt (shiftC A D m) t0 = interpValAt (shiftC B D n) t0 := by subst hAB; subst hmn; rfl
+
+/-! ### Distribute `^.` over logic (SFS.mm's "Distribute Time-Shift Temporal
+Operator `^.`" section, over logic) -/
+
+/-- SFS.mm `bl.tsan2i`. -/
+theorem shiftP_and (φ ψ : TProp) (D : ℝ) (n : ℤ) : shiftP (φ ∧ₜ ψ) D n = shiftP φ D n ∧ₜ shiftP ψ D n := rfl
+/-- SFS.mm `bl.tsor2i`. -/
+theorem shiftP_or (φ ψ : TProp) (D : ℝ) (n : ℤ) : shiftP (φ ∨ₜ ψ) D n = shiftP φ D n ∨ₜ shiftP ψ D n := rfl
+theorem shiftP_not (φ : TProp) (D : ℝ) (n : ℤ) : shiftP (¬ₜφ) D n = ¬ₜ(shiftP φ D n) := rfl
+theorem shiftP_imp (φ ψ : TProp) (D : ℝ) (n : ℤ) : shiftP (φ →ₜ ψ) D n = shiftP φ D n →ₜ shiftP ψ D n := rfl
+theorem shiftP_iff (φ ψ : TProp) (D : ℝ) (n : ℤ) : shiftP (φ ↔ₜ ψ) D n = shiftP φ D n ↔ₜ shiftP ψ D n := rfl
+
+-- SFS.mm `bl.tsan3i`/`bl.tsan3ri`/`bl.tsan3li`/`bl.tsor3i`/`bl.tsor3ri`/`bl.tsor3li`
+-- (3-term/left/right variants) fall out of `shiftP_and`/`shiftP_or` applied twice,
+-- same as the `@`-over-conjunction 3-term case earlier; `bl.tsani`/`bl.tsori`
+-- (wff-list variants) depend on the skipped multiterm-list plumbing, same as
+-- `bl.atad3` etc. above.
+
+/-! ### Distribute `^.` over arithmetic -/
+
+/-- SFS.mm `bl.tsad2i`. -/
+theorem shiftC_add (A B : TVal ℝ) (D : ℝ) (n : ℤ) : shiftC (A + B) D n = shiftC A D n + shiftC B D n := rfl
+/-- SFS.mm `bl.tssubi`. -/
+theorem shiftC_sub (A B : TVal ℝ) (D : ℝ) (n : ℤ) : shiftC (A - B) D n = shiftC A D n - shiftC B D n := rfl
+/-- SFS.mm `bl.tsmul2i`. -/
+theorem shiftC_mul (A B : TVal ℝ) (D : ℝ) (n : ℤ) : shiftC (A * B) D n = shiftC A D n * shiftC B D n := rfl
+/-- SFS.mm `bl.tsdivi`. -/
+theorem shiftC_div (A B : TVal ℝ) (D : ℝ) (n : ℤ) : shiftC (A / B) D n = shiftC A D n / shiftC B D n := rfl
+/-- SFS.mm `bl.tsumi`. -/
+theorem shiftC_neg (A : TVal ℝ) (D : ℝ) (n : ℤ) : shiftC (-A) D n = -shiftC A D n := rfl
+
+-- SFS.mm `bl.tsad3ri`/`bl.tsad3li`/`bl.tsmul3ri`/`bl.tsmul3li` (3-term variants)
+-- fall out of `shiftC_add`/`shiftC_mul` applied twice; `bl.tsadi`/`bl.tsmuli`
+-- (list variants) depend on the skipped multiterm-list plumbing, same as above.
+
+/-! ### Distribute `^.` over relations and quantifiers -/
+
+/-- SFS.mm `bl.tsdeqi`. -/
+theorem shiftP_teq (A B : TVal ℝ) (D : ℝ) (n : ℤ) : shiftP (teq A B) D n = teq (shiftC A D n) (shiftC B D n) := rfl
+/-- SFS.mm `bl.tslti`. -/
+theorem shiftP_tlt (A B : TVal ℝ) (D : ℝ) (n : ℤ) : shiftP (tlt A B) D n = tlt (shiftC A D n) (shiftC B D n) := rfl
+/-- SFS.mm `bl.tsami`. -/
+theorem shiftP_tle (A B : TVal ℝ) (D : ℝ) (n : ℤ) : shiftP (tle A B) D n = tle (shiftC A D n) (shiftC B D n) := rfl
+
+/-- SFS.mm `df-bl.tsali`. -/
+theorem shiftP_ralt {D' : Type*} (φ : D' → TProp) (A : Set D') (D : ℝ) (n : ℤ) :
+    shiftP (fun t => ∀ x ∈ A, φ x t) D n = fun t => ∀ x ∈ A, shiftP (φ x) D n t := rfl
+/-- SFS.mm `df-bl.tsexi`. -/
+theorem shiftP_rext {D' : Type*} (φ : D' → TProp) (A : Set D') (D : ℝ) (n : ℤ) :
+    shiftP (fun t => ∃ x ∈ A, φ x t) D n = fun t => ∃ x ∈ A, shiftP (φ x) D n t := rfl
+
+-- SFS.mm `df-bl.tssumi`/`df-bl.tsprodi`/`df-bl.tsqq` (`^.` distributing over `sum_`/
+-- `prod_`/conditional expressions), and `bl.tsoi` (the `TIME`-membership
+-- side-condition helper for converting `^.` into `@`), are out of scope for the
+-- same reasons `df-bl.atsum`/`atprod`/`atqq` were: real `Finset.sum`/`if`-`then`-
+-- `else` integration, or a technical side lemma about hypotheses rather than
+-- independent content.
 
 /-! ## Domain ontology (SFS.mm lines 2726-3150)
 
@@ -412,6 +656,13 @@ p_y` (self-overlap of `y`, not overlap of `x` and `y`) -- almost certainly a
 transcription slip for `-. p_x Overlap p_y`, which is what is used here; flagged,
 not corrected in SFS.mm itself. -/
 def PartDisjoint (x y : Part) : Prop := ¬ Overlap x y
+
+/-- SFS.mm `df-pch`: despite the `df-` name this doesn't define a new symbol -- it's
+purely a constraint (any two parts are comparable, equal, or disjoint, and not
+mutually part of each other) that is not derivable from `df-par`/`df-ptr` alone,
+so, like those two, it stays an `axiom` rather than becoming a `def`. -/
+axiom df_pch (x y : Part) :
+    ((PartOf x y ∨ PartOf y x) ∨ (x = y ∨ PartDisjoint x y)) ∧ ¬ (PartOf x y ∧ PartOf y x)
 
 /-- SFS.mm `df-pat`. -/
 def AtomPart (x : Part) : Prop := ¬ ∃ z, PartOf z x
@@ -581,6 +832,11 @@ uniqueness question dissolves once existence is known to fail on unrestricted
 dense time (matching the book's own remark that `next` "only does real work when
 applied to instant pairs known not to be dense with each other"). -/
 theorem next_uniq {t1 t2 t3 : Instant} (h : next t1 t2) : t2 = t3 := absurd h (next_dense t1 t2)
+
+-- SFS.mm `bl.nextev`/`bl.nextwit` (helper lemmas witnessing the "no instant between"
+-- clause of `df-next`, needed in the Metamath development to route around `wtp` not
+-- being `wbr`-based) are subsumed by `next_dense`: since `next` is uniformly false
+-- here, nothing downstream ever needs their witnessing content.
 
 /-! ### KerML Element Representation (SFS.mm lines 3121-3149) -/
 
