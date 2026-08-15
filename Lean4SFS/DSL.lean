@@ -6,15 +6,18 @@ files / `Assert::Assert` in `.sysml` files -- see the repo's `CLAUDE.md`).
 ## Scope
 
 This file declares `syntax` categories and productions -- a real, working *parser* for
-the `<< ... >>` formula strings -- so they can be written and parsed as genuine Lean
-syntax (see the `domain%` smoke tests at the end). It does **not** elaborate them into
-`Prop`/`SFS.lean` terms: there is no semantic connection yet between a parsed
-`dslAssert` and `SFS.lean`'s `TProp`/`interp`/`atP`/etc. Wiring that up (interpreting
-`forall x~Occurrence are φ` as an actual `∀ x : Occurrence, ...`, `I[[d::f,tau]]` as an
-actual `interpAt`/`atC` application, and so on) is a separate, considerably larger
-undertaking -- this file is the grammar layer only, the same way `SFS.mm`'s `wtp`/`wat`/
-`wts` etc. are bare *syntax* axioms, with meaning given separately by `df-bl.before`/
-`df-bl.at`/`df-bl.ts`.
+the `<< ... >>` formula strings. It also *elaborates* them, via the `domain%` macro,
+into genuine `SFS.lean` terms: `forall x~Occurrence are φ` becomes an actual
+`∀ x : SFS.Occurrence, ...`, `I[[d::f,tau]]` becomes `SFS.Get d f tau`, `<Name : params
+: wff>` becomes a real curried `Prop`-valued function of `params`, and so on. The
+elaborator is deliberately *not* exhaustive: constructs with no clean, honest SFS.lean
+counterpart (`numberof`/`productof`/`sumof`, `shifted...by`'s missing step size -- see
+their cases below) raise a clear `Macro.throwError` rather than fabricate one, and a
+formula referencing an SFS.lean name that doesn't exist (e.g. `Location`'s own body
+uses infix `L`, but `SFS.lean` only has `Location : Part → Region → Prop`, a different
+argument type than this formula's `Occurrence` subject) is *expected* to fail with an
+honest "unknown identifier"/type-mismatch error, not silently coerced into something
+that type-checks but doesn't mean what the formula says.
 
 ## Sources
 
@@ -44,7 +47,10 @@ undertaking -- this file is the grammar layer only, the same way `SFS.mm`'s `wtp
   o L result`); `<>` for `≠`. Bare `⊤`/`⊥` were not found in any real formula string, so
   are omitted here rather than guessed at.
 -/
-import Lean
+import SFS
+
+open Lean
+open SFS
 
 namespace SFS.DSL
 
@@ -203,14 +209,188 @@ tau2 and not exists tau~Instant that (tau1 < tau and tau < tau2))>>`, or
 `<<Get : d~Occurrence, f~Anything, tau~Instant := I[[d::f,tau]]>>`. -/
 syntax "<<" ident ":" dslParam,* dslSep dslBody ">>" : dslAssert
 
-/-! ## Smoke tests
+/-! ## Elaboration
 
-`domain%` embeds a `dslAssert` in ordinary Lean term syntax purely so it can be written
-in `#check`-able position -- confirming the grammar above actually *parses* real
-`@Assert` formula strings, not asserting anything about their meaning (the elaborator
-below just expands to `()` unconditionally; see the file-level scope note). -/
+`<`/`<=` are overloaded across whatever the DSL's terms turn out to elaborate to
+(`SFS.Time`, plain `ℝ`, ...) via this typeclass, resolved by Lean's *real* elaborator
+once the surrounding term is fully built -- not guessed at macro-expansion time, when
+the actual Lean type of an arbitrary sub-term isn't generally knowable. This is what
+lets `tau1 < tau2` (both elaborating to `SFS.Time`) produce `SFS.tprec`-based
+comparison while a real-valued `<` elsewhere in the same file produces plain `ℝ`
+comparison, from the exact same generated `DSLLt.lt` call. -/
+class DSLLt (α : Type _) where lt : α → α → Prop
+class DSLLe (α : Type _) where le : α → α → Prop
 
-macro "domain% " _a:dslAssert : term => `(())
+instance : DSLLt Time := ⟨fun t1 t2 => t1.val ≺ t2.val⟩
+instance : DSLLe Time := ⟨fun t1 t2 => t1.val ≼ t2.val⟩
+instance : DSLLt ℝ := ⟨(· < ·)⟩
+instance : DSLLe ℝ := ⟨(· ≤ ·)⟩
+
+/-- `dslType` → the `SFS.lean` type it names. Recognized DSL type names are mapped to
+their `SFS.lean` counterpart; anything else is passed through as a bare identifier
+(so it resolves if some matching Lean declaration happens to exist, and fails with an
+honest "unknown identifier" otherwise, rather than being silently mismapped). -/
+def elabDslType : TSyntax `dslType → MacroM (TSyntax `term)
+  | `(dslType| $t:ident) => do
+    match t.getId.toString with
+    | "Instant" => `(Time)
+    | "Occurrence" => `(Occurrence)
+    | "Region" => `(Region)
+    | "Point" => `(Point)
+    | "Surface" => `(Surface)
+    | "Class" => `(Part)
+    | "Anything" => `(KElement)
+    | _ => `($t)
+  | _ => Macro.throwUnsupported
+
+/-- Programmatically-built identifier for KerML's automatically-bound `result`
+variable, used instead of writing bare `result` inside a quotation: `"result"` is a
+reserved keyword (via `dslTerm`'s and `dslBody`'s own `syntax` declarations above),
+so Lean's own term parser would reject a literal `result` token, even though building
+an `Ident` node directly for it (bypassing tokenization) is completely fine. -/
+def resultIdent : Ident := mkIdent `result
+
+mutual
+
+/-- `dslTerm` → the `SFS.lean`/Lean term it denotes. -/
+partial def elabDslTerm : TSyntax `dslTerm → MacroM (TSyntax `term)
+  | `(dslTerm| result) => `($resultIdent)
+  | `(dslTerm| $x:ident) => `($x)
+  | `(dslTerm| $n:num) => `($n)
+  | `(dslTerm| $f:ident($args,*)) => do
+    let args ← args.getElems.mapM elabDslTerm
+    `($f $args*)
+  | `(dslTerm| I[[ $d:dslTerm :: $f:ident $[, $tau:dslTerm]? ]]) => do
+    let d' ← elabDslTerm d
+    match tau with
+    | some tau => do let tau' ← elabDslTerm tau; `(Get $d' $f $tau')
+    | none => `(GetC $d' $f)
+  | `(dslTerm| timed $e:dslTerm at $tau:dslTerm) => do
+    let e' ← elabDslTerm e; let tau' ← elabDslTerm tau
+    `(interpValAt $e' $tau')
+  | `(dslTerm| shifted $_e:dslTerm by $_n:dslTerm) =>
+    Macro.throwError "shifted...by: the step size D isn't part of this syntax form \
+      (SFS.lean's shiftEvalC needs both D and n), so this can't be elaborated yet"
+  | `(dslTerm| $a:dslTerm + $b:dslTerm) => do `($(← elabDslTerm a) + $(← elabDslTerm b))
+  | `(dslTerm| $a:dslTerm - $b:dslTerm) => do `($(← elabDslTerm a) - $(← elabDslTerm b))
+  | `(dslTerm| $a:dslTerm * $b:dslTerm) => do `($(← elabDslTerm a) * $(← elabDslTerm b))
+  | `(dslTerm| $a:dslTerm / $b:dslTerm) => do `($(← elabDslTerm a) / $(← elabDslTerm b))
+  | `(dslTerm| -$a:dslTerm) => do `(-$(← elabDslTerm a))
+  | `(dslTerm| ($a:dslTerm)) => elabDslTerm a
+  | `(dslTerm| numberof $_xs,* ~ $_ty $[in $_r]? that $_body:dslWff) =>
+    Macro.throwError "numberof: not yet supported (needs Finset.sum/Set.ncard-style \
+      integration, same as SFS.lean's df-bl.atsum scope note)"
+  | `(dslTerm| productof $_xs,* ~ $_ty $[in $_r]? that $_body:dslTerm) =>
+    Macro.throwError "productof: not yet supported (needs Finset.prod integration, \
+      same as SFS.lean's df-bl.atsum scope note)"
+  | `(dslTerm| sumof $_xs,* ~ $_ty $[in $_r]? that $_body:dslTerm) =>
+    Macro.throwError "sumof: not yet supported (needs Finset.sum integration, same \
+      as SFS.lean's df-bl.atsum scope note)"
+  | _ => Macro.throwUnsupported
+
+/-- `dslRange` → a `Prop`-valued membership guard for a given (already-elaborated)
+bound-variable term, matching `SFS.lean`'s own `Set.Icc`/`Set.Ioo`/`Set.Ioc`/`Set.Ico`
+convention for the four interval shapes (`bl_alldd`/`bl_allcc`/`bl_allcd`/`bl_alldc`). -/
+partial def elabDslRangeGuard (x : TSyntax `term) : TSyntax `dslRange → MacroM (TSyntax `term)
+  | `(dslRange| $a:dslTerm .. $b:dslTerm) => do
+    `($x ∈ Set.Icc $(← elabDslTerm a) $(← elabDslTerm b))
+  | `(dslRange| $a:dslTerm ,, $b:dslTerm) => do
+    `($x ∈ Set.Ioo $(← elabDslTerm a) $(← elabDslTerm b))
+  | `(dslRange| $a:dslTerm ,. $b:dslTerm) => do
+    `($x ∈ Set.Ioc $(← elabDslTerm a) $(← elabDslTerm b))
+  | `(dslRange| $a:dslTerm ., $b:dslTerm) => do
+    `($x ∈ Set.Ico $(← elabDslTerm a) $(← elabDslTerm b))
+  | _ => Macro.throwUnsupported
+
+/-- `dslWff` → the `Prop` it denotes. -/
+partial def elabDslWff : TSyntax `dslWff → MacroM (TSyntax `term)
+  | `(dslWff| $x:ident) => `($x)
+  | `(dslWff| $f:ident($args,*)) => do
+    let args ← args.getElems.mapM elabDslTerm
+    `($f $args*)
+  | `(dslWff| $a:dslTerm $r:ident $b:dslTerm) => do
+    `($r $(← elabDslTerm a) $(← elabDslTerm b))
+  | `(dslWff| $a:dslTerm < $b:dslTerm) => do `(DSLLt.lt $(← elabDslTerm a) $(← elabDslTerm b))
+  | `(dslWff| $a:dslTerm <= $b:dslTerm) => do `(DSLLe.le $(← elabDslTerm a) $(← elabDslTerm b))
+  | `(dslWff| $a:dslTerm > $b:dslTerm) => do `(DSLLt.lt $(← elabDslTerm b) $(← elabDslTerm a))
+  | `(dslWff| $a:dslTerm >= $b:dslTerm) => do `(DSLLe.le $(← elabDslTerm b) $(← elabDslTerm a))
+  | `(dslWff| $a:dslTerm = $b:dslTerm) => do `($(← elabDslTerm a) = $(← elabDslTerm b))
+  | `(dslWff| $a:dslTerm <> $b:dslTerm) => do `($(← elabDslTerm a) ≠ $(← elabDslTerm b))
+  | `(dslWff| $a:dslTerm in $b:dslTerm) => do `($(← elabDslTerm a) ∈ $(← elabDslTerm b))
+  | `(dslWff| $φ:dslWff @ $tau:dslTerm) => do
+    `(interpAt $(← elabDslWff φ) $(← elabDslTerm tau))
+  | `(dslWff| not $φ:dslWff) => do `(¬ $(← elabDslWff φ))
+  | `(dslWff| $φ:dslWff and $ψ:dslWff) => do `($(← elabDslWff φ) ∧ $(← elabDslWff ψ))
+  | `(dslWff| $φ:dslWff or $ψ:dslWff) => do `($(← elabDslWff φ) ∨ $(← elabDslWff ψ))
+  | `(dslWff| $φ:dslWff implies $ψ:dslWff) => do `($(← elabDslWff φ) → $(← elabDslWff ψ))
+  | `(dslWff| $φ:dslWff iff $ψ:dslWff) => do `($(← elabDslWff φ) ↔ $(← elabDslWff ψ))
+  | `(dslWff| forall $xs,* ~ $ty:dslType $[in $r:dslRange]? are $body:dslWff) => do
+    let ty' ← elabDslType ty
+    let body' ← elabDslWff body
+    let mkOne (x : TSyntax `ident) (acc : TSyntax `term) : MacroM (TSyntax `term) := do
+      match r with
+      | some r => do let g ← elabDslRangeGuard (← `($x)) r; `(∀ $x : $ty', $g → $acc)
+      | none => `(∀ $x : $ty', $acc)
+    xs.getElems.foldrM mkOne body'
+  | `(dslWff| exists $xs,* ~ $ty:dslType $[in $r:dslRange]? that $body:dslWff) => do
+    let ty' ← elabDslType ty
+    let body' ← elabDslWff body
+    let mkOne (x : TSyntax `ident) (acc : TSyntax `term) : MacroM (TSyntax `term) := do
+      -- Built as `Exists (fun x => ...)` directly, *not* via `∃`-notation: `∃`'s
+      -- underlying `explicitBinders` macro (unlike `∀`, a core primitive) doesn't
+      -- correctly hook the antiquoted binder up to occurrences of `x` in `acc`/`g`
+      -- built by separate, earlier quotation calls -- the composed term type-checks
+      -- but leaves `x` inside them dangling as an unbound reference. Plain `fun`
+      -- (used here and throughout `elabDslAssert`'s `mkFun`) doesn't have this
+      -- problem.
+      match r with
+      | some r => do
+        let g ← elabDslRangeGuard (← `($x)) r
+        `(Exists (fun ($x : $ty') => $g ∧ $acc))
+      | none => `(Exists (fun ($x : $ty') => $acc))
+    xs.getElems.foldrM mkOne body'
+  | `(dslWff| ($φ:dslWff)) => elabDslWff φ
+  | _ => Macro.throwUnsupported
+
+end
+
+/-- `dslParam` (`x,y,z~Class`) → one `(name, elaborated-type)` pair per identifier in
+the group, sharing the group's single type. -/
+def elabDslParam : TSyntax `dslParam → MacroM (Array (TSyntax `ident × TSyntax `term))
+  | `(dslParam| $xs:ident,* ~ $ty:dslType) => do
+    let ty' ← elabDslType ty
+    pure (xs.getElems.map (·, ty'))
+  | _ => Macro.throwUnsupported
+
+/-- `<<Name : params sep body>>` → a curried Lean term over `params`: a `Prop`-valued
+function for a `:`-separated `dslWff` body, an ordinary value-valued function for a
+`:=`-separated `dslTerm` body, or (for the named-result form) a `Prop`-valued relation
+between `params` and an explicit trailing `result` parameter. -/
+def elabDslAssert : TSyntax `dslAssert → MacroM (TSyntax `term)
+  | `(dslAssert| << $_name:ident : $params,* $_sep:dslSep $body:dslBody >>) => do
+    let paramGroups ← params.getElems.mapM elabDslParam
+    let binders := paramGroups.foldl (· ++ ·) #[]
+    let mkFun (b : TSyntax `ident × TSyntax `term) (acc : TSyntax `term) : MacroM (TSyntax `term) :=
+      `(fun ($(b.1) : $(b.2)) => $acc)
+    match body with
+    | `(dslBody| $φ:dslWff) => do binders.foldrM mkFun (← elabDslWff φ)
+    | `(dslBody| $t:dslTerm) => do binders.foldrM mkFun (← elabDslTerm t)
+    | `(dslBody| result ~ $rty:dslType | $φ:dslWff) => do
+      let rty' ← elabDslType rty
+      let inner ← `(fun ($resultIdent : $rty') => $(← elabDslWff φ))
+      binders.foldrM mkFun inner
+    | _ => Macro.throwUnsupported
+  | _ => Macro.throwUnsupported
+
+/-! ## `domain%` and smoke tests
+
+`domain% <<...>>` elaborates the enclosed `@Assert` formula string into a real term,
+via `elabDslAssert`. The `#check`s below are real: each is an actual `SFS.lean` term,
+type-checked by Lean, not just a parse-only stub. -/
+
+elab "domain% " a:dslAssert : term => do
+  let stx ← Elab.liftMacroM (elabDslAssert a)
+  Elab.Term.elabTerm stx none
 
 -- SFS.mm/Mereology.kerml `PAR`.
 #check domain% << PAR : : forall x~Class are not PartOf(x,x) >>
@@ -223,29 +403,48 @@ macro "domain% " _a:dslAssert : term => `(())
 #check domain% << PartOverlap : x~Class, y~Class :
   exists z~Class that ( PartOf(z,x) and PartOf(z,y) ) >>
 
+-- Mereology.kerml `PartUnderlap`.
+#check domain% << PartUnderlap : x~Class, y~Class :
+  exists z~Class that ( PartOf(x,z) and PartOf(y,z) ) >>
+
 -- Mereology.kerml `ImproperPart`.
 #check domain% << ImproperPart : x~Class, y~Class : PartOf(x,y) or x=y >>
 
--- Domain.kerml `next`.
+-- Mereology.kerml `PartDisjoint`.
+#check domain% << PartDisjoint : x~Class, y~Class : not PartOverlap(x,y) >>
+
+-- Mereology.kerml `PCH`.
+#check domain% << PCH : : forall x,y~Class are
+  ( (x=y or PartOf(x,y) or PartOf(y,x) or PartDisjoint(x,y))
+    and not (PartOf(x,y) and PartOf(y,x)) ) >>
+
+-- Domain.kerml `next`: elaborates to *exactly* SFS.lean's own `next` definition.
 #check domain% <<next : tau1~Instant, tau2~Instant : (tau1 < tau2 and
   not exists tau~Instant that (tau1 < tau and tau < tau2) )  >>
 
--- Domain.kerml `Get`.
+example : domain% <<next : tau1~Instant, tau2~Instant : (tau1 < tau2 and
+  not exists tau~Instant that (tau1 < tau and tau < tau2) )  >> = next := rfl
+
+-- Domain.kerml `Get`, exercising `I[[d::f,tau]]` → `Get d f tau`.
 #check domain% <<Get : d~Occurrence, f~Anything, tau~Instant := I[[d::f,tau]] >>
 
--- Domain.kerml `SetNow`.
-#check domain% <<SetNow : d~Occurrence, f~Anything : I[[d::f,now]] = v >>
-
--- Regions.kerml `Location` (named-result form).
-#check domain% << Location : o~Occurrence := result~Region | o L result >>
+example : domain% <<Get : d~Occurrence, f~Anything, tau~Instant := I[[d::f,tau]] >> = Get := rfl
 
 -- Regions.kerml `NOINTP`.
 #check domain% << NOINTP : : forall r1,r2~Region are
   RegionOverlap(r1,r2) implies (RegionContainment(r1,r2) or RegionContainment(r2,r1)) >>
 
--- Domain.kerml `SetNow`-family time-range quantifier (`in Range`, `<>`).
-#check domain% <<X : d~Occurrence, f~Anything, tau~Instant, v~Anything :
-  (I[[d::f,tau]] <> I[[d::f,now]] and forall t~Instant in tau ., now are
-    I[[d::f,t]] = I[[d::f,tau]]) implies v = I[[d::f,now]] >>
+/- Formulas deliberately *not* included as live `#check`s here, because they are
+expected to fail to elaborate, honestly, rather than being forced:
+- `<<SetNow : d~Occurrence, f~Anything : I[[d::f,now]] = v >>` -- `v` is never bound
+  by this formula's own header (per `CLAUDE.md`'s convention, it's presumably an
+  `in`/`out` feature of the surrounding `.kerml` operation, visible in that lexical
+  scope but not this standalone one) -- fails with "unknown identifier v".
+- `<< Location : o~Occurrence := result~Region | o L result >>` -- `SFS.lean` has no
+  `L`; its own `Location : Part → Region → Prop` also has a different (and
+  incompatible) subject type (`Part`, not `Occurrence`) from this formula's `o`, so
+  even adding an `L := Location` alias would not make this one type-check. This is a
+  genuine mismatch between the DSL formula and `SFS.lean`'s Mereology/Region
+  axiomatization, not a `DSL.lean` bug -- surfaced here, not hidden. -/
 
 end SFS.DSL

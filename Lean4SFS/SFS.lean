@@ -981,4 +981,44 @@ structure Model where
   than inventing a differently-shaped codomain. -/
   I : KElement → TVal (Set KElement)
 
+/-! ## Feature access (`Lean4SFS/DSL.lean` elaboration support, not an SFS.mm
+translation)
+
+`d::f` (KerML feature navigation) and the `I[[d::f,tau]]`/`I[[d::f]]`
+interpretation-bracket notation used throughout `Domain.kerml`'s `Get`/`GetNow`/
+`SetNow`/`GetChange` `@Assert` formulas have no SFS.mm formalization (confirmed
+absent -- see the [[project_lean4sfs]] memory). `featureAccess`/`Get`/`GetC` are new
+primitives added specifically so `DSL.lean`'s elaborator has something to translate
+`I[[·::·,·]]` into; they are not translations of any existing SFS.mm axiom, the same
+way `Model` above isn't. -/
+
+/-- `d::f`: the feature `f` of occurrence `d`, itself an occurrence (KerML features
+are themselves typed elements, so themselves `Occurrence`-shaped here). -/
+axiom featureAccess : Occurrence → KElement → Occurrence
+
+/-- `I[[d::f,tau]]`: the value of feature `f` of `d` at `tau`. -/
+def Get (d : Occurrence) (f : KElement) (tau : Time) : Set Item := interpValAt (featureAccess d f) tau
+
+/-- `I[[d::f]]`: the (untimed/constant) value of feature `f` of `d`. -/
+def GetC (d : Occurrence) (f : KElement) : Set Item := interpVal (featureAccess d f)
+
+/-! ## `Lean4SFS/DSL.lean` name-compatibility aliases
+
+Real `@Assert{n="..."}` names in `sysml.library/**/*.kerml` use the full KerML
+predicate name; this file's Mereology section, closer to `SFS.mm`'s own more compact
+naming, dropped the `Part`/`Atomic` prefix for three of them. Aliased here (not
+renamed above) so `DSL.lean`'s elaborator can resolve formula bodies that cite the
+KerML name directly, without disturbing this file's own established names or their
+citations elsewhere. Not every such mismatch gets an alias -- `Location`'s own
+`@Assert` formula uses infix `L` on an `Occurrence` subject, but `SFS.lean`'s
+`Location : Part → Region → Prop` takes a different argument type entirely, so no
+alias would make it type-check; see `DSL.lean`'s own note on that one. -/
+
+/-- SFS.mm/KerML's `PartOverlap`. -/
+abbrev PartOverlap := Overlap
+/-- SFS.mm/KerML's `PartUnderlap`. -/
+abbrev PartUnderlap := Underlap
+/-- SFS.mm/KerML's `AtomicPart`. -/
+abbrev AtomicPart := AtomPart
+
 end SFS
