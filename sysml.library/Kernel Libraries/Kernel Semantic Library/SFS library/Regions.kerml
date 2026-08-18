@@ -87,12 +87,12 @@ library package Regions {
      // SFS:  Two things having the same location are the same thing (df-lfu)
     @Assert{n="locational functionality"; 
         f="<< LFU : : forall x~Occurrence forall r1,r2~Region are"+
-          " ( (Location(x)=r1 and Location(x)=r2) implies r1=r2 ) >>"; t="df-lfu";}
+          " ( (Location(x)=r1 and Location(x)=r2) implies r1=r2 ) >>"; t="lfu";}
 
     // SFS:  No two things share an exact location.
     @Assert{n="injectivity of location"; 
         f="<< LIN : : forall x,y~Occurrence forall r~Region are"+
-          " ( (Location(x)=r and Location(y)=r) implies x=y ) >>"; t="df-lin";}
+          " ( (Location(x)=r and Location(y)=r) implies x=y ) >>"; t="lin";}
 
 
     predicate PointInRegion {
@@ -118,7 +118,7 @@ library package Regions {
             * This is the "O" relation (df-rov).
             * Regions are disjoint if they don't overlap */
         @Assert{n="RegionOverlap"; f="<< RegionOverlap : r1~Region, r2~Region :"+
-                "exists p~Point that (PointInRegion(p,r1) and PointInRegion(p,r2)) >>"; t="df-rov";}
+                "exists p~Point that (PointInRegion(p,r1) and PointInRegion(p,r2)) >>"; t="RegionOverlap";}
         in r1 : Region;
         in r2 : Region;
         inv { r1.frameOfReference == r2.frameOfReference }
@@ -130,7 +130,7 @@ library package Regions {
             *  true when r1 contains r2 
             * This is the "C" relation (df-rco). */
         @Assert{n="RegionContainment"; f="<< RegionContainment : r1~Region, r2~Region :"+
-                "forall p~Point are (PointInRegion(p,r2) implies PointInRegion(p,r1)) >>"; t="df-rco";}
+                "forall p~Point are (PointInRegion(p,r2) implies PointInRegion(p,r1)) >>"; t="RegionContainment";}
         in r1 : Region;
         in r2 : Region;
         inv { r1.frameOfReference == r2.frameOfReference }
@@ -138,17 +138,17 @@ library package Regions {
 
     doc /* SFS: Regions overlap only if one contains the other. This property is called no interpenetration. */
     @Assert{n="NOINTP"; f="<< NOINTP : : forall r1,r2~Region are "+
-            "RegionOverlap(r1,r2) implies (RegionContainment(r1,r2) or RegionContainment(r2,r1)) >>"; t="df-rni";}
+            "RegionOverlap(r1,r2) implies (RegionContainment(r1,r2) or RegionContainment(r2,r1)) >>"; t="no_interpenetration";}
 
     doc /* SFS: Parthood implies regional containment. This property is called expansivity. */
     @Assert{n="EXPNS"; f="<< EXPNS : : forall x,y~Occurrence forall r1,r2~Region are "+
-           "( (Location(x)=r1 and Location(y)=r2 and PartOf(x,y)) implies RegionContainment(r2,r1) ) >>"; t="df-pex";}
+           "( (Location(x)=r1 and Location(y)=r2 and PartOf(x,y)) implies RegionContainment(r2,r1) ) >>"; t="expansivity";}
 
     predicate AtomicRegion {
         doc /* SFS:  A region is atomic, Ar , when it contains no other regions (in the location relation).
          * This is the "A" operator (df-rat). */
         @Assert{n="AtomicRegion"; f="<< AtomicRegion : r~Region : "+
-                "forall r1~Region are ( RegionContainment(r,r1) implies r = r1 ) >>"; t="df-rat";}
+                "forall r1~Region are ( RegionContainment(r,r1) implies r = r1 ) >>"; t="AtomicRegion";}
         in r : Region;
     }
 
@@ -156,11 +156,11 @@ library package Regions {
     @Assert{n="AtomicRegionDisjoint"; f="<< AtomicRegionDisjoint : :"+ 
         "forall r1,r2~Region are "+
         "   ( (AtomicRegion(r1) and AtomicRegion(r2)) implies "+
-        "     (not RegionOverlap(r1,r2) or r1=r2) ) >>"; t="df-rdi";}  
+        "     (not RegionOverlap(r1,r2) or r1=r2) ) >>"; t="rdi";}
 
     // Atomic parts have atomic regions
     @Assert{n="APAR"; f="<< APAR : : forall x~Occurrence forall r~Region are "+
-            "(Location(x)=r and AtomicPart(x)) implies AtomicRegion(r) >>"; t="df-apar";}
+            "(Location(x)=r and AtomicPart(x)) implies AtomicRegion(r) >>"; t="apar";}
  
     // Adjacent points are infinitessimly close, the set of adjacent points to p
     // is Adj(p) defined by df-adjp
@@ -169,7 +169,7 @@ library package Regions {
         doc /* SFS: The surface of a region is all the points on its boundary */
         @Assert{n="RegionSurface"; f="<< RegionSurface : r~Region := result~Surface | "+
                 "forall p~Point are (PointOnSurface(p,result) iff (PointInRegion(p,r) and "+
-                "  exists p2~Point that ( p2 in Adj(p) and not PointInRegion(p2,r) ))) >>"; t="df-rsurf";}
+                "  exists p2~Point that ( p2 in Adj(p) and not PointInRegion(p2,r) ))) >>"; t="RegionSurface";}
         in r : Region;
         return result : Surface;
         inv { r.frameOfReference == (result as Surface).frameOfReference}
@@ -180,7 +180,7 @@ library package Regions {
           * not on its surface */
         @Assert{n="RegionInterior"; f="<< RegionInterior : r~Region := result~Region | "+
             "forall p~Point are (PointInRegion(p,result) iff "+
-            "  (PointInRegion(p,r) and not PointOnSurface(p,RegionSurface(r))) ) >>"; t="df-rint";}
+            "  (PointInRegion(p,r) and not PointOnSurface(p,RegionSurface(r))) ) >>"; t="RegionInterior";}
         in r : Region;
         return result : Region;
         inv { r.frameOfReference == (result as Region).frameOfReference}
@@ -191,7 +191,7 @@ library package Regions {
         @Assert{n="RegionFilm"; f="<< RegionFilm : r~Region := result~Surface | "+
             " forall p~Point are ( PointOnSurface(p,result) iff "+
             " (not PointInRegion(p,r) and exists p2~Point that "+
-            "    (PointOnSurface(p2,RegionSurface(r)) and p2 in Adj(p)))) >>"; t="df-rfilm";}
+            "    (PointOnSurface(p2,RegionSurface(r)) and p2 in Adj(p)))) >>"; t="RegionFilm";}
         in r : Region;
         return result : Surface;
         inv { r.frameOfReference == (result as Surface).frameOfReference}
@@ -201,7 +201,7 @@ library package Regions {
         doc /* SFS:  This is the externally connected (EC) relation  of Region Connection Calculus
           * r1 and r2 don't overlap, but some point on the film of r1 is in r2 */
         @Assert{n="ExternallyConnected"; f="<< ExternallyConnected : r1~Region, r2~Region : "+
-            " not RegionOverlap(r1,r2) and exists p~Point that ( PointOnSurface(p,RegionFilm(r1)) and PointInRegion(p,r2) ) >>"; t="df-rec";}
+            " not RegionOverlap(r1,r2) and exists p~Point that ( PointOnSurface(p,RegionFilm(r1)) and PointInRegion(p,r2) ) >>"; t="ExternallyConnected";}
         in r1 : Region;
         in r2 : Region;
         inv { r1.frameOfReference == r2.frameOfReference }

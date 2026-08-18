@@ -19,14 +19,14 @@ library package Mereology {
     }
 
     // SFS:  Define part antireflexivity.
-    @Assert{n="PAR"; f="<< PAR : : forall x~Class are not PartOf(x,x) >>"; t="df-par";}
+    @Assert{n="PAR"; f="<< PAR : : forall x~Class are not PartOf(x,x) >>"; t="par";}
     // SFS:  Define part transitivity.
-    @Assert{n="PTR"; f="<< PTR : : forall x,y,z~Class are ( (PartOf(x,y) and PartOf(y,z)) implies PartOf(x,z) ) >>"; t="df-ptr";}
+    @Assert{n="PTR"; f="<< PTR : : forall x,y,z~Class are ( (PartOf(x,y) and PartOf(y,z)) implies PartOf(x,z) ) >>"; t="ptr";}
      
     abstract predicate PartOverlap specializes BooleanEvaluation {
         doc /* SFS: PartOverlap is the overlap relation xOy */
         @Assert{n="PartOverlap"; f="<< PartOverlap : x~Class, y~Class : "+
-                "exists z~Class that ( PartOf(z,x) and PartOf(z,y) ) >>"; t="df-pov";}
+                "exists z~Class that ( PartOf(z,x) and PartOf(z,y) ) >>"; t="PartOverlap";}
         in x : Class;
         in y : Class;
     }
@@ -34,14 +34,14 @@ library package Mereology {
     abstract predicate PartUnderlap specializes BooleanEvaluation {
         doc /* SFS: PartUnderlap is the underlap relation xUy */
         @Assert{n="PartUnderlap"; f="<< PartUnderlap : x~Class, y~Class : "+
-                "exists z~Class that ( PartOf(x,z) and PartOf(y,z) ) >>"; t="df-pun";}
+                "exists z~Class that ( PartOf(x,z) and PartOf(y,z) ) >>"; t="PartUnderlap";}
         in x : Class;
         in y : Class;
     }
 
     abstract predicate ImproperPart specializes BooleanEvaluation {
         doc /* SFS: ImproperPart is the improper part relation xIPy */
-        @Assert{n="ImproperPart"; f="<< ImproperPart : x~Class, y~Class : PartOf(x,y) or x=y >>"; t="df-pim";}
+        @Assert{n="ImproperPart"; f="<< ImproperPart : x~Class, y~Class : PartOf(x,y) or x=y >>"; t="ImproperPart";}
         in x : Class;
         in y : Class;
     }
@@ -49,7 +49,7 @@ library package Mereology {
     abstract predicate PartDisjoint specializes BooleanEvaluation {
         doc /* SFS: PartDisjoint is the part disjointness relation xDy */
         @Assert{n="PartDisjoint"; f="<< PartDisjoint : x~Class, y~Class : not PartOverlap(x,y) >>";
-                t="df-pdj";}
+                t="PartDisjoint";}
         in x : Class;
         in y : Class;
     }
@@ -57,13 +57,13 @@ library package Mereology {
     // SFS:  Define part containment hierarchy.
     @Assert{n="PCH"; f="<< PCH : : forall x,y~Class are "+
         "( (x=y or PartOf(x,y) or PartOf(y,x) or PartDisjoint(x,y))"+
-        "and not (PartOf(x,y) and PartOf(y,x)) ) >>"; t="df-pch";}
+        "and not (PartOf(x,y) and PartOf(y,x)) ) >>"; t="pch";}
 
 
     abstract predicate AtomicPart specializes BooleanEvaluation {
         doc /* SFS: AtomicPart is the part atomicity Ax */
         @Assert{n="AtomicPart";f="<< AtomicPart : x~Class : not exists z~Class that PartOf(z,x) >>";
-                t="df-pat";}
+                t="AtomicPart";}
         in x : Class;
     }
 

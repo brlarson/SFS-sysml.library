@@ -54,17 +54,33 @@ open SFS
 
 namespace SFS.DSL
 
-/-! ## Types (Appendix J `\S`J.4: `TYPE` is the `Type`/`Classifier` elements of the
-design) -/
+/-! ## Syntax categories
+
+All eight declared together, up front: `dslRange` and `dslWff` refer to each other
+(a `dslWff` can quantify with an `in dslRange` clause; `dslRange` can itself be a bare
+`dslWff` boolean guard, `\S`3.13.1's `RangeOrBoolean`), and `dslWff`'s generalized
+`forall`/`exists` productions reference `dslParam`, declared much later in the source
+otherwise (in the "`@Assert` top level" section, alongside its main other use). Lean
+only requires a category to be *declared* (`declare_syntax_cat`) before it's named in
+another category's `syntax` production -- the individual productions themselves can
+still live wherever's most readable below, grouped by category as before. -/
 
 declare_syntax_cat dslType
+declare_syntax_cat dslTerm
+declare_syntax_cat dslRange
+declare_syntax_cat dslWff
+declare_syntax_cat dslParam
+declare_syntax_cat dslSep
+declare_syntax_cat dslBody
+declare_syntax_cat dslAssert
+
+/-! ## Types (Appendix J `\S`J.4: `TYPE` is the `Type`/`Classifier` elements of the
+design) -/
 
 /-- A type name: `Occurrence`, `Instant`, `Region`, `Class`, `Anything`, .... -/
 syntax ident : dslType
 
 /-! ## Terms (Appendix J `\S`J.4: `PT`, built from `CON`/`VAR`/`FUNC` application) -/
-
-declare_syntax_cat dslTerm
 
 /-- A variable or constant (`x`, `tau`, `d`, `now`, ...). -/
 syntax ident : dslTerm
@@ -107,8 +123,6 @@ syntax "(" dslTerm ")" : dslTerm
 
 /-! ## Ranges (`\S`3.13.1's `RangeOrBoolean`/`RangeSymbol`) -/
 
-declare_syntax_cat dslRange
-
 /-- `τ1 .. τ2` (closed), matching `df-bl.dd`. -/
 syntax dslTerm " .. " dslTerm : dslRange
 /-- `τ1 ,, τ2` (open), matching `df-bl.cc`. -/
@@ -118,16 +132,29 @@ syntax dslTerm " ,. " dslTerm : dslRange
 /-- `τ1 ., τ2` (open-right), matching `df-bl.dc`. -/
 syntax dslTerm " ., " dslTerm : dslRange
 
-/-! ## Well-formed formulas (Appendix J `df-bl0wff`/`df-blwff`) -/
+/-- `RangeOrBoolean`'s other alternative (`ExpressionSemantics.tex` `\S`3.13.1): a
+bare boolean guard instead of an interval, e.g. `exists t2~Instant in t2<t1 that ...`
+(`RunTimeServices.kerml`) -- `t2<t1` isn't shaped like any of the four range symbols
+above, it's an ordinary comparison. Unlike the interval forms, this guard is a
+self-contained proposition over already-bound identifiers (not a per-variable
+membership check), so its elaboration ignores the bound-variable argument entirely --
+see `elabDslRangeGuard`'s corresponding case. -/
+syntax dslWff : dslRange
 
-declare_syntax_cat dslWff
+/-! ## Well-formed formulas (Appendix J `df-bl0wff`/`df-blwff`) -/
 
 /-- A bare proposition symbol (SFS.mm/`PROP`), e.g. `PartOf`'s own body `xPy`: an
 otherwise-unparsed atomic formula name standing for some primitive relation. -/
 syntax ident : dslWff
 
-/-- N-ary predicate application, `P(t1,...,tn)`, e.g. `PartOf(x,y)`. -/
-syntax ident "(" dslTerm,* ")" : dslWff
+/-- N-ary predicate application, `P(t1,...,tn)`, e.g. `PartOf(x,y)`. Same concrete
+syntax as `dslTerm`'s own `ident "(" ... ")"` production (both elaborate identically,
+`$f $args*`), which is ambiguous whenever a `dslBody` is *only* a bare call with
+nothing else disambiguating it (e.g. the anonymous form `<<during(self,
+thisPerformance)>>`) -- `(priority := high)` makes the parser commit to this one
+instead of leaving an unresolved `choice` node that `elabDslAssert`'s pattern match
+can't see through. -/
+syntax (priority := high) ident "(" dslTerm,* ")" : dslWff
 
 /-- Infix binary relation, `x R y` -- e.g. `Location`'s own body `o L result` (`L` the
 relation name). A separate production from the bare-`ident` and `P(args)` forms above:
@@ -163,11 +190,21 @@ syntax:25 dslWff:26 " iff " dslWff:25 : dslWff
 /-- Bounded/unbounded universal quantification, `\S`3.13.1's `forall`, `df-bl.al`'s
 ASCII form. `in Range` is optional in practice (real formulas often quantify over an
 entire type with no range at all, e.g. `forall x~Class are not PartOf(x,x)`), though
-`\S`3.13.1's own EBNF does not mark it so. -/
-syntax "forall " ident,+ "~" dslType (" in " dslRange)? " are " dslWff : dslWff
+`\S`3.13.1's own EBNF does not mark it so. Takes `dslParam,+` (not `\S`3.13.1's own
+single-type `Identifier (',' Identifier)* ':' Type`) so a single `forall` can bind
+several differently-typed groups at once, comma-separated -- e.g.
+`RunTimeServices.kerml`'s `forall v~Anything, t1~Instant are ...` -- reusing the same
+grammar/elaboration already needed for `@Assert`'s own parameter header. -/
+syntax "forall " dslParam,+ (" in " dslRange)? " are " dslWff : dslWff
+
+/-- `Regions.kerml`'s own idiom for the same thing as the comma-joined form above, but
+spelled with a second `forall` keyword instead of a comma -- e.g. `forall x~Occurrence
+forall r1,r2~Region are ...` (`LFU`/`LIN`/`EXPNS`/`APAR`). Not part of `\S`3.13.1's
+EBNF; included because it's the form this repo's own Regions.kerml consistently uses. -/
+syntax "forall " dslParam,+ (" in " dslRange)? " forall " dslParam,+ (" in " dslRange)? " are " dslWff : dslWff
 
 /-- Bounded/unbounded existential quantification, `df-bl.ex`'s ASCII form. -/
-syntax "exists " ident,+ "~" dslType (" in " dslRange)? " that " dslWff : dslWff
+syntax "exists " dslParam,+ (" in " dslRange)? " that " dslWff : dslWff
 
 /-- Counting quantifier, value-producing (a `dslTerm`, not a `dslWff`) despite reading
 like `exists`. -/
@@ -184,30 +221,34 @@ syntax "(" dslWff ")" : dslWff
 /-! ## `@Assert` top level: `<<Name : params (: | :=) body>>` -/
 
 /-- One parameter-group in the header: `x,y,z~Class` (identifiers sharing one type). -/
-declare_syntax_cat dslParam
 syntax ident,+ "~" dslType : dslParam
 
 /-- The `: | :=` separator between the parameter list and the body: `:` for a
 predicate/relation body (a `dslWff`), `:=` for a value-defining body (a `dslTerm`, or
 the named-result form below). -/
-declare_syntax_cat dslSep
 syntax ":" : dslSep
 syntax ":=" : dslSep
 
 /-- A body is a formula, a term, or a named-result binding: `result~Type | wff`, e.g.
 `Location`'s `result~Region | o L result`, or `RegionSurface`'s
 `result~Surface | forall p~Point are ...`. -/
-declare_syntax_cat dslBody
 syntax dslWff : dslBody
 syntax dslTerm : dslBody
 syntax "result" "~" dslType " | " dslWff : dslBody
-
-declare_syntax_cat dslAssert
 
 /-- `<<Name : params sep body>>`, e.g. `<<next : tau1~Instant, tau2~Instant : (tau1 <
 tau2 and not exists tau~Instant that (tau1 < tau and tau < tau2))>>`, or
 `<<Get : d~Occurrence, f~Anything, tau~Instant := I[[d::f,tau]]>>`. -/
 syntax "<<" ident ":" dslParam,* dslSep dslBody ">>" : dslAssert
+
+/-- The anonymous form, `<<body>>` with no `Name :` header at all -- common in `inv{}`
+attachments outside the SFS library folder proper (`Performances.kerml`,
+`Objects.kerml`, `Occurrences.kerml`, `Links.kerml`), where the formula is just a bare
+constraint on the surrounding element, not a reusable named definition, e.g.
+`<< during(self, thisPerformance) >>`. Not covered by `\S`3.13.1's own EBNF (which only
+describes the quantifier/timed/shifted forms, not the `<<...>>` wrapper itself) --
+grounded directly in these real, unnamed `f="<<...>>"` strings. -/
+syntax "<<" dslBody ">>" : dslAssert
 
 /-! ## Elaboration
 
@@ -226,6 +267,19 @@ instance : DSLLe Time := ⟨fun t1 t2 => t1.val ≼ t2.val⟩
 instance : DSLLt ℝ := ⟨(· < ·)⟩
 instance : DSLLe ℝ := ⟨(· ≤ ·)⟩
 
+/-- `in`'s dslWff sense (`x in y`, e.g. `PointInRegion`'s own body `point in region`) is
+overloaded the same way `<`/`<=` are: `SFS.lean` doesn't model spatial containment via
+Mathlib's `Membership` (`Point`/`Region`/`Surface` are opaque axiom types with no such
+instance), it uses separate primitive relations (`InRegion`, `OnSurface`) instead, so a
+generic `∈`-based elaboration would fail outright rather than just mismatch. Only the
+two pairs actually used this way in real formulas get instances -- no generic
+`[Membership α β]`-derived fallback, matching `DSLLt`/`DSLLe`'s own precedent of not
+over-generalizing beyond what's observed. -/
+class DSLMem (α : Type _) (β : Type _) where mem : α → β → Prop
+
+instance : DSLMem Point Region := ⟨InRegion⟩
+instance : DSLMem Point Surface := ⟨OnSurface⟩
+
 /-- `dslType` → the `SFS.lean` type it names. Recognized DSL type names are mapped to
 their `SFS.lean` counterpart; anything else is passed through as a bare identifier
 (so it resolves if some matching Lean declaration happens to exist, and fails with an
@@ -240,6 +294,7 @@ def elabDslType : TSyntax `dslType → MacroM (TSyntax `term)
     | "Surface" => `(Surface)
     | "Class" => `(Part)
     | "Anything" => `(KElement)
+    | "BooleanEvaluation" => `(KElement)
     | _ => `($t)
   | _ => Macro.throwUnsupported
 
@@ -250,12 +305,28 @@ so Lean's own term parser would reject a literal `result` token, even though bui
 an `Ident` node directly for it (bypassing tokenization) is completely fine. -/
 def resultIdent : Ident := mkIdent `result
 
+/-- `dslParam` (`x,y,z~Class`) → one `(name, elaborated-type)` pair per identifier in
+the group, sharing the group's single type. Defined ahead of the `mutual` block below
+(rather than alongside `elabDslAssert`, its main other caller) because the generalized
+`forall`/`exists` elaboration inside that block now calls it too. -/
+def elabDslParam : TSyntax `dslParam → MacroM (Array (TSyntax `ident × TSyntax `term))
+  | `(dslParam| $xs:ident,* ~ $ty:dslType) => do
+    let ty' ← elabDslType ty
+    pure (xs.getElems.map (·, ty'))
+  | _ => Macro.throwUnsupported
+
 mutual
 
 /-- `dslTerm` → the `SFS.lean`/Lean term it denotes. -/
 partial def elabDslTerm : TSyntax `dslTerm → MacroM (TSyntax `term)
   | `(dslTerm| result) => `($resultIdent)
-  | `(dslTerm| $x:ident) => `($x)
+  | `(dslTerm| $x:ident) => do
+    -- `now` is special-cased: every real formula uses it in a `Time`-typed position
+    -- (`I[[d::f,now]]`'s `tau` argument, or a range's upper bound alongside another
+    -- `Time`-typed term like `tau`), never as bare `ℝ`, but `SFS.now : ℝ` is the raw
+    -- unrestricted constant. `dl_nowt : now ∈ TIME` closes the gap, matching how
+    -- `Time := ↥TIME` is threaded everywhere else `SFS.lean` needs an in-range instant.
+    if x.getId == `now then `((⟨now, dl_nowt⟩ : Time)) else `($x)
   | `(dslTerm| $n:num) => `($n)
   | `(dslTerm| $f:ident($args,*)) => do
     let args ← args.getElems.mapM elabDslTerm
@@ -300,7 +371,46 @@ partial def elabDslRangeGuard (x : TSyntax `term) : TSyntax `dslRange → MacroM
     `($x ∈ Set.Ioc $(← elabDslTerm a) $(← elabDslTerm b))
   | `(dslRange| $a:dslTerm ., $b:dslTerm) => do
     `($x ∈ Set.Ico $(← elabDslTerm a) $(← elabDslTerm b))
+  | `(dslRange| $φ:dslWff) => elabDslWff φ
   | _ => Macro.throwUnsupported
+
+/-- Shared by the plain and chained `forall` productions: nests `∀` over every
+`(name, type)` binder, with an optional trailing range/guard. An *interval*-shaped
+range (`..`/`,,`/`,.`/`.,`) is checked per-variable, exactly as before generalizing to
+multi-group binders (each bound name gets its own `x ∈ range` conjunct/hypothesis) --
+the only real formula using this shape (`Domain.kerml`'s `in tau ., now`) has a single
+binder anyway, so this never had to handle the multi-binder case. A *boolean*-shaped
+range (the new `dslWff`-as-`dslRange` alternative, e.g. `in t1<t2`) is a single
+self-contained proposition over the already-bound names, so it's applied exactly once,
+at the innermost position, not duplicated per binder. -/
+partial def wrapForall (binders : Array (TSyntax `ident × TSyntax `term))
+    (r : Option (TSyntax `dslRange)) (base : TSyntax `term) : MacroM (TSyntax `term) := do
+  match r with
+  | some rr =>
+    match rr with
+    | `(dslRange| $φ:dslWff) => do
+      let inner ← `($(← elabDslWff φ) → $base)
+      binders.foldrM (fun b acc => `(∀ ($(b.1) : $(b.2)), $acc)) inner
+    | _ => binders.foldrM (fun b acc => do
+        let g ← elabDslRangeGuard (← `($(b.1))) rr
+        `(∀ ($(b.1) : $(b.2)), $g → $acc)) base
+  | none => binders.foldrM (fun b acc => `(∀ ($(b.1) : $(b.2)), $acc)) base
+
+/-- `exists` counterpart of `wrapForall`, same interval-vs-boolean range handling. Built
+via plain `fun`/`Exists`, not `∃`-notation, for the same hygiene reason documented at
+the original single-group `exists` case this replaced. -/
+partial def wrapExists (binders : Array (TSyntax `ident × TSyntax `term))
+    (r : Option (TSyntax `dslRange)) (base : TSyntax `term) : MacroM (TSyntax `term) := do
+  match r with
+  | some rr =>
+    match rr with
+    | `(dslRange| $φ:dslWff) => do
+      let inner ← `($(← elabDslWff φ) ∧ $base)
+      binders.foldrM (fun b acc => `(Exists (fun ($(b.1) : $(b.2)) => $acc))) inner
+    | _ => binders.foldrM (fun b acc => do
+        let g ← elabDslRangeGuard (← `($(b.1))) rr
+        `(Exists (fun ($(b.1) : $(b.2)) => $g ∧ $acc))) base
+  | none => binders.foldrM (fun b acc => `(Exists (fun ($(b.1) : $(b.2)) => $acc))) base
 
 /-- `dslWff` → the `Prop` it denotes. -/
 partial def elabDslWff : TSyntax `dslWff → MacroM (TSyntax `term)
@@ -316,7 +426,8 @@ partial def elabDslWff : TSyntax `dslWff → MacroM (TSyntax `term)
   | `(dslWff| $a:dslTerm >= $b:dslTerm) => do `(DSLLe.le $(← elabDslTerm b) $(← elabDslTerm a))
   | `(dslWff| $a:dslTerm = $b:dslTerm) => do `($(← elabDslTerm a) = $(← elabDslTerm b))
   | `(dslWff| $a:dslTerm <> $b:dslTerm) => do `($(← elabDslTerm a) ≠ $(← elabDslTerm b))
-  | `(dslWff| $a:dslTerm in $b:dslTerm) => do `($(← elabDslTerm a) ∈ $(← elabDslTerm b))
+  | `(dslWff| $a:dslTerm in $b:dslTerm) => do
+    `(DSLMem.mem $(← elabDslTerm a) $(← elabDslTerm b))
   | `(dslWff| $φ:dslWff @ $tau:dslTerm) => do
     `(interpAt $(← elabDslWff φ) $(← elabDslTerm tau))
   | `(dslWff| not $φ:dslWff) => do `(¬ $(← elabDslWff φ))
@@ -324,43 +435,25 @@ partial def elabDslWff : TSyntax `dslWff → MacroM (TSyntax `term)
   | `(dslWff| $φ:dslWff or $ψ:dslWff) => do `($(← elabDslWff φ) ∨ $(← elabDslWff ψ))
   | `(dslWff| $φ:dslWff implies $ψ:dslWff) => do `($(← elabDslWff φ) → $(← elabDslWff ψ))
   | `(dslWff| $φ:dslWff iff $ψ:dslWff) => do `($(← elabDslWff φ) ↔ $(← elabDslWff ψ))
-  | `(dslWff| forall $xs,* ~ $ty:dslType $[in $r:dslRange]? are $body:dslWff) => do
-    let ty' ← elabDslType ty
-    let body' ← elabDslWff body
-    let mkOne (x : TSyntax `ident) (acc : TSyntax `term) : MacroM (TSyntax `term) := do
-      match r with
-      | some r => do let g ← elabDslRangeGuard (← `($x)) r; `(∀ $x : $ty', $g → $acc)
-      | none => `(∀ $x : $ty', $acc)
-    xs.getElems.foldrM mkOne body'
-  | `(dslWff| exists $xs,* ~ $ty:dslType $[in $r:dslRange]? that $body:dslWff) => do
-    let ty' ← elabDslType ty
-    let body' ← elabDslWff body
-    let mkOne (x : TSyntax `ident) (acc : TSyntax `term) : MacroM (TSyntax `term) := do
-      -- Built as `Exists (fun x => ...)` directly, *not* via `∃`-notation: `∃`'s
-      -- underlying `explicitBinders` macro (unlike `∀`, a core primitive) doesn't
-      -- correctly hook the antiquoted binder up to occurrences of `x` in `acc`/`g`
-      -- built by separate, earlier quotation calls -- the composed term type-checks
-      -- but leaves `x` inside them dangling as an unbound reference. Plain `fun`
-      -- (used here and throughout `elabDslAssert`'s `mkFun`) doesn't have this
-      -- problem.
-      match r with
-      | some r => do
-        let g ← elabDslRangeGuard (← `($x)) r
-        `(Exists (fun ($x : $ty') => $g ∧ $acc))
-      | none => `(Exists (fun ($x : $ty') => $acc))
-    xs.getElems.foldrM mkOne body'
+  | `(dslWff| forall $ps,* $[in $r:dslRange]? are $body:dslWff) => do
+    let groups ← ps.getElems.mapM elabDslParam
+    let binders := groups.foldl (· ++ ·) #[]
+    wrapForall binders r (← elabDslWff body)
+  | `(dslWff| forall $ps1,* $[in $r1:dslRange]? forall $ps2,* $[in $r2:dslRange]? are $body:dslWff) => do
+    let groups1 ← ps1.getElems.mapM elabDslParam
+    let binders1 := groups1.foldl (· ++ ·) #[]
+    let groups2 ← ps2.getElems.mapM elabDslParam
+    let binders2 := groups2.foldl (· ++ ·) #[]
+    let inner ← wrapForall binders2 r2 (← elabDslWff body)
+    wrapForall binders1 r1 inner
+  | `(dslWff| exists $ps,* $[in $r:dslRange]? that $body:dslWff) => do
+    let groups ← ps.getElems.mapM elabDslParam
+    let binders := groups.foldl (· ++ ·) #[]
+    wrapExists binders r (← elabDslWff body)
   | `(dslWff| ($φ:dslWff)) => elabDslWff φ
   | _ => Macro.throwUnsupported
 
 end
-
-/-- `dslParam` (`x,y,z~Class`) → one `(name, elaborated-type)` pair per identifier in
-the group, sharing the group's single type. -/
-def elabDslParam : TSyntax `dslParam → MacroM (Array (TSyntax `ident × TSyntax `term))
-  | `(dslParam| $xs:ident,* ~ $ty:dslType) => do
-    let ty' ← elabDslType ty
-    pure (xs.getElems.map (·, ty'))
-  | _ => Macro.throwUnsupported
 
 /-- `<<Name : params sep body>>` → a curried Lean term over `params`: a `Prop`-valued
 function for a `:`-separated `dslWff` body, an ordinary value-valued function for a
@@ -379,6 +472,14 @@ def elabDslAssert : TSyntax `dslAssert → MacroM (TSyntax `term)
       let rty' ← elabDslType rty
       let inner ← `(fun ($resultIdent : $rty') => $(← elabDslWff φ))
       binders.foldrM mkFun inner
+    | _ => Macro.throwUnsupported
+  | `(dslAssert| << $body:dslBody >>) => do
+    match body with
+    | `(dslBody| $φ:dslWff) => elabDslWff φ
+    | `(dslBody| $t:dslTerm) => elabDslTerm t
+    | `(dslBody| result ~ $rty:dslType | $φ:dslWff) => do
+      let rty' ← elabDslType rty
+      `(fun ($resultIdent : $rty') => $(← elabDslWff φ))
     | _ => Macro.throwUnsupported
   | _ => Macro.throwUnsupported
 

@@ -1020,5 +1020,11 @@ abbrev PartOverlap := Overlap
 abbrev PartUnderlap := Underlap
 /-- SFS.mm/KerML's `AtomicPart`. -/
 abbrev AtomicPart := AtomPart
+/-- `Regions.kerml`'s `PointInRegion` predicate, same KerML-vs-SFS.mm naming mismatch
+as the three above -- `SFS.mm`'s own primitive is `win`/`InRegion`. -/
+abbrev PointInRegion := InRegion
+/-- `Regions.kerml`'s `PointOnSurface` predicate; `SFS.mm`'s own primitive is
+`won`/`OnSurface`. -/
+abbrev PointOnSurface := OnSurface
 
 end SFS

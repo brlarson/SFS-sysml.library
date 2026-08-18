@@ -37,15 +37,15 @@ library package Domain {
 		doc /* tau1 precedes tau2 and there are no instants in between */
 		@Assert{n="next"; f="<<next : tau1~Instant, tau2~Instant : (tau1 < tau2 and "+
 			" not exists tau~Instant that (tau1 < tau and tau < tau2) )  >>"; 
-				t="df-bl.next";}
+				t="next";}
 		in feature tau1 : Instant;
 		in feature tau2 : Instant;
 	}
 
 	function Get { // replaces FeatureReferencingPerformances::FeatureReadEvaluation
 		doc /* Get(d,f,tau) returns the value of the feature d::f at time tau. */
-		@Assert{n="Get"; f="<<Get : d~Occurrence, f~Anything, tau~Instant := I[[d::f,tau]] >>"; 
-				t="df-model";}
+		@Assert{n="Get"; f="<<Get : d~Occurrence, f~Anything, tau~Instant := I[[d::f,tau]] >>";
+				t="Get";}
 		in feature d : Occurrence[1] {  //onOccurrence
 		  feature f : Anything[1];  //accessedFeature
 		}
@@ -56,7 +56,7 @@ library package Domain {
 	function GetNow {
 		doc /* GetNow(d,f) returns the value of the feature d::f at the current time, now. */
 		@Assert{n="GetNow"; f="<<GetNow : d~Occurrence, f~Anything := I[[d::f,now]] >>"; 
-				t=("df-model","df-bl.nowrr");}
+				t=("Get","now");}
 		in feature d : Occurrence[1] {  //onOccurrence
 		  feature f : Anything[1];  //accessedFeature
 		}
