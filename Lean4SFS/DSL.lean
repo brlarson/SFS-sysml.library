@@ -290,7 +290,7 @@ partial def elabDslTerm : TSyntax `dslTerm → MacroM (TSyntax `term)
 
 /-- `dslRange` → a `Prop`-valued membership guard for a given (already-elaborated)
 bound-variable term, matching `SFS.lean`'s own `Set.Icc`/`Set.Ioo`/`Set.Ioc`/`Set.Ico`
-convention for the four interval shapes (`bl_alldd`/`bl_allcc`/`bl_allcd`/`bl_alldc`). -/
+convention for the four interval shapes (`dl_alldd`/`dl_allcc`/`dl_allcd`/`dl_alldc`). -/
 partial def elabDslRangeGuard (x : TSyntax `term) : TSyntax `dslRange → MacroM (TSyntax `term)
   | `(dslRange| $a:dslTerm .. $b:dslTerm) => do
     `($x ∈ Set.Icc $(← elabDslTerm a) $(← elabDslTerm b))
