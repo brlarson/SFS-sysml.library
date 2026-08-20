@@ -40,20 +40,28 @@ Feature`; ...), which Lean 4's `structure ... extends A, B` supports directly
 and `Relationship`/`Feature` all eventually reach `Element`) -- built and verified via
 `lake build`, not assumed.
 
-**KerML §8.2.5 Kernel Concrete Syntax**: unlike `Core.lean`, this file does *not* add
-`syntax`/`elab` productions for Kernel's (much larger) textual notation. That was a
-separate, explicit follow-up request for Core; if wanted for Kernel too, it's a
-natural next step, following the same `declare_syntax_cat`/`syntax`/`elab` house style
-established in `DSL.lean` and `Core.lean`'s own concrete-syntax section.
+**KerML §8.2.5 Kernel Concrete Syntax**: below the abstract-syntax structures, this
+file also adds real `syntax`/`elab` productions for a subset of Kernel's textual
+notation, in the same house style `DSL.lean` and `Core.lean`'s own concrete-syntax
+section established. Two independent pieces: `kernelDecl` (declaration keywords --
+`datatype`/`class`/`struct`/`assoc`/`behavior`/`function`/`predicate`/`interaction`/
+`package`, reusing `Core.lean`'s relationship-builder helpers directly since `open
+KerML.Core` brings them into scope) and `kermlExpr` (a real operator-precedence
+expression grammar -- literals, arithmetic/comparison/logical operators, feature
+chaining, indexing, invocation, `new`-construction). See that section's own header
+comment for its scope and the (substantial) list of KerML §8.2.5.8 operators
+deliberately left out.
 -/
 
 import Root
 import Core
+import Lean
 
 namespace KerML.Kernel
 
 open KerML.Root
 open KerML.Core
+open Lean
 
 /-! ## 8.3.4.1 Data Types -/
 
@@ -412,6 +420,391 @@ Libraries, or in normative model libraries for a language built on KerML. -/
 structure LibraryPackage extends Package where
   isStandard : Bool := false
   deriving Repr
+
+/-! ## Concrete syntax (KerML §8.2.5 "Kernel Concrete Syntax")
+
+Two independent syntax/elaboration pieces, in `DSL.lean`/`Core.lean`'s house style.
+
+### `kernelDecl` -- declaration keywords
+
+Mirrors `Core.lean`'s `kermlDecl` `Type`/`Classifier` productions exactly (same
+optional relationship parts, same "fresh stub, no symbol table" simplification, same
+`;`-only body), just for nine more KerML §8.2.5 declaration keywords:
+`datatype`/`class`/`struct`/`assoc`/`behavior`/`function`/`predicate`/`interaction`
+(all "classifier-like" -- their `specializes` clause produces a `Subclassification`,
+reusing `Core.lean`'s own `mkSubclassificationTerm`/`mkConjugationTerm`/
+`mkDisjoiningTerm`/`mkUnioningTerm`/`mkIntersectingTerm`/`mkDifferencingTerm`/
+`classifierStubTerm`/`kTypeStubTerm` directly, since `open KerML.Core` brings them
+into scope) plus `package` (structurally different -- no relationship parts at all in
+the real grammar, just a bare name). A genuinely separate category name from
+`Core.lean`'s `kermlDecl` (not an extension of it) to avoid any risk of collision if
+both files are ever imported together. **Not covered** (documented, matching
+`Core.lean`'s own scope note): `AssociationStructure`/`BindingConnector`/
+`Succession`/`Step`/`Expression`/`BooleanExpression`/`Invariant`/`Flow`/
+`SuccessionFlow`/`Metaclass`/`LibraryPackage`/`MultiplicityRange` declaration forms,
+and `FunctionBody`'s `return`/result-expression parts -- all use richer grammar
+(binary connector ends, function bodies with owned steps, ...) that would need the
+containment-graph machinery this whole project deliberately drops; a plain `;` body
+is used everywhere here instead, exactly like `Core.lean`'s `Type`/`Classifier`. -/
+
+/-- `.toClassifier`-style coercion to `Classifier`, uniform across all nine
+"classifier-like" declaration keywords below regardless of how deep their own
+`extends` chain runs -- lets the shared elaboration helper call `.toClassifierC`
+without caring which concrete type it's holding. -/
+def DataType.toClassifierC (t : DataType) : Classifier := t.toClassifier
+def KClass.toClassifierC (t : KClass) : Classifier := t.toClassifier
+def KStructure.toClassifierC (t : KStructure) : Classifier := t.toKClass.toClassifier
+def Association.toClassifierC (t : Association) : Classifier := t.toClassifier
+def Behavior.toClassifierC (t : Behavior) : Classifier := t.toKClass.toClassifier
+def KFunction.toClassifierC (t : KFunction) : Classifier := t.toBehavior.toKClass.toClassifier
+def Predicate.toClassifierC (t : Predicate) : Classifier :=
+  t.toKFunction.toBehavior.toKClass.toClassifier
+def Interaction.toClassifierC (t : Interaction) : Classifier := t.toAssociation.toClassifier
+
+/-- `.toElement` for each of the nine, composed through `.toClassifierC` above. -/
+def DataType.elt (t : DataType) : Element := t.toClassifierC.toKType.toNamespace.toElement
+def KClass.elt (t : KClass) : Element := t.toClassifierC.toKType.toNamespace.toElement
+def KStructure.elt (t : KStructure) : Element := t.toClassifierC.toKType.toNamespace.toElement
+def Association.elt (t : Association) : Element := t.toClassifierC.toKType.toNamespace.toElement
+def Behavior.elt (t : Behavior) : Element := t.toClassifierC.toKType.toNamespace.toElement
+def KFunction.elt (t : KFunction) : Element := t.toClassifierC.toKType.toNamespace.toElement
+def Predicate.elt (t : Predicate) : Element := t.toClassifierC.toKType.toNamespace.toElement
+def Interaction.elt (t : Interaction) : Element := t.toClassifierC.toKType.toNamespace.toElement
+def Package.elt (t : Package) : Element := t.toNamespace.toElement
+
+def mkDataTypeStub (name : String) : DataType := { elementId := name, declaredName := some name }
+def mkKClassStub (name : String) : KClass := { elementId := name, declaredName := some name }
+def mkKStructureStub (name : String) : KStructure := { elementId := name, declaredName := some name }
+def mkAssociationStub (name : String) : Association := { elementId := name, declaredName := some name }
+def mkBehaviorStub (name : String) : Behavior := { elementId := name, declaredName := some name }
+def mkKFunctionStub (name : String) : KFunction := { elementId := name, declaredName := some name }
+def mkPredicateStub (name : String) : Predicate := { elementId := name, declaredName := some name }
+def mkInteractionStub (name : String) : Interaction := { elementId := name, declaredName := some name }
+def mkPackageStub (name : String) : Package := { elementId := name, declaredName := some name }
+
+def dataTypeStubTerm (s : String) : MacroM (TSyntax `term) := `(mkDataTypeStub $(quote s))
+def kClassStubTerm (s : String) : MacroM (TSyntax `term) := `(mkKClassStub $(quote s))
+def kStructureStubTerm (s : String) : MacroM (TSyntax `term) := `(mkKStructureStub $(quote s))
+def associationStubTerm (s : String) : MacroM (TSyntax `term) := `(mkAssociationStub $(quote s))
+def behaviorStubTerm (s : String) : MacroM (TSyntax `term) := `(mkBehaviorStub $(quote s))
+def kFunctionStubTerm (s : String) : MacroM (TSyntax `term) := `(mkKFunctionStub $(quote s))
+def predicateStubTerm (s : String) : MacroM (TSyntax `term) := `(mkPredicateStub $(quote s))
+def interactionStubTerm (s : String) : MacroM (TSyntax `term) := `(mkInteractionStub $(quote s))
+def packageStubTerm (s : String) : MacroM (TSyntax `term) := `(mkPackageStub $(quote s))
+
+/-- Shared elaboration body for all nine "classifier-like" declaration keywords: one
+stub for the primary declared name (via `mkStub`), plus one relationship `Element`
+per `specializes`/`conjugates`/`disjoint from`/`unions`/`intersects`/`differences`
+target, exactly mirroring `Core.lean`'s `type`/`classifier` elaboration (which this
+calls into directly). -/
+def classifierLikeDeclElems (mkStub : String → MacroM (TSyntax `term)) (a : TSyntax `ident)
+    (specs : Option (Syntax.TSepArray `ident ",")) (conj : Option (TSyntax `ident))
+    (disj uni inter diff : Option (Syntax.TSepArray `ident ",")) : MacroM (Array (TSyntax `term)) := do
+  let an := a.getId.toString
+  let aT ← mkStub an
+  let aC ← `(($aT).toClassifierC)
+  let aK ← `(($aC).toKType)
+  let specElems ← match specs with
+    | some ss => ss.getElems.mapM (fun g => do
+        let gC ← classifierStubTerm g
+        let rel ← mkSubclassificationTerm aC gC an g.getId.toString
+        `(($rel).elt))
+    | none => pure #[]
+  let conjElems ← match conj with
+    | some c => do
+        let cT ← kTypeStubTerm c
+        let rel ← mkConjugationTerm aK cT an c.getId.toString
+        pure #[← `(($rel).elt)]
+    | none => pure #[]
+  let disjElems ← match disj with
+    | some ds => ds.getElems.mapM (fun g => do
+        let gT ← kTypeStubTerm g
+        let rel ← mkDisjoiningTerm aK gT an g.getId.toString
+        `(($rel).elt))
+    | none => pure #[]
+  let uniElems ← match uni with
+    | some us => us.getElems.mapM (fun g => do
+        let gT ← kTypeStubTerm g
+        let rel ← mkUnioningTerm gT g.getId.toString
+        `(($rel).elt))
+    | none => pure #[]
+  let interElems ← match inter with
+    | some is' => is'.getElems.mapM (fun g => do
+        let gT ← kTypeStubTerm g
+        let rel ← mkIntersectingTerm gT g.getId.toString
+        `(($rel).elt))
+    | none => pure #[]
+  let diffElems ← match diff with
+    | some ds => ds.getElems.mapM (fun g => do
+        let gT ← kTypeStubTerm g
+        let rel ← mkDifferencingTerm gT g.getId.toString
+        `(($rel).elt))
+    | none => pure #[]
+  pure (#[← `(($aT).elt)] ++ specElems ++ conjElems ++ disjElems ++ uniElems ++ interElems ++ diffElems)
+
+declare_syntax_cat kernelDecl
+
+syntax "datatype " ident (" specializes " ident,+)? (" conjugates " ident)?
+  (" disjoint" " from " ident,+)? (" unions " ident,+)? (" intersects " ident,+)?
+  (" differences " ident,+)? " ;" : kernelDecl
+syntax "class " ident (" specializes " ident,+)? (" conjugates " ident)?
+  (" disjoint" " from " ident,+)? (" unions " ident,+)? (" intersects " ident,+)?
+  (" differences " ident,+)? " ;" : kernelDecl
+syntax "struct " ident (" specializes " ident,+)? (" conjugates " ident)?
+  (" disjoint" " from " ident,+)? (" unions " ident,+)? (" intersects " ident,+)?
+  (" differences " ident,+)? " ;" : kernelDecl
+syntax "assoc " ident (" specializes " ident,+)? (" conjugates " ident)?
+  (" disjoint" " from " ident,+)? (" unions " ident,+)? (" intersects " ident,+)?
+  (" differences " ident,+)? " ;" : kernelDecl
+syntax "behavior " ident (" specializes " ident,+)? (" conjugates " ident)?
+  (" disjoint" " from " ident,+)? (" unions " ident,+)? (" intersects " ident,+)?
+  (" differences " ident,+)? " ;" : kernelDecl
+syntax "function " ident (" specializes " ident,+)? (" conjugates " ident)?
+  (" disjoint" " from " ident,+)? (" unions " ident,+)? (" intersects " ident,+)?
+  (" differences " ident,+)? " ;" : kernelDecl
+syntax "predicate " ident (" specializes " ident,+)? (" conjugates " ident)?
+  (" disjoint" " from " ident,+)? (" unions " ident,+)? (" intersects " ident,+)?
+  (" differences " ident,+)? " ;" : kernelDecl
+syntax "interaction " ident (" specializes " ident,+)? (" conjugates " ident)?
+  (" disjoint" " from " ident,+)? (" unions " ident,+)? (" intersects " ident,+)?
+  (" differences " ident,+)? " ;" : kernelDecl
+syntax "package " ident " ;" : kernelDecl
+
+def elabKernelDecl : TSyntax `kernelDecl → MacroM (TSyntax `term)
+  | `(kernelDecl| datatype $a:ident $[specializes $specs,*]? $[conjugates $conj:ident]?
+        $[disjoint from $disj,*]? $[unions $uni,*]? $[intersects $inter,*]? $[differences $diff,*]? ;) => do
+    mkListTerm (← classifierLikeDeclElems dataTypeStubTerm a specs conj disj uni inter diff).toList
+  | `(kernelDecl| class $a:ident $[specializes $specs,*]? $[conjugates $conj:ident]?
+        $[disjoint from $disj,*]? $[unions $uni,*]? $[intersects $inter,*]? $[differences $diff,*]? ;) => do
+    mkListTerm (← classifierLikeDeclElems kClassStubTerm a specs conj disj uni inter diff).toList
+  | `(kernelDecl| struct $a:ident $[specializes $specs,*]? $[conjugates $conj:ident]?
+        $[disjoint from $disj,*]? $[unions $uni,*]? $[intersects $inter,*]? $[differences $diff,*]? ;) => do
+    mkListTerm (← classifierLikeDeclElems kStructureStubTerm a specs conj disj uni inter diff).toList
+  | `(kernelDecl| assoc $a:ident $[specializes $specs,*]? $[conjugates $conj:ident]?
+        $[disjoint from $disj,*]? $[unions $uni,*]? $[intersects $inter,*]? $[differences $diff,*]? ;) => do
+    mkListTerm (← classifierLikeDeclElems associationStubTerm a specs conj disj uni inter diff).toList
+  | `(kernelDecl| behavior $a:ident $[specializes $specs,*]? $[conjugates $conj:ident]?
+        $[disjoint from $disj,*]? $[unions $uni,*]? $[intersects $inter,*]? $[differences $diff,*]? ;) => do
+    mkListTerm (← classifierLikeDeclElems behaviorStubTerm a specs conj disj uni inter diff).toList
+  | `(kernelDecl| function $a:ident $[specializes $specs,*]? $[conjugates $conj:ident]?
+        $[disjoint from $disj,*]? $[unions $uni,*]? $[intersects $inter,*]? $[differences $diff,*]? ;) => do
+    mkListTerm (← classifierLikeDeclElems kFunctionStubTerm a specs conj disj uni inter diff).toList
+  | `(kernelDecl| predicate $a:ident $[specializes $specs,*]? $[conjugates $conj:ident]?
+        $[disjoint from $disj,*]? $[unions $uni,*]? $[intersects $inter,*]? $[differences $diff,*]? ;) => do
+    mkListTerm (← classifierLikeDeclElems predicateStubTerm a specs conj disj uni inter diff).toList
+  | `(kernelDecl| interaction $a:ident $[specializes $specs,*]? $[conjugates $conj:ident]?
+        $[disjoint from $disj,*]? $[unions $uni,*]? $[intersects $inter,*]? $[differences $diff,*]? ;) => do
+    mkListTerm (← classifierLikeDeclElems interactionStubTerm a specs conj disj uni inter diff).toList
+  | `(kernelDecl| package $a:ident ;) => do
+    let pT ← packageStubTerm a.getId.toString
+    mkListTerm [← `(($pT).elt)]
+  | _ => Macro.throwUnsupported
+
+elab "kernel% " d:kernelDecl : term => do
+  let stx ← Elab.liftMacroM (elabKernelDecl d)
+  Elab.Term.elabTerm stx none
+
+/-! ### `kermlExpr` -- the expression language (KerML §8.2.5.8)
+
+An operator-precedence expression grammar, in `DSL.lean`'s `dslTerm`
+precedence-climbing style (`syntax:N`). Each `kermlExpr` elaborates to `Array
+Element` (not a finished `List Element` term -- callers concatenate freely; only the
+top-level `kexpr%` trigger wraps the final result), consistent with `kermlDecl`'s own
+"flat list of implied elements, not a nested graph" principle: `1 + 2` becomes *three*
+`Element`s (an `OperatorExpression` stub with `operator := "+"`, plus the two
+`LiteralInteger` argument stubs) with no attempt to model the owning
+`ArgumentMember`/`Argument`/`ArgumentValue` chain the real grammar uses to relate
+them -- that chain is exactly the containment-graph machinery this whole project
+drops (see file header).
+
+**Covered** (KerML §8.2.5.8, Table 5/6): Boolean/Integer/Real/String/Infinity
+literals, `null`, bare identifiers (`FeatureReferenceExpression`), function
+invocation `f(a, b)`, `new T(a, b)` construction, feature chaining `.`, indexing
+`#(...)`, unary `-`/`not`, and binary `^`/`**` `*` `/` `%` `+` `-` `<` `>` `<=` `>=`
+`==` `!=` `and` `xor` `or` `implies` -- precedence/associativity ordering taken
+directly from the spec's Table 6 (right-associative `^`/`**`, all others
+left-associative), with `&`/`|` collapsed into `and`/`or` (documented simplification,
+not a distinct KerML operator).
+
+**Not covered** (documented, not guessed at): `..` range construction, `??` null
+coalescing, the classification/cast operators (`istype`/`hastype`/`@`/`@@`/`as`/
+`meta`), the ternary conditional (`if ... ? ... else ...`), `[...]` bracket
+invocation, `->` function-operation syntax, `.?` select / `.` collect (both share
+concrete-syntax tokens with feature chaining and invocation respectively, requiring
+lookahead this grammar doesn't attempt), sequence construction (`,`), and named
+arguments (`name = value` inside a call) -- each would need either more grammar
+machinery than is worth it here or (for select/collect) genuine disambiguation
+lookahead; real formulas needing them aren't guessed at, matching this project's
+established precedent (`DSL.lean`'s own `numberof`/`productof`/`sumof` scope note).
+
+**Known limitation, not a bug**: Lean's own `ident` token already parses dotted
+sequences (`x.y.z`) as a single compound identifier (the same mechanism that lets
+`Nat.succ` be one token), so it wins over this file's `kermlExpr:90 "." ident`
+feature-chaining rule for any chain of bare names -- `x.y.z` elaborates as one
+`FeatureReferenceExpression` stub named `"x.y.z"`, never reaching the
+`FeatureChainExpression` production at all. The chaining rule *does* fire whenever
+the left side isn't itself a bare compound identifier, e.g. `(x).y` or `foo(a).b` --
+verified via smoke test below. -/
+
+def mkLiteralBooleanStub (name : String) (v : Bool) : LiteralBoolean := { elementId := name, value := v }
+def mkLiteralIntegerStub (name : String) (v : Int) : LiteralInteger := { elementId := name, value := v }
+def mkLiteralRationalStub (name : String) (v : Float) : LiteralRational := { elementId := name, value := v }
+def mkLiteralStringStub (name : String) (v : String) : LiteralString := { elementId := name, value := v }
+def mkLiteralInfinityStub (name : String) : LiteralInfinity := { elementId := name }
+def mkNullExpressionStub (name : String) : NullExpression := { elementId := name }
+def mkFeatureReferenceStub (name : String) : FeatureReferenceExpression := { elementId := name }
+def mkInvocationStub (name : String) : InvocationExpression := { elementId := name }
+def mkConstructorStub (name : String) : ConstructorExpression := { elementId := name }
+def mkFeatureChainStub (name : String) : FeatureChainExpression := { elementId := name, operator := "." }
+def mkOperatorStub (name op : String) : OperatorExpression := { elementId := name, operator := op }
+def mkIndexStub (name : String) : IndexExpression := { elementId := name, operator := "#" }
+
+def Expression.elt (e : Expression) : Element := e.toStep.toFeature.toKType.toNamespace.toElement
+def LiteralExpression.elt (e : LiteralExpression) : Element := e.toExpression.elt
+def LiteralBoolean.elt (e : LiteralBoolean) : Element := e.toLiteralExpression.elt
+def LiteralInteger.elt (e : LiteralInteger) : Element := e.toLiteralExpression.elt
+def LiteralRational.elt (e : LiteralRational) : Element := e.toLiteralExpression.elt
+def LiteralString.elt (e : LiteralString) : Element := e.toLiteralExpression.elt
+def LiteralInfinity.elt (e : LiteralInfinity) : Element := e.toLiteralExpression.elt
+def NullExpression.elt (e : NullExpression) : Element := e.toExpression.elt
+def FeatureReferenceExpression.elt (e : FeatureReferenceExpression) : Element := e.toExpression.elt
+def InstantiationExpression.elt (e : InstantiationExpression) : Element := e.toExpression.elt
+def InvocationExpression.elt (e : InvocationExpression) : Element := e.toInstantiationExpression.elt
+def ConstructorExpression.elt (e : ConstructorExpression) : Element := e.toInstantiationExpression.elt
+def OperatorExpression.elt (e : OperatorExpression) : Element := e.toInvocationExpression.elt
+def FeatureChainExpression.elt (e : FeatureChainExpression) : Element := e.toOperatorExpression.elt
+def IndexExpression.elt (e : IndexExpression) : Element := e.toOperatorExpression.elt
+
+declare_syntax_cat kermlExpr
+
+syntax "true" : kermlExpr
+syntax "false" : kermlExpr
+syntax num : kermlExpr
+syntax scientific : kermlExpr
+syntax str : kermlExpr
+syntax "*" : kermlExpr
+syntax "null" : kermlExpr
+syntax ident : kermlExpr
+
+syntax (priority := high) ident "(" kermlExpr,* ")" : kermlExpr
+syntax "new " ident "(" kermlExpr,* ")" : kermlExpr
+
+syntax:90 kermlExpr:90 "." ident : kermlExpr
+syntax:90 kermlExpr:90 "#" "(" kermlExpr,* ")" : kermlExpr
+
+syntax:80 "-" kermlExpr:80 : kermlExpr
+syntax:80 "not " kermlExpr:80 : kermlExpr
+
+syntax:76 kermlExpr:77 " ^ " kermlExpr:76 : kermlExpr
+syntax:76 kermlExpr:77 " ** " kermlExpr:76 : kermlExpr
+syntax:70 kermlExpr:70 " * " kermlExpr:71 : kermlExpr
+syntax:70 kermlExpr:70 " / " kermlExpr:71 : kermlExpr
+syntax:70 kermlExpr:70 " % " kermlExpr:71 : kermlExpr
+syntax:65 kermlExpr:65 " + " kermlExpr:66 : kermlExpr
+syntax:65 kermlExpr:65 " - " kermlExpr:66 : kermlExpr
+syntax:60 kermlExpr:60 " < " kermlExpr:61 : kermlExpr
+syntax:60 kermlExpr:60 " > " kermlExpr:61 : kermlExpr
+syntax:60 kermlExpr:60 " <= " kermlExpr:61 : kermlExpr
+syntax:60 kermlExpr:60 " >= " kermlExpr:61 : kermlExpr
+syntax:55 kermlExpr:55 " == " kermlExpr:56 : kermlExpr
+syntax:55 kermlExpr:55 " != " kermlExpr:56 : kermlExpr
+syntax:50 kermlExpr:50 " and " kermlExpr:51 : kermlExpr
+syntax:45 kermlExpr:45 " xor " kermlExpr:46 : kermlExpr
+syntax:40 kermlExpr:40 " or " kermlExpr:41 : kermlExpr
+syntax:35 kermlExpr:35 " implies " kermlExpr:36 : kermlExpr
+
+syntax "(" kermlExpr ")" : kermlExpr
+
+mutual
+
+partial def elabKermlExpr : TSyntax `kermlExpr → MacroM (Array (TSyntax `term))
+  | `(kermlExpr| true) => do pure #[← `((mkLiteralBooleanStub "lit-true" Bool.true).elt)]
+  | `(kermlExpr| false) => do pure #[← `((mkLiteralBooleanStub "lit-false" Bool.false).elt)]
+  | `(kermlExpr| $n:num) => do pure #[← `((mkLiteralIntegerStub "lit-int" $n).elt)]
+  | `(kermlExpr| $n:scientific) => do pure #[← `((mkLiteralRationalStub "lit-real" $n).elt)]
+  | `(kermlExpr| $s:str) => do pure #[← `((mkLiteralStringStub "lit-str" $s).elt)]
+  | `(kermlExpr| *) => do pure #[← `((mkLiteralInfinityStub "infinity").elt)]
+  | `(kermlExpr| null) => do pure #[← `((mkNullExpressionStub "null-expr").elt)]
+  | `(kermlExpr| $x:ident) => do
+    pure #[← `((mkFeatureReferenceStub $(quote x.getId.toString)).elt)]
+  | `(kermlExpr| $f:ident($args,*)) => do
+    let argElems ← args.getElems.mapM elabKermlExpr
+    pure (#[← `((mkInvocationStub $(quote f.getId.toString)).elt)] ++ argElems.foldl (· ++ ·) #[])
+  | `(kermlExpr| new $t:ident($args,*)) => do
+    let argElems ← args.getElems.mapM elabKermlExpr
+    pure (#[← `((mkConstructorStub $(quote ("new-" ++ t.getId.toString))).elt)] ++
+      argElems.foldl (· ++ ·) #[])
+  | `(kermlExpr| $e:kermlExpr . $f:ident) => do
+    let eElems ← elabKermlExpr e
+    pure (#[← `((mkFeatureChainStub $(quote ("chain-" ++ f.getId.toString))).elt)] ++ eElems)
+  | `(kermlExpr| $e:kermlExpr # ($args,*)) => do
+    let eElems ← elabKermlExpr e
+    let argElems ← args.getElems.mapM elabKermlExpr
+    pure (#[← `((mkIndexStub "index-expr").elt)] ++ eElems ++ argElems.foldl (· ++ ·) #[])
+  | `(kermlExpr| -$e:kermlExpr) => do
+    let eElems ← elabKermlExpr e
+    pure (#[← `((mkOperatorStub "unary-minus" "-").elt)] ++ eElems)
+  | `(kermlExpr| not $e:kermlExpr) => do
+    let eElems ← elabKermlExpr e
+    pure (#[← `((mkOperatorStub "unary-not" "not").elt)] ++ eElems)
+  | `(kermlExpr| $a:kermlExpr ^ $b:kermlExpr) => elabBinOp "^" a b
+  | `(kermlExpr| $a:kermlExpr ** $b:kermlExpr) => elabBinOp "**" a b
+  | `(kermlExpr| $a:kermlExpr * $b:kermlExpr) => elabBinOp "*" a b
+  | `(kermlExpr| $a:kermlExpr / $b:kermlExpr) => elabBinOp "/" a b
+  | `(kermlExpr| $a:kermlExpr % $b:kermlExpr) => elabBinOp "%" a b
+  | `(kermlExpr| $a:kermlExpr + $b:kermlExpr) => elabBinOp "+" a b
+  | `(kermlExpr| $a:kermlExpr - $b:kermlExpr) => elabBinOp "-" a b
+  | `(kermlExpr| $a:kermlExpr < $b:kermlExpr) => elabBinOp "<" a b
+  | `(kermlExpr| $a:kermlExpr > $b:kermlExpr) => elabBinOp ">" a b
+  | `(kermlExpr| $a:kermlExpr <= $b:kermlExpr) => elabBinOp "<=" a b
+  | `(kermlExpr| $a:kermlExpr >= $b:kermlExpr) => elabBinOp ">=" a b
+  | `(kermlExpr| $a:kermlExpr == $b:kermlExpr) => elabBinOp "==" a b
+  | `(kermlExpr| $a:kermlExpr != $b:kermlExpr) => elabBinOp "!=" a b
+  | `(kermlExpr| $a:kermlExpr and $b:kermlExpr) => elabBinOp "and" a b
+  | `(kermlExpr| $a:kermlExpr xor $b:kermlExpr) => elabBinOp "xor" a b
+  | `(kermlExpr| $a:kermlExpr or $b:kermlExpr) => elabBinOp "or" a b
+  | `(kermlExpr| $a:kermlExpr implies $b:kermlExpr) => elabBinOp "implies" a b
+  | `(kermlExpr| ($e:kermlExpr)) => elabKermlExpr e
+  | _ => Macro.throwUnsupported
+
+/-- Shared by every binary-operator match arm above: one `OperatorExpression` stub
+tagged with `op`, plus both operands' own elements. -/
+partial def elabBinOp (op : String) (a b : TSyntax `kermlExpr) : MacroM (Array (TSyntax `term)) := do
+  let aElems ← elabKermlExpr a
+  let bElems ← elabKermlExpr b
+  pure (#[← `((mkOperatorStub $(quote ("op-" ++ op)) $(quote op)).elt)] ++ aElems ++ bElems)
+
+end
+
+elab "kexpr% " e:kermlExpr : term => do
+  let elems ← Elab.liftMacroM (elabKermlExpr e)
+  let stx ← Elab.liftMacroM (mkListTerm elems.toList)
+  Elab.Term.elabTerm stx none
+
+-- Smoke tests: real elaborations, type-checked by Lean.
+#check kernel% datatype Real ;
+#check kernel% class Vehicle specializes Car, Truck ;
+#check kernel% struct Point3D specializes Point ;
+#check kernel% assoc Owns specializes Association ;
+#check kernel% behavior Drive specializes Behavior ;
+#check kernel% function Sum specializes Function ;
+#check kernel% predicate IsPositive specializes Predicate ;
+#check kernel% interaction Handshake specializes Interaction ;
+#check kernel% package VehicleModel ;
+
+#check kexpr% 1 + 2 * 3
+#check kexpr% true and not false
+#check kexpr% x.y.z
+#check kexpr% (x).y
+#check kexpr% foo(1, 2, x)
+#check kexpr% new Widget(1, 2)
+#check kexpr% -x + y
+#check kexpr% a < b and b < c or d
+#check kexpr% count#(1, 2)
+#check kexpr% 3.14
+#check kexpr% "hello"
+#check kexpr% *
+#check kexpr% null
 
 /-! ## Smoke tests
 
