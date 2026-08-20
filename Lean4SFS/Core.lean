@@ -404,6 +404,27 @@ syntax "[" kermlMultBound ".." kermlMultBound "]" : kermlMult
 
 declare_syntax_cat kermlDecl
 
+/-- KerML `TypeBody`/`FeatureBody`-style bodies: `;` (no owned members) or `{
+kermlDecl* }` -- real nested member declarations, e.g. `Base.kerml`'s `classifier
+Anything { feature self ... }`. `kermlDecl*` (not a dedicated "feature member only"
+subgrammar) is deliberately over-permissive -- real KerML restricts body content to
+`NonFeatureMember | FeatureMember | AliasMember | Import`, but reusing the full
+`kermlDecl` category directly keeps this addition small, and every real nested
+declaration this project's `#check`s exercise (`Base.kerml`'s nested `feature`s) is a
+valid `kermlDecl` anyway. **Nested content contributes flat, sibling `Element`s to
+the same list the outer declaration's own elaboration builds** -- consistent with
+`kermlDecl`'s pre-existing "flat list of implied elements, not a nested graph"
+principle (see that note above): a nested `feature self ...` becomes additional
+entries alongside `Anything`'s own `Element` and its relationship `Element`s, not a
+child linked to `Anything` via an owned-membership edge (that edge is exactly the
+containment-graph machinery this whole project drops). Doc comments (`doc /* ... */`)
+inside real bodies are **not** parsed here -- left for a future addition; smoke tests
+below omit them, using genuinely empty or doc-free bodies instead of `Base.kerml`'s
+literal text. -/
+declare_syntax_cat kermlBody
+syntax " ;" : kermlBody
+syntax " {" kermlDecl* "}" : kermlBody
+
 /-- KerML §8.2.4.1.1 `Type`, relationship-part subset (see scope note above): `[abstract]
 type A [specializes B,+] [conjugates C] [disjoint from D,+] [unions U,+] [intersects
 I,+] [differences Df,+] ;`. `abstract` is parsed (see `kermlAbstractFlag` above) but
@@ -417,7 +438,7 @@ syntax (name := kermlType) (kermlAbstractFlag)? "type " ident
   (" unions " ident,+)?
   (" intersects " ident,+)?
   (" differences " ident,+)?
-  " ;" : kermlDecl
+  kermlBody : kermlDecl
 
 /-- KerML §8.2.4.2.1 `Classifier`, same shape as `Type` above except `specializes`
 produces `Subclassification` (not generic `Specialization`), per
@@ -429,7 +450,7 @@ syntax (name := kermlClassifier) (kermlAbstractFlag)? "classifier " ident
   (" unions " ident,+)?
   (" intersects " ident,+)?
   (" differences " ident,+)?
-  " ;" : kermlDecl
+  kermlBody : kermlDecl
 
 /-- KerML §8.2.4.3.1 `Feature`, relationship-part subset: `[abstract] feature f
 ([typed by T,+] | [: T,+]) [mult] [subsets S,+] [references R] [crosses X] [redefines
@@ -449,7 +470,7 @@ syntax (name := kermlFeature) (kermlAbstractFlag)? "feature " ident
   (" chains " ident)?
   (" inverse" " of " ident)?
   (" featured" " by " ident,+)?
-  " ;" : kermlDecl
+  kermlBody : kermlDecl
 
 /-- KerML §8.2.4.1.2 `Specialization`, standalone form: `subtype A specializes B ;`. -/
 syntax "subtype " ident " specializes " ident " ;" : kermlDecl
@@ -472,9 +493,15 @@ syntax "inverse " ident " of " ident " ;" : kermlDecl
 keyword from `Feature`'s inline `featured by` part above, per the spec). -/
 syntax "featuring " ident " by " ident " ;" : kermlDecl
 
-/-- `kermlDecl` → `List KerML.Root.Element` (see the scope note above for why a flat
-list, rather than a single value, is the faithful elaboration target). -/
-def elabKermlDecl : TSyntax `kermlDecl → MacroM (TSyntax `term)
+mutual
+
+/-- `kermlDecl` → `Array (TSyntax term)`, one entry per implied `Element` (see the
+scope note above for why a flat array, rather than a single value, is the faithful
+elaboration target). Callers concatenate freely; only the top-level `kerml%` trigger
+wraps the final result into a `List Element` term via `mkListTerm` -- matching
+`kermlExpr`'s own convention (`Kernel.lean`), adopted here too once nested `kermlBody`
+content needed the same composability. -/
+partial def elabKermlDecl : TSyntax `kermlDecl → MacroM (Array (TSyntax `term))
   | `(kermlDecl| $[$_abs:kermlAbstractFlag]? type $a:ident
         $[specializes $specs,*]?
         $[conjugates $conj:ident]?
@@ -482,7 +509,7 @@ def elabKermlDecl : TSyntax `kermlDecl → MacroM (TSyntax `term)
         $[unions $uni,*]?
         $[intersects $inter,*]?
         $[differences $diff,*]?
-        ;) => do
+        $body:kermlBody) => do
     let an := a.getId.toString
     let aT ← kTypeStubTerm a
     let specElems ← match specs with
@@ -521,8 +548,8 @@ def elabKermlDecl : TSyntax `kermlDecl → MacroM (TSyntax `term)
           let rel ← mkDifferencingTerm gT g.getId.toString
           `(($rel).elt))
       | none => pure #[]
-    let all := #[← `(($aT).elt)] ++ specElems ++ conjElems ++ disjElems ++ uniElems ++ interElems ++ diffElems
-    mkListTerm all.toList
+    let bodyElems ← elabKermlBody body
+    pure (#[← `(($aT).elt)] ++ specElems ++ conjElems ++ disjElems ++ uniElems ++ interElems ++ diffElems ++ bodyElems)
   | `(kermlDecl| $[$_abs:kermlAbstractFlag]? classifier $a:ident
         $[specializes $specs,*]?
         $[conjugates $conj:ident]?
@@ -530,7 +557,7 @@ def elabKermlDecl : TSyntax `kermlDecl → MacroM (TSyntax `term)
         $[unions $uni,*]?
         $[intersects $inter,*]?
         $[differences $diff,*]?
-        ;) => do
+        $body:kermlBody) => do
     let an := a.getId.toString
     let aT ← classifierStubTerm a
     let specElems ← match specs with
@@ -569,8 +596,8 @@ def elabKermlDecl : TSyntax `kermlDecl → MacroM (TSyntax `term)
           let rel ← mkDifferencingTerm gT g.getId.toString
           `(($rel).elt))
       | none => pure #[]
-    let all := #[← `(($aT).elt)] ++ specElems ++ conjElems ++ disjElems ++ uniElems ++ interElems ++ diffElems
-    mkListTerm all.toList
+    let bodyElems ← elabKermlBody body
+    pure (#[← `(($aT).elt)] ++ specElems ++ conjElems ++ disjElems ++ uniElems ++ interElems ++ diffElems ++ bodyElems)
   | `(kermlDecl| $[$_abs:kermlAbstractFlag]? feature $a:ident
         $[typed by $tys,*]?
         $[: $tys2,*]?
@@ -582,7 +609,7 @@ def elabKermlDecl : TSyntax `kermlDecl → MacroM (TSyntax `term)
         $[chains $chainF:ident]?
         $[inverse of $invF:ident]?
         $[featured by $feats,*]?
-        ;) => do
+        $body:kermlBody) => do
     let an := a.getId.toString
     let aT ← featureStubTerm a
     let tyTargets := (tys.map (·.getElems) |>.getD #[]) ++ (tys2.map (·.getElems) |>.getD #[])
@@ -632,51 +659,64 @@ def elabKermlDecl : TSyntax `kermlDecl → MacroM (TSyntax `term)
           let rel ← mkTypeFeaturingTerm aT gT an g.getId.toString
           `(($rel).elt))
       | none => pure #[]
-    let all := #[← `(($aT).elt)] ++ tyElems ++ subElems ++ refElems ++ crossElems ++ redefElems ++
-      chainElems ++ invElems ++ featElems
-    mkListTerm all.toList
+    let bodyElems ← elabKermlBody body
+    pure (#[← `(($aT).elt)] ++ tyElems ++ subElems ++ refElems ++ crossElems ++ redefElems ++
+      chainElems ++ invElems ++ featElems ++ bodyElems)
   | `(kermlDecl| subtype $a:ident specializes $b:ident ;) => do
     let aT ← kTypeStubTerm a; let bT ← kTypeStubTerm b
     let rel ← mkSpecializationTerm aT bT a.getId.toString b.getId.toString
-    mkListTerm [← `(($rel).elt)]
+    pure #[← `(($rel).elt)]
   | `(kermlDecl| conjugate $a:ident conjugates $b:ident ;) => do
     let aT ← kTypeStubTerm a; let bT ← kTypeStubTerm b
     let rel ← mkConjugationTerm aT bT a.getId.toString b.getId.toString
-    mkListTerm [← `(($rel).elt)]
+    pure #[← `(($rel).elt)]
   | `(kermlDecl| disjoint $a:ident from $b:ident ;) => do
     let aT ← kTypeStubTerm a; let bT ← kTypeStubTerm b
     let rel ← mkDisjoiningTerm aT bT a.getId.toString b.getId.toString
-    mkListTerm [← `(($rel).elt)]
+    pure #[← `(($rel).elt)]
   | `(kermlDecl| subclassifier $a:ident specializes $b:ident ;) => do
     let aT ← classifierStubTerm a; let bT ← classifierStubTerm b
     let rel ← mkSubclassificationTerm aT bT a.getId.toString b.getId.toString
-    mkListTerm [← `(($rel).elt)]
+    pure #[← `(($rel).elt)]
   | `(kermlDecl| typing $a:ident typed by $b:ident ;) => do
     let aT ← featureStubTerm a; let bT ← kTypeStubTerm b
     let rel ← mkFeatureTypingTerm aT bT a.getId.toString b.getId.toString
-    mkListTerm [← `(($rel).elt)]
+    pure #[← `(($rel).elt)]
   | `(kermlDecl| subset $a:ident subsets $b:ident ;) => do
     let aT ← featureStubTerm a; let bT ← featureStubTerm b
     let rel ← mkSubsettingTerm aT bT a.getId.toString b.getId.toString
-    mkListTerm [← `(($rel).elt)]
+    pure #[← `(($rel).elt)]
   | `(kermlDecl| redefinition $a:ident redefines $b:ident ;) => do
     let aT ← featureStubTerm a; let bT ← featureStubTerm b
     let rel ← mkRedefinitionTerm aT bT a.getId.toString b.getId.toString
-    mkListTerm [← `(($rel).elt)]
+    pure #[← `(($rel).elt)]
   | `(kermlDecl| inverse $a:ident of $b:ident ;) => do
     let aT ← featureStubTerm a; let bT ← featureStubTerm b
     let rel ← mkFeatureInvertingTerm aT bT a.getId.toString b.getId.toString
-    mkListTerm [← `(($rel).elt)]
+    pure #[← `(($rel).elt)]
   | `(kermlDecl| featuring $a:ident by $b:ident ;) => do
     let aT ← featureStubTerm a; let bT ← kTypeStubTerm b
     let rel ← mkTypeFeaturingTerm aT bT a.getId.toString b.getId.toString
-    mkListTerm [← `(($rel).elt)]
+    pure #[← `(($rel).elt)]
   | _ => Macro.throwUnsupported
 
-/-- `kerml% <decl>` elaborates a `kermlDecl` into its `List Element` term, matching
+/-- `kermlBody` → the flat `Array` of `Element` terms its nested `kermlDecl*` content
+implies (`;`/empty `{}` contributes nothing) -- see `kermlBody`'s own declaration
+above for why this stays flat rather than building any ownership linkage. -/
+partial def elabKermlBody : TSyntax `kermlBody → MacroM (Array (TSyntax `term))
+  | `(kermlBody| ;) => pure #[]
+  | `(kermlBody| { $decls:kermlDecl* }) => do
+    let subs ← decls.mapM elabKermlDecl
+    pure (subs.foldl (· ++ ·) #[])
+  | _ => pure #[]
+
+end
+
+/-- `kerml% <decl>` elaborates a `kermlDecl` into a `List Element` term, matching
 `DSL.lean`'s own `domain%` trigger convention. -/
 elab "kerml% " d:kermlDecl : term => do
-  let stx ← Elab.liftMacroM (elabKermlDecl d)
+  let elems ← Elab.liftMacroM (elabKermlDecl d)
+  let stx ← Elab.liftMacroM (mkListTerm elems.toList)
   Elab.Term.elabTerm stx none
 
 -- Smoke tests: real elaborations, type-checked by Lean, not parse-only stubs.
@@ -699,13 +739,13 @@ elab "kerml% " d:kermlDecl : term => do
 #check kerml% inverse spoke of hub ;
 #check kerml% featuring mass by Car ;
 
--- Base.kerml's own real declarations (minus nested `{ ... }` bodies, `doc` blocks,
--- `::`-qualified names, and unsupported flags like `nonunique` -- all still out of
--- scope; see the concrete-syntax scope note above). `abstract`, bare `:` typing, and
--- `[...]` multiplicity brackets are exercised here for the first time on real text.
-#check kerml% abstract classifier Anything ;
-#check kerml% abstract feature self : Anything [1] subsets things ;
-#check kerml% abstract feature things : Anything [1..*] ;
+-- Base.kerml's own real declarations, now including real nested `{ ... }` bodies
+-- (`doc` blocks, `::`-qualified names, and unsupported flags like `nonunique` stay
+-- out of scope; see the concrete-syntax scope note above and `kermlBody`'s own). The
+-- first is Base.kerml's actual nesting shape: `Anything`'s own body really does own
+-- a nested `feature self ...`.
+#check kerml% abstract classifier Anything { feature self : Anything [1] subsets things ; }
+#check kerml% abstract feature things : Anything [1..*] { feature that : Anything [1] ; }
 #check kerml% abstract feature dataValues : DataValue [0..*] subsets things ;
 #check kerml% abstract feature naturals : Natural [0..*] subsets dataValues ;
 

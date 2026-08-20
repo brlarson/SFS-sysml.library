@@ -578,70 +578,87 @@ declare_syntax_cat kernelDecl
 
 syntax (kermlAbstractFlag)? "datatype " ident (" specializes " ident,+)? (" conjugates " ident)?
   (" disjoint" " from " ident,+)? (" unions " ident,+)? (" intersects " ident,+)?
-  (" differences " ident,+)? " ;" : kernelDecl
+  (" differences " ident,+)? kermlBody : kernelDecl
 syntax (kermlAbstractFlag)? "class " ident (" specializes " ident,+)? (" conjugates " ident)?
   (" disjoint" " from " ident,+)? (" unions " ident,+)? (" intersects " ident,+)?
-  (" differences " ident,+)? " ;" : kernelDecl
+  (" differences " ident,+)? kermlBody : kernelDecl
 syntax (kermlAbstractFlag)? "struct " ident (" specializes " ident,+)? (" conjugates " ident)?
   (" disjoint" " from " ident,+)? (" unions " ident,+)? (" intersects " ident,+)?
-  (" differences " ident,+)? " ;" : kernelDecl
+  (" differences " ident,+)? kermlBody : kernelDecl
 syntax (kermlAbstractFlag)? "assoc " ident (" specializes " ident,+)? (" conjugates " ident)?
   (" disjoint" " from " ident,+)? (" unions " ident,+)? (" intersects " ident,+)?
-  (" differences " ident,+)? " ;" : kernelDecl
+  (" differences " ident,+)? kermlBody : kernelDecl
 syntax (kermlAbstractFlag)? "behavior " ident (" specializes " ident,+)? (" conjugates " ident)?
   (" disjoint" " from " ident,+)? (" unions " ident,+)? (" intersects " ident,+)?
-  (" differences " ident,+)? " ;" : kernelDecl
+  (" differences " ident,+)? kermlBody : kernelDecl
 syntax (kermlAbstractFlag)? "function " ident (" specializes " ident,+)? (" conjugates " ident)?
   (" disjoint" " from " ident,+)? (" unions " ident,+)? (" intersects " ident,+)?
-  (" differences " ident,+)? " ;" : kernelDecl
+  (" differences " ident,+)? kermlBody : kernelDecl
 syntax (kermlAbstractFlag)? "predicate " ident (" specializes " ident,+)? (" conjugates " ident)?
   (" disjoint" " from " ident,+)? (" unions " ident,+)? (" intersects " ident,+)?
-  (" differences " ident,+)? " ;" : kernelDecl
+  (" differences " ident,+)? kermlBody : kernelDecl
 syntax (kermlAbstractFlag)? "interaction " ident (" specializes " ident,+)? (" conjugates " ident)?
   (" disjoint" " from " ident,+)? (" unions " ident,+)? (" intersects " ident,+)?
-  (" differences " ident,+)? " ;" : kernelDecl
+  (" differences " ident,+)? kermlBody : kernelDecl
 syntax "package " ident " ;" : kernelDecl
 /-- KerML §8.2.5.11 `MultiplicityRange`, standalone: `multiplicity Name [N..M] ;`
 (`Base.kerml`'s `exactlyOne`/`zeroOrOne`/`oneToMany`/`zeroToMany`). Bounds are parsed
 (`kermlMult`, `Core.lean`) but not stored, same reason as `feature`'s own inline
 bracket there -- `MultiplicityRange` has zero stored fields. -/
-syntax "multiplicity " ident kermlMult " ;" : kernelDecl
+syntax "multiplicity " ident kermlMult kermlBody : kernelDecl
 
-def elabKernelDecl : TSyntax `kernelDecl → MacroM (TSyntax `term)
+/-- `kernelDecl` → `Array (TSyntax term)`, matching `Core.lean`'s own
+`elabKermlDecl` convention (adopted there first, for the same "nested `kermlBody`
+content composes as a flat array, wrapped into a `List Element` only at the very top"
+reason). Nested body content here is always `Core.lean`'s own `kermlDecl` (e.g. a
+`feature` nested inside a `datatype`'s body), elaborated via `Core.lean`'s
+`elabKermlBody` directly -- no new mutual recursion needed on this side, since
+`elabKermlBody`'s own recursion only ever calls back into `Core.lean`'s
+`elabKermlDecl`, not this file's `elabKernelDecl`. -/
+def elabKernelDecl : TSyntax `kernelDecl → MacroM (Array (TSyntax `term))
   | `(kernelDecl| $[$_abs:kermlAbstractFlag]? datatype $a:ident $[specializes $specs,*]? $[conjugates $conj:ident]?
-        $[disjoint from $disj,*]? $[unions $uni,*]? $[intersects $inter,*]? $[differences $diff,*]? ;) => do
-    mkListTerm (← classifierLikeDeclElems dataTypeStubTerm a specs conj disj uni inter diff).toList
+        $[disjoint from $disj,*]? $[unions $uni,*]? $[intersects $inter,*]? $[differences $diff,*]? $body:kermlBody) => do
+    let declElems ← classifierLikeDeclElems dataTypeStubTerm a specs conj disj uni inter diff
+    pure (declElems ++ (← elabKermlBody body))
   | `(kernelDecl| $[$_abs:kermlAbstractFlag]? class $a:ident $[specializes $specs,*]? $[conjugates $conj:ident]?
-        $[disjoint from $disj,*]? $[unions $uni,*]? $[intersects $inter,*]? $[differences $diff,*]? ;) => do
-    mkListTerm (← classifierLikeDeclElems kClassStubTerm a specs conj disj uni inter diff).toList
+        $[disjoint from $disj,*]? $[unions $uni,*]? $[intersects $inter,*]? $[differences $diff,*]? $body:kermlBody) => do
+    let declElems ← classifierLikeDeclElems kClassStubTerm a specs conj disj uni inter diff
+    pure (declElems ++ (← elabKermlBody body))
   | `(kernelDecl| $[$_abs:kermlAbstractFlag]? struct $a:ident $[specializes $specs,*]? $[conjugates $conj:ident]?
-        $[disjoint from $disj,*]? $[unions $uni,*]? $[intersects $inter,*]? $[differences $diff,*]? ;) => do
-    mkListTerm (← classifierLikeDeclElems kStructureStubTerm a specs conj disj uni inter diff).toList
+        $[disjoint from $disj,*]? $[unions $uni,*]? $[intersects $inter,*]? $[differences $diff,*]? $body:kermlBody) => do
+    let declElems ← classifierLikeDeclElems kStructureStubTerm a specs conj disj uni inter diff
+    pure (declElems ++ (← elabKermlBody body))
   | `(kernelDecl| $[$_abs:kermlAbstractFlag]? assoc $a:ident $[specializes $specs,*]? $[conjugates $conj:ident]?
-        $[disjoint from $disj,*]? $[unions $uni,*]? $[intersects $inter,*]? $[differences $diff,*]? ;) => do
-    mkListTerm (← classifierLikeDeclElems associationStubTerm a specs conj disj uni inter diff).toList
+        $[disjoint from $disj,*]? $[unions $uni,*]? $[intersects $inter,*]? $[differences $diff,*]? $body:kermlBody) => do
+    let declElems ← classifierLikeDeclElems associationStubTerm a specs conj disj uni inter diff
+    pure (declElems ++ (← elabKermlBody body))
   | `(kernelDecl| $[$_abs:kermlAbstractFlag]? behavior $a:ident $[specializes $specs,*]? $[conjugates $conj:ident]?
-        $[disjoint from $disj,*]? $[unions $uni,*]? $[intersects $inter,*]? $[differences $diff,*]? ;) => do
-    mkListTerm (← classifierLikeDeclElems behaviorStubTerm a specs conj disj uni inter diff).toList
+        $[disjoint from $disj,*]? $[unions $uni,*]? $[intersects $inter,*]? $[differences $diff,*]? $body:kermlBody) => do
+    let declElems ← classifierLikeDeclElems behaviorStubTerm a specs conj disj uni inter diff
+    pure (declElems ++ (← elabKermlBody body))
   | `(kernelDecl| $[$_abs:kermlAbstractFlag]? function $a:ident $[specializes $specs,*]? $[conjugates $conj:ident]?
-        $[disjoint from $disj,*]? $[unions $uni,*]? $[intersects $inter,*]? $[differences $diff,*]? ;) => do
-    mkListTerm (← classifierLikeDeclElems kFunctionStubTerm a specs conj disj uni inter diff).toList
+        $[disjoint from $disj,*]? $[unions $uni,*]? $[intersects $inter,*]? $[differences $diff,*]? $body:kermlBody) => do
+    let declElems ← classifierLikeDeclElems kFunctionStubTerm a specs conj disj uni inter diff
+    pure (declElems ++ (← elabKermlBody body))
   | `(kernelDecl| $[$_abs:kermlAbstractFlag]? predicate $a:ident $[specializes $specs,*]? $[conjugates $conj:ident]?
-        $[disjoint from $disj,*]? $[unions $uni,*]? $[intersects $inter,*]? $[differences $diff,*]? ;) => do
-    mkListTerm (← classifierLikeDeclElems predicateStubTerm a specs conj disj uni inter diff).toList
+        $[disjoint from $disj,*]? $[unions $uni,*]? $[intersects $inter,*]? $[differences $diff,*]? $body:kermlBody) => do
+    let declElems ← classifierLikeDeclElems predicateStubTerm a specs conj disj uni inter diff
+    pure (declElems ++ (← elabKermlBody body))
   | `(kernelDecl| $[$_abs:kermlAbstractFlag]? interaction $a:ident $[specializes $specs,*]? $[conjugates $conj:ident]?
-        $[disjoint from $disj,*]? $[unions $uni,*]? $[intersects $inter,*]? $[differences $diff,*]? ;) => do
-    mkListTerm (← classifierLikeDeclElems interactionStubTerm a specs conj disj uni inter diff).toList
+        $[disjoint from $disj,*]? $[unions $uni,*]? $[intersects $inter,*]? $[differences $diff,*]? $body:kermlBody) => do
+    let declElems ← classifierLikeDeclElems interactionStubTerm a specs conj disj uni inter diff
+    pure (declElems ++ (← elabKermlBody body))
   | `(kernelDecl| package $a:ident ;) => do
     let pT ← packageStubTerm a.getId.toString
-    mkListTerm [← `(($pT).elt)]
-  | `(kernelDecl| multiplicity $a:ident $_mult:kermlMult ;) => do
+    pure #[← `(($pT).elt)]
+  | `(kernelDecl| multiplicity $a:ident $_mult:kermlMult $body:kermlBody) => do
     let mT ← multiplicityRangeStubTerm a.getId.toString
-    mkListTerm [← `(($mT).elt)]
+    pure (#[← `(($mT).elt)] ++ (← elabKermlBody body))
   | _ => Macro.throwUnsupported
 
 elab "kernel% " d:kernelDecl : term => do
-  let stx ← Elab.liftMacroM (elabKernelDecl d)
+  let elems ← Elab.liftMacroM (elabKernelDecl d)
+  let stx ← Elab.liftMacroM (mkListTerm elems.toList)
   Elab.Term.elabTerm stx none
 
 /-! ### `kermlExpr` -- the expression language (KerML §8.2.5.8)
@@ -842,9 +859,11 @@ elab "kexpr% " e:kermlExpr : term => do
 #check kernel% package VehicleModel ;
 
 -- Base.kerml's own real declarations (see Core.lean's own matching block for the
--- `classifier`/`feature` half of this same file's content, and its scope caveats,
--- which apply equally here -- no nested bodies/doc blocks/`::`-qualified names).
-#check kernel% abstract datatype DataValue specializes Anything ;
+-- `classifier`/`feature` half of this same file's content, and its scope caveats --
+-- nested bodies are now real, `doc` blocks/`::`-qualified names still aren't). The
+-- real text is `feature self: DataValue redefines Anything::self;`; `self` here
+-- (dropping the `Anything::` qualifier) is this same simplification applied.
+#check kernel% abstract datatype DataValue specializes Anything { feature self redefines self ; }
 #check kernel% multiplicity exactlyOne [1..1] ;
 #check kernel% multiplicity zeroOrOne [0..1] ;
 #check kernel% multiplicity oneToMany [1..*] ;
