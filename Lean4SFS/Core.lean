@@ -418,7 +418,15 @@ stub carrying the string `"Anything::self"`, not an actual lookup of `Anything`'
 real `self` member; this is a strictly more faithful *label* for the reference than
 dropping the qualifier ever was, not a resolution mechanism. -/
 declare_syntax_cat kermlQualName
-syntax ident ("::" ident)* : kermlQualName
+/-- `atomic(...)` on the repeated `"::" ident` group: without it, once `"::"` is
+consumed inside one repetition attempt, a following token that isn't a valid `ident`
+(e.g. the `*` in `import Kernel::* ;`'s wildcard suffix, parsed by a different,
+*outer* production) is a hard parse error ("expected identifier") rather than a
+graceful "this repetition doesn't apply, stop extending here, let the outer grammar
+have the `::`" backtrack -- `atomic` makes a failed attempt fully unconsume so `*`
+(the repetition combinator) can correctly stop at zero further repetitions instead of
+propagating the failure. -/
+syntax ident (atomic("::" ident))* : kermlQualName
 
 def qualNameStr : TSyntax `kermlQualName → String
   | `(kermlQualName| $x:ident $[:: $xs:ident]*) =>
@@ -451,6 +459,25 @@ be written -- `def Documentation.elt` here would silently become
 under the current namespace (`KerML.Core.KerML.Root.Documentation.elt`) rather than
 replacing it -- `_root_.` anchors the name at the true top level. -/
 def _root_.KerML.Root.Documentation.elt (d : Documentation) : Element := d.toComment.toAnnotatingElement.toElement
+
+/-- KerML §8.3.2.4.7/8.3.2.4.8 `MembershipImport`/`NamespaceImport` (`Root.lean`)
+stubs for `import A::B ;` / `import A::* ;` respectively. As with every other
+reference in this grammar, no symbol table means `importedMembership`/
+`importedNamespace` are freshly-built minimal stub values (`memberElement`/nothing
+extra) carrying just the referenced name, not real lookups. -/
+def mkMembershipImportStub (name : String) : MembershipImport :=
+  { elementId := "import-" ++ name,
+    importedMembership := { elementId := name, memberElement := { elementId := name } } }
+def mkNamespaceImportStub (name : String) : NamespaceImport :=
+  { elementId := "import-" ++ name, importedNamespace := { elementId := name } }
+/-- `_root_.KerML.Root....` required for both -- see `Documentation.elt`'s own note
+just above for why (dot notation needs the extension `def`'s name to match the
+type's actual declaring namespace, `_root_.` needed on top of that to escape the
+current `namespace KerML.Core` block rather than nesting under it). -/
+def _root_.KerML.Root.MembershipImport.elt (m : MembershipImport) : Element :=
+  m.toImport.toRelationship.toElement
+def _root_.KerML.Root.NamespaceImport.elt (n : NamespaceImport) : Element :=
+  n.toImport.toRelationship.toElement
 
 declare_syntax_cat kermlDecl
 
@@ -574,6 +601,25 @@ full optional-clause list `feature` itself supports. -/
 syntax "in " ident " : " kermlQualName " ;" : kermlDecl
 syntax "out " ident " : " kermlQualName " ;" : kermlDecl
 syntax "inout " ident " : " kermlQualName " ;" : kermlDecl
+
+/-- KerML §8.2.3.4 `Import` family (`Root.lean`'s `MembershipImport`/
+`NamespaceImport`): `import A::B ;` (one specific member) or `import A::* ;` (every
+visible member of `A`). Declared here in `Core.lean`, not `Root.lean` itself, even
+though the *structures* these produce are `Root.lean`'s own -- `Root.lean` is a
+*dependency* of `Core.lean` (imported before `Core.lean` exists), so it has no way to
+reference `kermlDecl` at all, and being a `kermlDecl` alternative is exactly what
+lets `import` nest inside a `kermlBody` the way a real KerML import statement scopes
+to the namespace/body it appears in -- any classifier/feature/predicate body that can
+hold a nested `doc`/`feature` can equally hold a nested `import`, genuinely visible
+to (in the same flat scope/list as) every sibling declaration in that same body, not
+restricted to a fixed position. (Real name *resolution* against an import --
+expanding a later bare `Assert` into `Assertion::Assert` because of an `import
+Assertion::Assert;` earlier in the same scope -- is not attempted; this project has
+no symbol table anywhere, and a bare reference already always becomes its own fresh
+stub regardless of what's been imported, same as before this addition.) Visibility
+(`private`/`public`) isn't parsed -- defaults to `Import`'s own `.private`. -/
+syntax "import " kermlQualName "::" "*" " ;" : kermlDecl
+syntax "import " kermlQualName " ;" : kermlDecl
 
 mutual
 
@@ -796,6 +842,10 @@ partial def elabKermlDecl : TSyntax `kermlDecl → MacroM (Array (TSyntax `term)
     let tT ← kTypeStubTermQ t
     let rel ← mkFeatureTypingTerm aT tT a.getId.toString (qualNameStr t)
     pure #[← `(($aT).elt), ← `(($rel).elt)]
+  | `(kermlDecl| import $q:kermlQualName :: * ;) => do
+    pure #[← `((mkNamespaceImportStub $(quote (qualNameStr q))).elt)]
+  | `(kermlDecl| import $q:kermlQualName ;) => do
+    pure #[← `((mkMembershipImportStub $(quote (qualNameStr q))).elt)]
   | _ => Macro.throwUnsupported
 
 /-- `kermlBody` → the flat `Array` of `Element` terms its nested `kermlDecl*` content
@@ -870,5 +920,18 @@ elab "kerml% " d:kermlDecl : term => do
 #check kerml% in x : Occurrence ;
 #check kerml% out y : Occurrence ;
 #check kerml% inout z : Occurrence ;
+
+-- Allen.kerml's own real import statements (visibility keyword not parsed, see
+-- that production's own note) -- both standalone and nested inside a body,
+-- confirming the second is genuinely usable anywhere the first is: a sibling in
+-- the same flat scope as whatever else the body declares, not restricted to a
+-- fixed leading position.
+#check kerml% import Assertion::Assert ;
+#check kerml% import Occurrences::Occurrence ;
+#check kerml% import Kernel::* ;
+#check kerml% classifier Widget {
+  import Assertion::Assert ;
+  feature self : Widget ;
+}
 
 end KerML.Core
