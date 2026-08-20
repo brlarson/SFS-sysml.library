@@ -279,6 +279,12 @@ resolve the reference, so the stub carries only the referenced name). -/
 def mkKTypeStub (name : String) : KType := { elementId := name, declaredName := some name }
 def mkClassifierStub (name : String) : Classifier := { elementId := name, declaredName := some name }
 def mkFeatureStub (name : String) : Feature := { elementId := name, declaredName := some name }
+/-- Like `mkFeatureStub`, but with `direction` actually set -- unlike `abstract`/
+`nonunique`/etc. (parsed-but-discarded prefix flags noted throughout this file's
+scope notes), `direction` is the entire point of the `in`/`out`/`inout`-prefixed
+short `Feature` form below, so it's threaded through, not dropped. -/
+def mkDirFeatureStub (name : String) (dir : FeatureDirectionKind) : Feature :=
+  { elementId := name, declaredName := some name, direction := some dir }
 
 /-- `.toElement` composed through each structure's `extends` chain, so every metaclass
 constructed below can be placed in a single flat `List Element` result. -/
@@ -557,6 +563,18 @@ principle, its *ownership* (which element it documents) isn't modeled, only its
 existence as a sibling `Element`, same as every other nested declaration. -/
 syntax "doc " str : kermlDecl
 
+/-- KerML §8.2.4.3.1 `Feature`, direction-prefixed short form: `in x : T ;` / `out x :
+T ;` / `inout x : T ;` -- real usage (`Allen.kerml`'s parameter declarations, e.g.
+`in x : Occurrence;`) omits the `feature` keyword entirely. Per the real grammar this
+is legitimate: `Feature`'s own production allows `BasicFeaturePrefix FeatureDeclaration`
+with no literal `'feature'` token, since a direction (or `derived`/`abstract`/...)
+prefix flag alone already disambiguates that a `Feature` is being declared. This
+covers just that minimal name+type shape (matching every real usage found), not the
+full optional-clause list `feature` itself supports. -/
+syntax "in " ident " : " kermlQualName " ;" : kermlDecl
+syntax "out " ident " : " kermlQualName " ;" : kermlDecl
+syntax "inout " ident " : " kermlQualName " ;" : kermlDecl
+
 mutual
 
 /-- `kermlDecl` → `Array (TSyntax term)`, one entry per implied `Element` (see the
@@ -763,6 +781,21 @@ partial def elabKermlDecl : TSyntax `kermlDecl → MacroM (Array (TSyntax `term)
     let rel ← mkTypeFeaturingTerm aT bT (qualNameStr a) (qualNameStr b)
     pure #[← `(($rel).elt)]
   | `(kermlDecl| doc $s:str) => do pure #[← `((mkDocumentationStub $s).elt)]
+  | `(kermlDecl| in $a:ident : $t:kermlQualName ;) => do
+    let aT ← `(mkDirFeatureStub $(quote a.getId.toString) FeatureDirectionKind.inDir)
+    let tT ← kTypeStubTermQ t
+    let rel ← mkFeatureTypingTerm aT tT a.getId.toString (qualNameStr t)
+    pure #[← `(($aT).elt), ← `(($rel).elt)]
+  | `(kermlDecl| out $a:ident : $t:kermlQualName ;) => do
+    let aT ← `(mkDirFeatureStub $(quote a.getId.toString) FeatureDirectionKind.outDir)
+    let tT ← kTypeStubTermQ t
+    let rel ← mkFeatureTypingTerm aT tT a.getId.toString (qualNameStr t)
+    pure #[← `(($aT).elt), ← `(($rel).elt)]
+  | `(kermlDecl| inout $a:ident : $t:kermlQualName ;) => do
+    let aT ← `(mkDirFeatureStub $(quote a.getId.toString) FeatureDirectionKind.inoutDir)
+    let tT ← kTypeStubTermQ t
+    let rel ← mkFeatureTypingTerm aT tT a.getId.toString (qualNameStr t)
+    pure #[← `(($aT).elt), ← `(($rel).elt)]
   | _ => Macro.throwUnsupported
 
 /-- `kermlBody` → the flat `Array` of `Element` terms its nested `kermlDecl*` content
@@ -831,5 +864,11 @@ elab "kerml% " d:kermlDecl : term => do
 #check kerml% abstract feature naturals : ScalarValues::Natural [0..*] subsets dataValues {
   doc "naturals is a specialization of dataValues restricted to type Natural."
 }
+
+-- Allen.kerml's own real parameter declarations: `in x : Occurrence;`/`out`/`inout`,
+-- the `feature`-keyword-omitted short form.
+#check kerml% in x : Occurrence ;
+#check kerml% out y : Occurrence ;
+#check kerml% inout z : Occurrence ;
 
 end KerML.Core
