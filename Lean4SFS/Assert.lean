@@ -59,7 +59,7 @@ import SFS
 open Lean
 open SFS
 
-namespace SFS.DSL
+namespace SFS.Assert
 
 /-! ## Syntax categories
 
@@ -727,6 +727,6 @@ expected to fail to elaborate, honestly, rather than being forced:
   incompatible) subject type (`Part`, not `Occurrence`) from this formula's `o`, so
   even adding an `L := Location` alias would not make this one type-check. This is a
   genuine mismatch between the DSL formula and `SFS.lean`'s Mereology/Region
-  axiomatization, not a `DSL.lean` bug -- surfaced here, not hidden. -/
+  axiomatization, not a `Assert.lean` bug -- surfaced here, not hidden. -/
 
-end SFS.DSL
+end SFS.Assert

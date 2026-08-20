@@ -1,5 +1,5 @@
 name = "SFS"
-defaultTargets = ["SFS", "DSL", "Root", "Core", "Kernel"]
+defaultTargets = ["SFS", "Assert", "Root", "Core", "Kernel"]
 
 [[require]]
 name = "mathlib"
@@ -9,7 +9,7 @@ git = "https://github.com/leanprover-community/mathlib4.git"
 name = "SFS"
 
 [[lean_lib]]
-name = "DSL"
+name = "Assert"
 
 [[lean_lib]]
 name = "Root"

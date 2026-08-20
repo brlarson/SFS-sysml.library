@@ -42,7 +42,7 @@ the same "structural, not deeply verified" scope already used for `ElementRep`/
 `ElementKind`/`Model` in `SFS.lean`.
 
 Imported by `Core.lean` (KerML §8.2.4/§8.3.3) and, as of the `KElement` replacement
-above, by `SFS.lean` and (transitively, via `SFS.lean`) `DSL.lean` too.
+above, by `SFS.lean` and (transitively, via `SFS.lean`) `Assert.lean` too.
 -/
 
 namespace KerML.Root

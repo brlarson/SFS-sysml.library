@@ -21,7 +21,7 @@ renamed (`in`/`out` are Lean keywords) to `inDir`/`outDir`/`inoutDir`.
 Below the abstract-syntax structures, this file also declares real `syntax`/`elab`
 productions for KerML §8.2.4 "Core Concrete Syntax" -- a working parser and elaborator
 for a keyword-only subset of the textual notation itself (`type A specializes B ;`,
-`feature f typed by T ;`, ...), in the same house style `DSL.lean` established for the
+`feature f typed by T ;`, ...), in the same house style `Assert.lean` established for the
 `@Assert` formula language (`declare_syntax_cat`/`syntax ... : category` productions,
 pure `MacroM (TSyntax `term)` elaborator functions, one top-level triggering `elab`).
 See that section's own header comment for its scope (relationship-bearing productions
@@ -233,7 +233,7 @@ structure TypeFeaturing extends Relationship where
 /-! ## Concrete syntax (KerML §8.2.4 "Core Concrete Syntax")
 
 A real, working parser and elaborator for a subset of KerML's textual notation, in
-`DSL.lean`'s house style (`declare_syntax_cat`, `syntax ... : category` productions,
+`Assert.lean`'s house style (`declare_syntax_cat`, `syntax ... : category` productions,
 pure `MacroM (TSyntax `term)` elaborators, one top-level triggering `elab`).
 
 **Scope, deliberately narrower than the full grammar (documented, not accidental)**:
@@ -372,7 +372,7 @@ def mkTypeFeaturingTerm (fT tT : TSyntax `term) (fn tn : String) : MacroM (TSynt
   `(({ elementId := $(quote (relElementId fn tn "featuredby")),
        featureOfType := $fT, featuringType := $tT } : TypeFeaturing))
 
-/-- `[t1, t2, ...] : List Element`, built as nested `::`, matching `DSL.lean`'s own
+/-- `[t1, t2, ...] : List Element`, built as nested `::`, matching `Assert.lean`'s own
 `foldrM`-over-a-collection idiom for assembling syntax incrementally. -/
 partial def mkListTerm : List (TSyntax `term) → MacroM (TSyntax `term)
   | [] => `([])
@@ -380,7 +380,7 @@ partial def mkListTerm : List (TSyntax `term) → MacroM (TSyntax `term)
 
 /-- A bare `abstract` prefix flag, wrapped in its own trivial category (rather than
 used as a bare optional keyword directly) so it can be captured via `$[$abs:...]?`
-the same proven way `dslRange`'s own optional clauses are captured in `DSL.lean` --
+the same proven way `dslRange`'s own optional clauses are captured in `Assert.lean` --
 presence tested via `.isSome`, not stored (matches `KType`/`Classifier`/etc.'s own
 `isAbstract` field existing, just not yet threaded from parsed text into a value,
 same "not yet read from text" status as the other omitted prefix flags noted below).
@@ -861,7 +861,7 @@ partial def elabKermlBody : TSyntax `kermlBody → MacroM (Array (TSyntax `term)
 end
 
 /-- `kerml% <decl>` elaborates a `kermlDecl` into a `List Element` term, matching
-`DSL.lean`'s own `domain%` trigger convention. -/
+`Assert.lean`'s own `domain%` trigger convention. -/
 elab "kerml% " d:kermlDecl : term => do
   let elems ← Elab.liftMacroM (elabKermlDecl d)
   let stx ← Elab.liftMacroM (mkListTerm elems.toList)

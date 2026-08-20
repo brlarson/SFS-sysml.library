@@ -54,7 +54,7 @@ and `Relationship`/`Feature` all eventually reach `Element`) -- built and verifi
 
 **KerML §8.2.5 Kernel Concrete Syntax**: below the abstract-syntax structures, this
 file also adds real `syntax`/`elab` productions for a subset of Kernel's textual
-notation, in the same house style `DSL.lean` and `Core.lean`'s own concrete-syntax
+notation, in the same house style `Assert.lean` and `Core.lean`'s own concrete-syntax
 section established. Two independent pieces: `kernelDecl` (declaration keywords --
 `datatype`/`class`/`struct`/`assoc`/`behavior`/`function`/`predicate`/`interaction`/
 `package`, reusing `Core.lean`'s relationship-builder helpers directly since `open
@@ -451,7 +451,7 @@ structure LibraryPackage extends Package where
 
 /-! ## Concrete syntax (KerML §8.2.5 "Kernel Concrete Syntax")
 
-Two independent syntax/elaboration pieces, in `DSL.lean`/`Core.lean`'s house style.
+Two independent syntax/elaboration pieces, in `Assert.lean`/`Core.lean`'s house style.
 
 ### `kernelDecl` -- declaration keywords
 
@@ -575,7 +575,7 @@ def classifierLikeDeclElems (mkStub : String → MacroM (TSyntax `term)) (a : TS
   pure (#[← `(($aT).elt)] ++ specElems ++ conjElems ++ disjElems ++ uniElems ++ interElems ++ diffElems)
 
 declare_syntax_cat kernelDecl
-/-- Declared here (category name only, matching `DSL.lean`'s own "declare every
+/-- Declared here (category name only, matching `Assert.lean`'s own "declare every
 category up front" lesson for forward references) so `predicate`'s own `syntax`
 declaration below can end in it; its actual productions -- which need `kermlExpr`,
 declared much later in this file -- are added alongside `elabKermlPredBody` after
@@ -617,7 +617,7 @@ syntax "multiplicity " ident kermlMult kermlBody : kernelDecl
 
 /-! ### `kermlExpr` -- the expression language (KerML §8.2.5.8)
 
-An operator-precedence expression grammar, in `DSL.lean`'s `dslTerm`
+An operator-precedence expression grammar, in `Assert.lean`'s `dslTerm`
 precedence-climbing style (`syntax:N`). Each `kermlExpr` elaborates to `Array
 Element` (not a finished `List Element` term -- callers concatenate freely; only the
 top-level `kexpr%` trigger wraps the final result), consistent with `kermlDecl`'s own
@@ -655,7 +655,7 @@ lookahead this grammar doesn't attempt), sequence construction (`,`), and named
 arguments (`name = value` inside a call) -- each would need either more grammar
 machinery than is worth it here or (for select/collect) genuine disambiguation
 lookahead; real formulas needing them aren't guessed at, matching this project's
-established precedent (`DSL.lean`'s own `numberof`/`productof`/`sumof` scope note).
+established precedent (`Assert.lean`'s own `numberof`/`productof`/`sumof` scope note).
 
 **Known limitation, not a bug**: Lean's own `ident` token already parses dotted
 sequences (`x.y.z`) as a single compound identifier (the same mechanism that lets
