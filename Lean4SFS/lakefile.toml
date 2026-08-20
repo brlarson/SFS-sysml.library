@@ -1,5 +1,5 @@
 name = "SFS"
-defaultTargets = ["SFS", "DSL", "Root", "Core"]
+defaultTargets = ["SFS", "DSL", "Root", "Core", "Kernel"]
 
 [[require]]
 name = "mathlib"
@@ -16,3 +16,6 @@ name = "Root"
 
 [[lean_lib]]
 name = "Core"
+
+[[lean_lib]]
+name = "Kernel"
