@@ -402,6 +402,34 @@ declare_syntax_cat kermlMult
 syntax "[" kermlMultBound "]" : kermlMult
 syntax "[" kermlMultBound ".." kermlMultBound "]" : kermlMult
 
+/-- KerML `QualifiedName`: `A` or `A::B::C`. Used at every *reference* position below
+(a `specializes`/`typed by`/`subsets`/... target, or either operand of a standalone
+relationship declaration) -- never for a *primary* declared name, which stays plain
+`ident` (KerML's own `Identification`, not `QualifiedName`). Elaborates to a `String`
+(`qualNameStr`, "::"-joined) used the same way a bare reference `ident`'s
+`.getId.toString` always was -- still no symbol table, so `Anything::self` becomes a
+stub carrying the string `"Anything::self"`, not an actual lookup of `Anything`'s
+real `self` member; this is a strictly more faithful *label* for the reference than
+dropping the qualifier ever was, not a resolution mechanism. -/
+declare_syntax_cat kermlQualName
+syntax ident ("::" ident)* : kermlQualName
+
+def qualNameStr : TSyntax `kermlQualName → String
+  | `(kermlQualName| $x:ident $[:: $xs:ident]*) =>
+    String.intercalate "::" ((#[x] ++ xs).toList.map (·.getId.toString))
+  | _ => "?"
+
+/-- `kermlQualName`-taking counterparts of `kTypeStubTerm`/`classifierStubTerm`/
+`featureStubTerm` above, for reference positions (everywhere those three were
+previously called with a bare `ident` *target*, as opposed to a primary declared
+name, which stays `ident`-based). -/
+def kTypeStubTermQ (q : TSyntax `kermlQualName) : MacroM (TSyntax `term) :=
+  `(mkKTypeStub $(quote (qualNameStr q)))
+def classifierStubTermQ (q : TSyntax `kermlQualName) : MacroM (TSyntax `term) :=
+  `(mkClassifierStub $(quote (qualNameStr q)))
+def featureStubTermQ (q : TSyntax `kermlQualName) : MacroM (TSyntax `term) :=
+  `(mkFeatureStub $(quote (qualNameStr q)))
+
 declare_syntax_cat kermlDecl
 
 /-- KerML `TypeBody`/`FeatureBody`-style bodies: `;` (no owned members) or `{
@@ -432,24 +460,24 @@ not yet threaded into `KType.isAbstract` -- still not a *stored* field from this
 concrete-syntax layer's own text, same status as before, just no longer a token that
 blocks parsing real `abstract`-prefixed declarations like `Base.kerml`'s. -/
 syntax (name := kermlType) (kermlAbstractFlag)? "type " ident
-  (" specializes " ident,+)?
-  (" conjugates " ident)?
-  (" disjoint" " from " ident,+)?
-  (" unions " ident,+)?
-  (" intersects " ident,+)?
-  (" differences " ident,+)?
+  (" specializes " kermlQualName,+)?
+  (" conjugates " kermlQualName)?
+  (" disjoint" " from " kermlQualName,+)?
+  (" unions " kermlQualName,+)?
+  (" intersects " kermlQualName,+)?
+  (" differences " kermlQualName,+)?
   kermlBody : kermlDecl
 
 /-- KerML §8.2.4.2.1 `Classifier`, same shape as `Type` above except `specializes`
 produces `Subclassification` (not generic `Specialization`), per
 `SuperclassingPart : OwnedSubclassification`. -/
 syntax (name := kermlClassifier) (kermlAbstractFlag)? "classifier " ident
-  (" specializes " ident,+)?
-  (" conjugates " ident)?
-  (" disjoint" " from " ident,+)?
-  (" unions " ident,+)?
-  (" intersects " ident,+)?
-  (" differences " ident,+)?
+  (" specializes " kermlQualName,+)?
+  (" conjugates " kermlQualName)?
+  (" disjoint" " from " kermlQualName,+)?
+  (" unions " kermlQualName,+)?
+  (" intersects " kermlQualName,+)?
+  (" differences " kermlQualName,+)?
   kermlBody : kermlDecl
 
 /-- KerML §8.2.4.3.1 `Feature`, relationship-part subset: `[abstract] feature f
@@ -460,38 +488,41 @@ keyword form was covered before) -- both feed the same `FeatureTyping` elaborati
 `[mult]` (`kermlMult` above) is parsed but not stored, matching that category's own
 note. -/
 syntax (name := kermlFeature) (kermlAbstractFlag)? "feature " ident
-  (" typed" " by " ident,+)?
-  (" : " ident,+)?
+  (" typed" " by " kermlQualName,+)?
+  (" : " kermlQualName,+)?
   (kermlMult)?
-  (" subsets " ident,+)?
-  (" references " ident)?
-  (" crosses " ident)?
-  (" redefines " ident,+)?
-  (" chains " ident)?
-  (" inverse" " of " ident)?
-  (" featured" " by " ident,+)?
+  (" subsets " kermlQualName,+)?
+  (" references " kermlQualName)?
+  (" crosses " kermlQualName)?
+  (" redefines " kermlQualName,+)?
+  (" chains " kermlQualName)?
+  (" inverse" " of " kermlQualName)?
+  (" featured" " by " kermlQualName,+)?
   kermlBody : kermlDecl
 
-/-- KerML §8.2.4.1.2 `Specialization`, standalone form: `subtype A specializes B ;`. -/
-syntax "subtype " ident " specializes " ident " ;" : kermlDecl
+/-- KerML §8.2.4.1.2 `Specialization`, standalone form: `subtype A specializes B ;`.
+Both `A`/`B` are `QualifiedName` references (`SpecificType`/`GeneralType`), not
+declarations -- unlike `type`/`classifier`/`feature`'s own primary name, neither
+operand here is ever a fresh declaration. -/
+syntax "subtype " kermlQualName " specializes " kermlQualName " ;" : kermlDecl
 /-- KerML §8.2.4.1.3 `Conjugation`, standalone form: `conjugate A conjugates B ;`. -/
-syntax "conjugate " ident " conjugates " ident " ;" : kermlDecl
+syntax "conjugate " kermlQualName " conjugates " kermlQualName " ;" : kermlDecl
 /-- KerML §8.2.4.1.4 `Disjoining`, standalone form: `disjoint A from B ;`. -/
-syntax "disjoint " ident " from " ident " ;" : kermlDecl
+syntax "disjoint " kermlQualName " from " kermlQualName " ;" : kermlDecl
 /-- KerML §8.2.4.2.2 `Subclassification`, standalone form: `subclassifier A specializes
 B ;`. -/
-syntax "subclassifier " ident " specializes " ident " ;" : kermlDecl
+syntax "subclassifier " kermlQualName " specializes " kermlQualName " ;" : kermlDecl
 /-- KerML §8.2.4.3.2 `FeatureTyping`, standalone form: `typing F typed by T ;`. -/
-syntax "typing " ident " typed" " by " ident " ;" : kermlDecl
+syntax "typing " kermlQualName " typed" " by " kermlQualName " ;" : kermlDecl
 /-- KerML §8.2.4.3.3 `Subsetting`, standalone form: `subset A subsets B ;`. -/
-syntax "subset " ident " subsets " ident " ;" : kermlDecl
+syntax "subset " kermlQualName " subsets " kermlQualName " ;" : kermlDecl
 /-- KerML §8.2.4.3.4 `Redefinition`, standalone form: `redefinition A redefines B ;`. -/
-syntax "redefinition " ident " redefines " ident " ;" : kermlDecl
+syntax "redefinition " kermlQualName " redefines " kermlQualName " ;" : kermlDecl
 /-- KerML §8.2.4.3.6 `FeatureInverting`, standalone form: `inverse A of B ;`. -/
-syntax "inverse " ident " of " ident " ;" : kermlDecl
+syntax "inverse " kermlQualName " of " kermlQualName " ;" : kermlDecl
 /-- KerML §8.2.4.3.7 `TypeFeaturing`, standalone form: `featuring A by B ;` (distinct
 keyword from `Feature`'s inline `featured by` part above, per the spec). -/
-syntax "featuring " ident " by " ident " ;" : kermlDecl
+syntax "featuring " kermlQualName " by " kermlQualName " ;" : kermlDecl
 
 mutual
 
@@ -504,7 +535,7 @@ content needed the same composability. -/
 partial def elabKermlDecl : TSyntax `kermlDecl → MacroM (Array (TSyntax `term))
   | `(kermlDecl| $[$_abs:kermlAbstractFlag]? type $a:ident
         $[specializes $specs,*]?
-        $[conjugates $conj:ident]?
+        $[conjugates $conj:kermlQualName]?
         $[disjoint from $disj,*]?
         $[unions $uni,*]?
         $[intersects $inter,*]?
@@ -514,45 +545,45 @@ partial def elabKermlDecl : TSyntax `kermlDecl → MacroM (Array (TSyntax `term)
     let aT ← kTypeStubTerm a
     let specElems ← match specs with
       | some ss => ss.getElems.mapM (fun g => do
-          let gT ← kTypeStubTerm g
-          let rel ← mkSpecializationTerm aT gT an g.getId.toString
+          let gT ← kTypeStubTermQ g
+          let rel ← mkSpecializationTerm aT gT an (qualNameStr g)
           `(($rel).elt))
       | none => pure #[]
     let conjElems ← match conj with
       | some c => do
-          let cT ← kTypeStubTerm c
-          let rel ← mkConjugationTerm aT cT an c.getId.toString
+          let cT ← kTypeStubTermQ c
+          let rel ← mkConjugationTerm aT cT an (qualNameStr c)
           pure #[← `(($rel).elt)]
       | none => pure #[]
     let disjElems ← match disj with
       | some ds => ds.getElems.mapM (fun g => do
-          let gT ← kTypeStubTerm g
-          let rel ← mkDisjoiningTerm aT gT an g.getId.toString
+          let gT ← kTypeStubTermQ g
+          let rel ← mkDisjoiningTerm aT gT an (qualNameStr g)
           `(($rel).elt))
       | none => pure #[]
     let uniElems ← match uni with
       | some us => us.getElems.mapM (fun g => do
-          let gT ← kTypeStubTerm g
-          let rel ← mkUnioningTerm gT g.getId.toString
+          let gT ← kTypeStubTermQ g
+          let rel ← mkUnioningTerm gT (qualNameStr g)
           `(($rel).elt))
       | none => pure #[]
     let interElems ← match inter with
       | some is' => is'.getElems.mapM (fun g => do
-          let gT ← kTypeStubTerm g
-          let rel ← mkIntersectingTerm gT g.getId.toString
+          let gT ← kTypeStubTermQ g
+          let rel ← mkIntersectingTerm gT (qualNameStr g)
           `(($rel).elt))
       | none => pure #[]
     let diffElems ← match diff with
       | some ds => ds.getElems.mapM (fun g => do
-          let gT ← kTypeStubTerm g
-          let rel ← mkDifferencingTerm gT g.getId.toString
+          let gT ← kTypeStubTermQ g
+          let rel ← mkDifferencingTerm gT (qualNameStr g)
           `(($rel).elt))
       | none => pure #[]
     let bodyElems ← elabKermlBody body
     pure (#[← `(($aT).elt)] ++ specElems ++ conjElems ++ disjElems ++ uniElems ++ interElems ++ diffElems ++ bodyElems)
   | `(kermlDecl| $[$_abs:kermlAbstractFlag]? classifier $a:ident
         $[specializes $specs,*]?
-        $[conjugates $conj:ident]?
+        $[conjugates $conj:kermlQualName]?
         $[disjoint from $disj,*]?
         $[unions $uni,*]?
         $[intersects $inter,*]?
@@ -562,38 +593,38 @@ partial def elabKermlDecl : TSyntax `kermlDecl → MacroM (Array (TSyntax `term)
     let aT ← classifierStubTerm a
     let specElems ← match specs with
       | some ss => ss.getElems.mapM (fun g => do
-          let gT ← classifierStubTerm g
-          let rel ← mkSubclassificationTerm aT gT an g.getId.toString
+          let gT ← classifierStubTermQ g
+          let rel ← mkSubclassificationTerm aT gT an (qualNameStr g)
           `(($rel).elt))
       | none => pure #[]
     let conjElems ← match conj with
       | some c => do
-          let cT ← kTypeStubTerm c
-          let rel ← mkConjugationTerm (← `(($aT).toKType)) cT an c.getId.toString
+          let cT ← kTypeStubTermQ c
+          let rel ← mkConjugationTerm (← `(($aT).toKType)) cT an (qualNameStr c)
           pure #[← `(($rel).elt)]
       | none => pure #[]
     let disjElems ← match disj with
       | some ds => ds.getElems.mapM (fun g => do
-          let gT ← kTypeStubTerm g
-          let rel ← mkDisjoiningTerm (← `(($aT).toKType)) gT an g.getId.toString
+          let gT ← kTypeStubTermQ g
+          let rel ← mkDisjoiningTerm (← `(($aT).toKType)) gT an (qualNameStr g)
           `(($rel).elt))
       | none => pure #[]
     let uniElems ← match uni with
       | some us => us.getElems.mapM (fun g => do
-          let gT ← kTypeStubTerm g
-          let rel ← mkUnioningTerm gT g.getId.toString
+          let gT ← kTypeStubTermQ g
+          let rel ← mkUnioningTerm gT (qualNameStr g)
           `(($rel).elt))
       | none => pure #[]
     let interElems ← match inter with
       | some is' => is'.getElems.mapM (fun g => do
-          let gT ← kTypeStubTerm g
-          let rel ← mkIntersectingTerm gT g.getId.toString
+          let gT ← kTypeStubTermQ g
+          let rel ← mkIntersectingTerm gT (qualNameStr g)
           `(($rel).elt))
       | none => pure #[]
     let diffElems ← match diff with
       | some ds => ds.getElems.mapM (fun g => do
-          let gT ← kTypeStubTerm g
-          let rel ← mkDifferencingTerm gT g.getId.toString
+          let gT ← kTypeStubTermQ g
+          let rel ← mkDifferencingTerm gT (qualNameStr g)
           `(($rel).elt))
       | none => pure #[]
     let bodyElems ← elabKermlBody body
@@ -603,100 +634,100 @@ partial def elabKermlDecl : TSyntax `kermlDecl → MacroM (Array (TSyntax `term)
         $[: $tys2,*]?
         $[$_mult:kermlMult]?
         $[subsets $subs,*]?
-        $[references $refF:ident]?
-        $[crosses $crossF:ident]?
+        $[references $refF:kermlQualName]?
+        $[crosses $crossF:kermlQualName]?
         $[redefines $redefs,*]?
-        $[chains $chainF:ident]?
-        $[inverse of $invF:ident]?
+        $[chains $chainF:kermlQualName]?
+        $[inverse of $invF:kermlQualName]?
         $[featured by $feats,*]?
         $body:kermlBody) => do
     let an := a.getId.toString
     let aT ← featureStubTerm a
     let tyTargets := (tys.map (·.getElems) |>.getD #[]) ++ (tys2.map (·.getElems) |>.getD #[])
     let tyElems ← tyTargets.mapM (fun g => do
-        let gT ← kTypeStubTerm g
-        let rel ← mkFeatureTypingTerm aT gT an g.getId.toString
+        let gT ← kTypeStubTermQ g
+        let rel ← mkFeatureTypingTerm aT gT an (qualNameStr g)
         `(($rel).elt))
     let subElems ← match subs with
       | some ss => ss.getElems.mapM (fun g => do
-          let gT ← featureStubTerm g
-          let rel ← mkSubsettingTerm aT gT an g.getId.toString
+          let gT ← featureStubTermQ g
+          let rel ← mkSubsettingTerm aT gT an (qualNameStr g)
           `(($rel).elt))
       | none => pure #[]
     let refElems ← match refF with
       | some g => do
-          let gT ← featureStubTerm g
-          let rel ← mkReferenceSubsettingTerm aT gT an g.getId.toString
+          let gT ← featureStubTermQ g
+          let rel ← mkReferenceSubsettingTerm aT gT an (qualNameStr g)
           pure #[← `(($rel).elt)]
       | none => pure #[]
     let crossElems ← match crossF with
       | some g => do
-          let gT ← featureStubTerm g
-          let rel ← mkCrossSubsettingTerm aT gT an g.getId.toString
+          let gT ← featureStubTermQ g
+          let rel ← mkCrossSubsettingTerm aT gT an (qualNameStr g)
           pure #[← `(($rel).elt)]
       | none => pure #[]
     let redefElems ← match redefs with
       | some rs => rs.getElems.mapM (fun g => do
-          let gT ← featureStubTerm g
-          let rel ← mkRedefinitionTerm aT gT an g.getId.toString
+          let gT ← featureStubTermQ g
+          let rel ← mkRedefinitionTerm aT gT an (qualNameStr g)
           `(($rel).elt))
       | none => pure #[]
     let chainElems ← match chainF with
       | some g => do
-          let gT ← featureStubTerm g
-          let rel ← mkFeatureChainingTerm aT gT an g.getId.toString
+          let gT ← featureStubTermQ g
+          let rel ← mkFeatureChainingTerm aT gT an (qualNameStr g)
           pure #[← `(($rel).elt)]
       | none => pure #[]
     let invElems ← match invF with
       | some g => do
-          let gT ← featureStubTerm g
-          let rel ← mkFeatureInvertingTerm aT gT an g.getId.toString
+          let gT ← featureStubTermQ g
+          let rel ← mkFeatureInvertingTerm aT gT an (qualNameStr g)
           pure #[← `(($rel).elt)]
       | none => pure #[]
     let featElems ← match feats with
       | some ts => ts.getElems.mapM (fun g => do
-          let gT ← kTypeStubTerm g
-          let rel ← mkTypeFeaturingTerm aT gT an g.getId.toString
+          let gT ← kTypeStubTermQ g
+          let rel ← mkTypeFeaturingTerm aT gT an (qualNameStr g)
           `(($rel).elt))
       | none => pure #[]
     let bodyElems ← elabKermlBody body
     pure (#[← `(($aT).elt)] ++ tyElems ++ subElems ++ refElems ++ crossElems ++ redefElems ++
       chainElems ++ invElems ++ featElems ++ bodyElems)
-  | `(kermlDecl| subtype $a:ident specializes $b:ident ;) => do
-    let aT ← kTypeStubTerm a; let bT ← kTypeStubTerm b
-    let rel ← mkSpecializationTerm aT bT a.getId.toString b.getId.toString
+  | `(kermlDecl| subtype $a:kermlQualName specializes $b:kermlQualName ;) => do
+    let aT ← kTypeStubTermQ a; let bT ← kTypeStubTermQ b
+    let rel ← mkSpecializationTerm aT bT (qualNameStr a) (qualNameStr b)
     pure #[← `(($rel).elt)]
-  | `(kermlDecl| conjugate $a:ident conjugates $b:ident ;) => do
-    let aT ← kTypeStubTerm a; let bT ← kTypeStubTerm b
-    let rel ← mkConjugationTerm aT bT a.getId.toString b.getId.toString
+  | `(kermlDecl| conjugate $a:kermlQualName conjugates $b:kermlQualName ;) => do
+    let aT ← kTypeStubTermQ a; let bT ← kTypeStubTermQ b
+    let rel ← mkConjugationTerm aT bT (qualNameStr a) (qualNameStr b)
     pure #[← `(($rel).elt)]
-  | `(kermlDecl| disjoint $a:ident from $b:ident ;) => do
-    let aT ← kTypeStubTerm a; let bT ← kTypeStubTerm b
-    let rel ← mkDisjoiningTerm aT bT a.getId.toString b.getId.toString
+  | `(kermlDecl| disjoint $a:kermlQualName from $b:kermlQualName ;) => do
+    let aT ← kTypeStubTermQ a; let bT ← kTypeStubTermQ b
+    let rel ← mkDisjoiningTerm aT bT (qualNameStr a) (qualNameStr b)
     pure #[← `(($rel).elt)]
-  | `(kermlDecl| subclassifier $a:ident specializes $b:ident ;) => do
-    let aT ← classifierStubTerm a; let bT ← classifierStubTerm b
-    let rel ← mkSubclassificationTerm aT bT a.getId.toString b.getId.toString
+  | `(kermlDecl| subclassifier $a:kermlQualName specializes $b:kermlQualName ;) => do
+    let aT ← classifierStubTermQ a; let bT ← classifierStubTermQ b
+    let rel ← mkSubclassificationTerm aT bT (qualNameStr a) (qualNameStr b)
     pure #[← `(($rel).elt)]
-  | `(kermlDecl| typing $a:ident typed by $b:ident ;) => do
-    let aT ← featureStubTerm a; let bT ← kTypeStubTerm b
-    let rel ← mkFeatureTypingTerm aT bT a.getId.toString b.getId.toString
+  | `(kermlDecl| typing $a:kermlQualName typed by $b:kermlQualName ;) => do
+    let aT ← featureStubTermQ a; let bT ← kTypeStubTermQ b
+    let rel ← mkFeatureTypingTerm aT bT (qualNameStr a) (qualNameStr b)
     pure #[← `(($rel).elt)]
-  | `(kermlDecl| subset $a:ident subsets $b:ident ;) => do
-    let aT ← featureStubTerm a; let bT ← featureStubTerm b
-    let rel ← mkSubsettingTerm aT bT a.getId.toString b.getId.toString
+  | `(kermlDecl| subset $a:kermlQualName subsets $b:kermlQualName ;) => do
+    let aT ← featureStubTermQ a; let bT ← featureStubTermQ b
+    let rel ← mkSubsettingTerm aT bT (qualNameStr a) (qualNameStr b)
     pure #[← `(($rel).elt)]
-  | `(kermlDecl| redefinition $a:ident redefines $b:ident ;) => do
-    let aT ← featureStubTerm a; let bT ← featureStubTerm b
-    let rel ← mkRedefinitionTerm aT bT a.getId.toString b.getId.toString
+  | `(kermlDecl| redefinition $a:kermlQualName redefines $b:kermlQualName ;) => do
+    let aT ← featureStubTermQ a; let bT ← featureStubTermQ b
+    let rel ← mkRedefinitionTerm aT bT (qualNameStr a) (qualNameStr b)
     pure #[← `(($rel).elt)]
-  | `(kermlDecl| inverse $a:ident of $b:ident ;) => do
-    let aT ← featureStubTerm a; let bT ← featureStubTerm b
-    let rel ← mkFeatureInvertingTerm aT bT a.getId.toString b.getId.toString
+  | `(kermlDecl| inverse $a:kermlQualName of $b:kermlQualName ;) => do
+    let aT ← featureStubTermQ a; let bT ← featureStubTermQ b
+    let rel ← mkFeatureInvertingTerm aT bT (qualNameStr a) (qualNameStr b)
     pure #[← `(($rel).elt)]
-  | `(kermlDecl| featuring $a:ident by $b:ident ;) => do
-    let aT ← featureStubTerm a; let bT ← kTypeStubTerm b
-    let rel ← mkTypeFeaturingTerm aT bT a.getId.toString b.getId.toString
+  | `(kermlDecl| featuring $a:kermlQualName by $b:kermlQualName ;) => do
+    let aT ← featureStubTermQ a; let bT ← kTypeStubTermQ b
+    let rel ← mkTypeFeaturingTerm aT bT (qualNameStr a) (qualNameStr b)
     pure #[← `(($rel).elt)]
   | _ => Macro.throwUnsupported
 
@@ -739,14 +770,15 @@ elab "kerml% " d:kermlDecl : term => do
 #check kerml% inverse spoke of hub ;
 #check kerml% featuring mass by Car ;
 
--- Base.kerml's own real declarations, now including real nested `{ ... }` bodies
--- (`doc` blocks, `::`-qualified names, and unsupported flags like `nonunique` stay
--- out of scope; see the concrete-syntax scope note above and `kermlBody`'s own). The
--- first is Base.kerml's actual nesting shape: `Anything`'s own body really does own
--- a nested `feature self ...`.
+-- Base.kerml's own real declarations, now including real nested `{ ... }` bodies and
+-- `::`-qualified name references (`doc` blocks and unsupported flags like
+-- `nonunique` still stay out of scope; see the concrete-syntax scope note above and
+-- `kermlBody`'s/`kermlQualName`'s own). The first is Base.kerml's actual nesting
+-- shape: `Anything`'s own body really does own a nested `feature self ...`.
 #check kerml% abstract classifier Anything { feature self : Anything [1] subsets things ; }
 #check kerml% abstract feature things : Anything [1..*] { feature that : Anything [1] ; }
 #check kerml% abstract feature dataValues : DataValue [0..*] subsets things ;
 #check kerml% abstract feature naturals : Natural [0..*] subsets dataValues ;
+#check kerml% feature self redefines Anything::self ;
 
 end KerML.Core
