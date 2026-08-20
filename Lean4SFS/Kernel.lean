@@ -7,6 +7,18 @@ not implemented -- see the note at the end of this header). Builds on `Core.lean
 which imports Root (Figure 1, "KerML Syntax Layers") -- this completes the three-layer
 KerML metamodel.
 
+**Authoritative source note**: the generalization hierarchy here follows this repo's
+own `sysml.library/Kernel Libraries/Kernel Semantic Library/KerML.kerml` (a
+reflective KerML model of the abstract syntax, maintained in this fork) rather than
+the generic OMG spec PDF wherever the two disagree -- `KerML.kerml` takes precedence
+for an "SFS-sysml.library"-specific formalization like this one. Two places they
+disagree, both marked `//SFS:` in `KerML.kerml` itself: `Expression` specializes
+`Feature` directly (not `Step`), and `Function` (`KFunction`) specializes `Classifier`
+directly (not `Behavior`) -- see those two structures' own doc comments below for the
+detail. `Root.lean`/`Core.lean` were checked against `KerML.kerml` too and already
+matched it exactly; only this file needed correcting (verified 2026-08-20, after
+initially being written from the PDF's §8.3.4 alone).
+
 Same scope discipline as `Root.lean`/`Core.lean` -- see `Root.lean`'s header for the
 full rationale: `extends` mirrors the generalization hierarchy; only non-derived
 (stored) attributes become fields; containment/graph-structural attributes are
@@ -113,7 +125,7 @@ to instances of the `Connector`'s featuring `Type`(s), further restricted to lin
 between values of `Feature`s on instances of its domain. Constraint (not encoded):
 binary form must specialize `Links::binaryLinks`; a concrete `Connector` must have
 ≥2 related features. -/
-structure Connector extends Relationship, Feature where
+structure Connector extends Feature, Relationship where
   deriving Repr
 
 /-- KerML §8.3.4.5 `BindingConnector`. A binary `Connector` requiring its two related
@@ -154,11 +166,21 @@ structure ParameterMembership extends FeatureMembership where
 
 /-! ## 8.3.4.7 Functions -/
 
-/-- KerML §8.3.4.7 `Expression`. A `Step` typed by a `KFunction`; always has a single
-result parameter (redefining its function's result), enabling tree-structured
-interconnection of `Expression`s. Constraint (not encoded): must specialize
-`Performances::evaluations`; must have exactly one result parameter. -/
-structure Expression extends Step where
+/-- KerML §8.3.4.7 `Expression`. **Deviates from the OMG spec here**: the spec has
+`Expression specializes Step`, but this repo's own `KerML.kerml` (the maintained
+reflective abstract-syntax model, authoritative over the generic OMG PDF for this
+fork) has `Expression specializes Feature` directly instead, marked
+`//SFS: Expression specializes Feature, added 'parameter'` -- part of a pair of
+changes (with `KFunction` below) making `Expression`/`Function` evaluation
+"immediate" rather than routed through `Step`/`Behavior`'s general
+Step-of-a-Behavior machinery. `KerML.kerml`'s own top-of-file comment warns this
+isn't reflected in the *abstract syntax* metaclass tree there either, so unexpected
+errors are possible from metaclass reflection -- noted for parity, not applicable
+here since this file doesn't model reflection. Always has a single result parameter
+(redefining its function's result), enabling tree-structured interconnection of
+`Expression`s. Constraint (not encoded): must specialize `Performances::evaluations`;
+must have exactly one result parameter. -/
+structure Expression extends Feature where
   deriving Repr
 
 /-- KerML §8.3.4.7 `BooleanExpression`. A Boolean-valued `Expression` whose type is a
@@ -168,12 +190,16 @@ structure Expression extends Step where
 structure BooleanExpression extends Expression where
   deriving Repr
 
-/-- KerML §8.3.4.7 `Function` (renamed `KFunction`, see file header). A `Behavior`
-with an `out` parameter identified as its result; represents performance of a
-calculation producing the result's value(s), possibly decomposed into `Expression`s
-as steps. Constraint (not encoded): must specialize `Performances::Evaluation`; must
-have exactly one `ReturnParameterMembership`. -/
-structure KFunction extends Behavior where
+/-- KerML §8.3.4.7 `Function` (renamed `KFunction`, see file header). **Deviates from
+the OMG spec here**: the spec has `Function specializes Behavior`, but this repo's own
+`KerML.kerml` has `Function specializes Classifier` directly instead (with `Behavior`
+commented out in the source), marked `//SFS: Function specializes Classifier to be
+immediate` -- see `Expression`'s own doc comment above for the paired rationale
+(immediate-evaluation semantics, not routed through `Behavior`/`Step`). Represents
+performance of a calculation with an `out` parameter identified as its result,
+possibly decomposed into `Expression`s. Constraint (not encoded): must specialize
+`Performances::Evaluation`; must have exactly one `ReturnParameterMembership`. -/
+structure KFunction extends Classifier where
   deriving Repr
 
 /-- KerML §8.3.4.7 `Invariant`. A `BooleanExpression` asserted to have a specific
@@ -292,8 +318,10 @@ structure LiteralInteger extends LiteralExpression where
   value : Int
   deriving Repr
 
-/-- KerML §8.3.4.8 `LiteralRational`. A `LiteralExpression` whose Real-valued
-`value` (`Float`, see file header) is the result. -/
+/-- KerML §8.3.4.8 `LiteralRational`. A `LiteralExpression` whose `value` is the
+result -- `KerML.kerml` types this `Rational` (not `Real`, despite the OMG spec text
+elsewhere calling it real-valued); `Float` stands in here regardless (see file
+header), the same placeholder either way. -/
 structure LiteralRational extends LiteralExpression where
   value : Float
   deriving Repr
@@ -341,7 +369,7 @@ structure FlowEnd extends Feature where
 
 /-- KerML §8.3.4.9 `Interaction`. A `Behavior` that is also an `Association`,
 providing a context for multiple objects whose behaviors impact one another. -/
-structure Interaction extends Behavior, Association where
+structure Interaction extends Association, Behavior where
   deriving Repr
 
 /-- KerML §8.3.4.9 `PayloadFeature`. The owned feature of a `Flow` that identifies
@@ -393,7 +421,7 @@ structure Metaclass extends KStructure where
 `Metaclass`. Constraint (not encoded): must have exactly one type, which must be a
 non-abstract `Metaclass`; every (transitively) owned feature must have no declared
 name and must redefine exactly one feature of that metaclass. -/
-structure MetadataFeature extends Feature, AnnotatingElement where
+structure MetadataFeature extends AnnotatingElement, Feature where
   deriving Repr
 
 /-! ## 8.3.4.13 Packages -/
@@ -456,9 +484,8 @@ def KClass.toClassifierC (t : KClass) : Classifier := t.toClassifier
 def KStructure.toClassifierC (t : KStructure) : Classifier := t.toKClass.toClassifier
 def Association.toClassifierC (t : Association) : Classifier := t.toClassifier
 def Behavior.toClassifierC (t : Behavior) : Classifier := t.toKClass.toClassifier
-def KFunction.toClassifierC (t : KFunction) : Classifier := t.toBehavior.toKClass.toClassifier
-def Predicate.toClassifierC (t : Predicate) : Classifier :=
-  t.toKFunction.toBehavior.toKClass.toClassifier
+def KFunction.toClassifierC (t : KFunction) : Classifier := t.toClassifier
+def Predicate.toClassifierC (t : Predicate) : Classifier := t.toKFunction.toClassifier
 def Interaction.toClassifierC (t : Interaction) : Classifier := t.toAssociation.toClassifier
 
 /-- `.toElement` for each of the nine, composed through `.toClassifierC` above. -/
@@ -659,7 +686,7 @@ def mkFeatureChainStub (name : String) : FeatureChainExpression := { elementId :
 def mkOperatorStub (name op : String) : OperatorExpression := { elementId := name, operator := op }
 def mkIndexStub (name : String) : IndexExpression := { elementId := name, operator := "#" }
 
-def Expression.elt (e : Expression) : Element := e.toStep.toFeature.toKType.toNamespace.toElement
+def Expression.elt (e : Expression) : Element := e.toFeature.toKType.toNamespace.toElement
 def LiteralExpression.elt (e : LiteralExpression) : Element := e.toExpression.elt
 def LiteralBoolean.elt (e : LiteralBoolean) : Element := e.toLiteralExpression.elt
 def LiteralInteger.elt (e : LiteralInteger) : Element := e.toLiteralExpression.elt
