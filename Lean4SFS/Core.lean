@@ -804,20 +804,32 @@ elab "kerml% " d:kermlDecl : term => do
 #check kerml% inverse spoke of hub ;
 #check kerml% featuring mass by Car ;
 
--- Base.kerml's own real declarations, now including real nested `{ ... }` bodies,
--- `::`-qualified name references, and `doc` annotations (as quoted strings, not
--- literal `/* ... */` text -- see `doc`'s own production note; unsupported flags
--- like `nonunique` still stay out of scope). The first is Base.kerml's actual
--- nesting shape: `Anything`'s own body really does own both a nested `doc` and a
--- nested `feature self ...`.
+-- Base.kerml's own real declarations (`Classifiers`/`Features` half -- see
+-- Kernel.lean's own matching block for `DataValue`/the four `multiplicity`
+-- ranges), now as close to the real file's literal text as this grammar gets:
+-- real nesting, real clause order (`: T [mult] subsets ... chains ...`), real
+-- `doc` placement, `things.that` as a real (Lean-tokenizer-compound) chain
+-- target. Two things still don't match verbatim, both explicitly out of scope
+-- (not requested, not reopened here): `doc /* ... */`'s literal block-comment
+-- text (`"..."` stands in, see `doc`'s own production note) and the `nonunique`
+-- flag (omitted from every feature below that has it in the real file).
 #check kerml% abstract classifier Anything {
   doc "Anything is the top level generalized type in the language."
-  feature self : Anything [1] subsets things ;
+  feature self : Anything [1] subsets things chains things.that {
+    doc "The source of a SelfLink of this thing to itself. self is thus a feature that relates everything to itself."
+  }
 }
-#check kerml% abstract feature things : Anything [1..*] { feature that : Anything [1] ; }
-#check kerml% abstract feature dataValues : DataValue [0..*] subsets things ;
-#check kerml% abstract feature naturals : Natural [0..*] subsets dataValues ;
-#check kerml% doc "A standalone documentation annotation."
-#check kerml% feature self redefines Anything::self ;
+#check kerml% abstract feature things : Anything [1..*] {
+  doc "things is the top-level feature in the language."
+  feature that : Anything [1] {
+    doc "For each value of things, the featuring instance of that value."
+  }
+}
+#check kerml% abstract feature dataValues : DataValue [0..*] subsets things {
+  doc "dataValues is a specialization of things restricted to type DataValue."
+}
+#check kerml% abstract feature naturals : ScalarValues::Natural [0..*] subsets dataValues {
+  doc "naturals is a specialization of dataValues restricted to type Natural."
+}
 
 end KerML.Core

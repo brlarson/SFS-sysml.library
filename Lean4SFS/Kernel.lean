@@ -858,15 +858,26 @@ elab "kexpr% " e:kermlExpr : term => do
 #check kernel% interaction Handshake specializes Interaction ;
 #check kernel% package VehicleModel ;
 
--- Base.kerml's own real declarations, now including its literal `Anything::self`
--- qualified-name reference (see Core.lean's own matching block for the
--- `classifier`/`feature` half of this same file's content, and its scope caveats --
--- `doc` blocks are still not parsed).
-#check kernel% abstract datatype DataValue specializes Anything { feature self redefines Anything::self ; }
-#check kernel% multiplicity exactlyOne [1..1] ;
-#check kernel% multiplicity zeroOrOne [0..1] ;
-#check kernel% multiplicity oneToMany [1..*] ;
-#check kernel% multiplicity zeroToMany [0..*] ;
+-- Base.kerml's own real declarations, as close to the real file's literal text as
+-- this grammar gets (see Core.lean's own matching block for the same caveats --
+-- `doc /* ... */`'s literal block-comment text and the `nonunique` flag are the
+-- only remaining departures from the real file, both explicitly out of scope).
+#check kernel% abstract datatype DataValue specializes Anything {
+  doc "Value is the most general classifier of entities that are values that do not change over time."
+  feature self : DataValue redefines Anything::self ;
+}
+#check kernel% multiplicity exactlyOne [1..1] {
+  doc "exactlyOne is a multiplicity range requiring a cardinality of exactly one."
+}
+#check kernel% multiplicity zeroOrOne [0..1] {
+  doc "zeroOrOne is a multiplicity range requiring a cardinality of zero or one."
+}
+#check kernel% multiplicity oneToMany [1..*] {
+  doc "oneToMany is a multiplicity range allowing any cardinality of one or more."
+}
+#check kernel% multiplicity zeroToMany [0..*] {
+  doc "zeroToMany is a multiplicity range allowing any cardinality of zero or more (that is, no restriction)."
+}
 
 #check kexpr% 1 + 2 * 3
 #check kexpr% true and not false
