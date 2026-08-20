@@ -430,6 +430,22 @@ def classifierStubTermQ (q : TSyntax `kermlQualName) : MacroM (TSyntax `term) :=
 def featureStubTermQ (q : TSyntax `kermlQualName) : MacroM (TSyntax `term) :=
   `(mkFeatureStub $(quote (qualNameStr q)))
 
+/-- `doc "..."` stub -- see that production's own doc comment for the `/* ... */`
+simplification. `elementId` is a fixed placeholder (uniqueness not enforced anywhere
+else in this grammar either). -/
+def mkDocumentationStub (body : String) : Documentation := { elementId := "doc", body := body }
+/-- Fully-qualified name required here (unlike `KType.elt`/`Classifier.elt`/etc.
+above, which live in *this* file's own `KerML.Core` namespace): `Documentation` is
+declared in `Root.lean`'s `KerML.Root` namespace, and dot notation (`d.elt`) resolves
+against a type's own declaring namespace, not wherever an extension `def` happens to
+be written -- `def Documentation.elt` here would silently become
+`KerML.Core.Documentation.elt`, invisible to `d.elt` for a real
+`KerML.Root.Documentation`. `_root_.` is required too: merely writing
+`KerML.Root.Documentation.elt` while *inside* `namespace KerML.Core` still nests
+under the current namespace (`KerML.Core.KerML.Root.Documentation.elt`) rather than
+replacing it -- `_root_.` anchors the name at the true top level. -/
+def _root_.KerML.Root.Documentation.elt (d : Documentation) : Element := d.toComment.toAnnotatingElement.toElement
+
 declare_syntax_cat kermlDecl
 
 /-- KerML `TypeBody`/`FeatureBody`-style bodies: `;` (no owned members) or `{
@@ -523,6 +539,23 @@ syntax "inverse " kermlQualName " of " kermlQualName " ;" : kermlDecl
 /-- KerML §8.2.4.3.7 `TypeFeaturing`, standalone form: `featuring A by B ;` (distinct
 keyword from `Feature`'s inline `featured by` part above, per the spec). -/
 syntax "featuring " kermlQualName " by " kermlQualName " ;" : kermlDecl
+
+/-- KerML `Documentation` (`Root.lean`): real KerML writes `doc /* ... */`, a
+C-style block comment whose contents *are* the documentation text -- lexing that
+needs a custom low-level parser this project doesn't attempt (every other production
+here is built from existing token categories -- `ident`/`num`/`str`/literal keyword
+atoms -- never a raw custom one). `doc "..."` (a plain quoted string, Lean's own
+`str` token) stands in for it: same simplified-surface/faithful-structure trade this
+grammar already makes throughout (`;` for `{ ... }`, bare `ident` for
+`QualifiedName`, before those were separately closed) -- `Base.kerml`'s literal
+`doc /* This package defines... */` becomes `doc "This package defines..."` in the
+smoke tests below, not its exact text. Valid as a nested `kermlDecl` (so it appears
+inside a `kermlBody` alongside sibling declarations, matching `Base.kerml`'s own
+`classifier Anything { doc ... feature self ... }` shape) or standalone. Produces a
+`Documentation` element -- per this grammar's established "no containment graph"
+principle, its *ownership* (which element it documents) isn't modeled, only its
+existence as a sibling `Element`, same as every other nested declaration. -/
+syntax "doc " str : kermlDecl
 
 mutual
 
@@ -729,6 +762,7 @@ partial def elabKermlDecl : TSyntax `kermlDecl → MacroM (Array (TSyntax `term)
     let aT ← featureStubTermQ a; let bT ← kTypeStubTermQ b
     let rel ← mkTypeFeaturingTerm aT bT (qualNameStr a) (qualNameStr b)
     pure #[← `(($rel).elt)]
+  | `(kermlDecl| doc $s:str) => do pure #[← `((mkDocumentationStub $s).elt)]
   | _ => Macro.throwUnsupported
 
 /-- `kermlBody` → the flat `Array` of `Element` terms its nested `kermlDecl*` content
@@ -770,15 +804,20 @@ elab "kerml% " d:kermlDecl : term => do
 #check kerml% inverse spoke of hub ;
 #check kerml% featuring mass by Car ;
 
--- Base.kerml's own real declarations, now including real nested `{ ... }` bodies and
--- `::`-qualified name references (`doc` blocks and unsupported flags like
--- `nonunique` still stay out of scope; see the concrete-syntax scope note above and
--- `kermlBody`'s/`kermlQualName`'s own). The first is Base.kerml's actual nesting
--- shape: `Anything`'s own body really does own a nested `feature self ...`.
-#check kerml% abstract classifier Anything { feature self : Anything [1] subsets things ; }
+-- Base.kerml's own real declarations, now including real nested `{ ... }` bodies,
+-- `::`-qualified name references, and `doc` annotations (as quoted strings, not
+-- literal `/* ... */` text -- see `doc`'s own production note; unsupported flags
+-- like `nonunique` still stay out of scope). The first is Base.kerml's actual
+-- nesting shape: `Anything`'s own body really does own both a nested `doc` and a
+-- nested `feature self ...`.
+#check kerml% abstract classifier Anything {
+  doc "Anything is the top level generalized type in the language."
+  feature self : Anything [1] subsets things ;
+}
 #check kerml% abstract feature things : Anything [1..*] { feature that : Anything [1] ; }
 #check kerml% abstract feature dataValues : DataValue [0..*] subsets things ;
 #check kerml% abstract feature naturals : Natural [0..*] subsets dataValues ;
+#check kerml% doc "A standalone documentation annotation."
 #check kerml% feature self redefines Anything::self ;
 
 end KerML.Core
