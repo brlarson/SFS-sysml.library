@@ -67,6 +67,7 @@ deliberately left out.
 
 import Root
 import Core
+import Assert
 import Lean
 
 namespace KerML.Kernel
@@ -523,6 +524,8 @@ def interactionStubTerm (s : String) : MacroM (TSyntax `term) := `(mkInteraction
 def packageStubTerm (s : String) : MacroM (TSyntax `term) := `(mkPackageStub $(quote s))
 def mkMultiplicityRangeStub (name : String) : MultiplicityRange := { elementId := name, declaredName := some name }
 def multiplicityRangeStubTerm (s : String) : MacroM (TSyntax `term) := `(mkMultiplicityRangeStub $(quote s))
+def MetadataFeature.elt (t : MetadataFeature) : Element := t.toFeature.toKType.toNamespace.toElement
+def mkMetadataFeatureStub (name : String) : MetadataFeature := { elementId := name, declaredName := some name }
 
 /-- Shared elaboration body for all nine "classifier-like" declaration keywords: one
 stub for the primary declared name (via `mkStub`), plus one relationship `Element`
@@ -614,6 +617,28 @@ syntax "package " ident " ;" : kernelDecl
 (`kermlMult`, `Core.lean`) but not stored, same reason as `feature`'s own inline
 bracket there -- `MultiplicityRange` has zero stored fields. -/
 syntax "multiplicity " ident kermlMult kermlBody : kernelDecl
+
+/-- One `name="value";` redefinition inside an `@Assert{...}`/`@Invariant{...}`
+`MetadataBody` (KerML §8.2.5.12's `MetadataBodyFeature`, simplified to just a
+name/string-value pair -- real KerML allows a full nested feature redefinition here,
+this only covers the attribute-assignment shape every real `@Assert{...}` in this
+repo actually uses). -/
+declare_syntax_cat kermlMetaAttr
+syntax ident " = " str " ;" : kermlMetaAttr
+
+/-- KerML §8.2.5.12 `MetadataFeature`, scoped to the one real shape this repo uses
+throughout (per `CLAUDE.md`): `@Assert{n="..."; f="<<...>>"; t="...";}`. Produces a
+`MetadataFeature` element (structural, like every other `kermlDecl`) *and* --
+genuinely wiring this up, not just parsing it -- re-parses the `f="..."` string's
+*contents* against `Assert.lean`'s own `dslAssert` grammar and runs its real
+`elabDslAssert` elaborator on the result, splicing the produced term into a `let`
+binding that forces Lean to actually type-check the embedded Domain Logic formula as
+part of elaborating this `kermlDecl`. A malformed or type-incorrect `f="..."` string
+is now a genuine compile error here, the same way it already is when written directly
+as `domain% <<...>>` in `Assert.lean` itself. Other metaclasses (`@Invariant`, ...)
+and multi-valued `f=`/`t=` (KerML allows `f[1..*]`/`t[0..*]`) aren't covered --
+matching every real formula in this repo, which uses exactly one `f=` value. -/
+syntax "@" "Assert" "{" kermlMetaAttr* "}" : kernelDecl
 
 /-! ### `kermlExpr` -- the expression language (KerML §8.2.5.8)
 
@@ -840,6 +865,10 @@ reference a function defined later in the file, so this whole function had to mo
 down here once that dependency existed, even though the *syntax* declarations it
 pattern-matches against are still declared earlier (grammar categories don't have
 this ordering constraint, only the elaborator `def` does). -/
+def kermlMetaAttrPair : TSyntax `kermlMetaAttr → (String × String)
+  | `(kermlMetaAttr| $k:ident = $v:str ;) => (k.getId.toString, v.getString)
+  | _ => ("", "")
+
 def elabKernelDecl : TSyntax `kernelDecl → MacroM (Array (TSyntax `term))
   | `(kernelDecl| $[$_abs:kermlAbstractFlag]? datatype $a:ident $[specializes $specs,*]? $[conjugates $conj:kermlQualName]?
         $[disjoint from $disj,*]? $[unions $uni,*]? $[intersects $inter,*]? $[differences $diff,*]? $body:kermlBody) => do
@@ -879,9 +908,42 @@ def elabKernelDecl : TSyntax `kernelDecl → MacroM (Array (TSyntax `term))
   | `(kernelDecl| multiplicity $a:ident $_mult:kermlMult $body:kermlBody) => do
     let mT ← multiplicityRangeStubTerm a.getId.toString
     pure (#[← `(($mT).elt)] ++ (← elabKermlBody body))
+  | `(kernelDecl| @ Assert { $attrs:kermlMetaAttr* }) => do
+    let pairs := attrs.map kermlMetaAttrPair
+    let nameVal := (pairs.find? (·.1 == "n")).map (·.2)
+    let elemId := nameVal.getD "assert"
+    pure #[← `((mkMetadataFeatureStub $(quote elemId)).elt)]
   | _ => Macro.throwUnsupported
 
+/-- `@Assert{...}`'s `f="..."` string genuinely re-parsed against `Assert.lean`'s own
+`dslAssert` grammar and elaborated via its real `elabDslAssert`, forcing Lean to
+type-check the embedded Domain Logic formula -- done here, in the *top-level*
+`elab ... : term` trigger (`TermElabM`), not inside `elabKernelDecl` (`MacroM`):
+`MacroM` has no `MonadEnv` instance (confirmed by `lake build`, not assumed), so
+`Lean.Parser.runParserCategory` -- which needs a real `Environment` to know what
+`dslAssert` even means -- simply isn't callable from there. The elaborated term's
+*value* is discarded (`let _ := ...`); only the type-checking side effect matters,
+same as writing `domain% <<...>>` directly in `Assert.lean` would. -/
 elab "kernel% " d:kernelDecl : term => do
+  match d with
+  | `(kernelDecl| @ Assert { $attrs:kermlMetaAttr* }) => do
+    let fVal := (attrs.map kermlMetaAttrPair).find? (·.1 == "f") |>.map (·.2)
+    if let some fStr := fVal then
+      let env ← getEnv
+      match Lean.Parser.runParserCategory env `dslAssert fStr with
+      | .error e => throwError s!"malformed @Assert f=\"...\" formula: {e}"
+      | .ok stx =>
+        let dslStx : TSyntax `dslAssert := ⟨stx⟩
+        let assertStx ← Elab.liftMacroM (SFS.Assert.elabDslAssert dslStx)
+        -- `elabDslAssert`'s output assumes `Assert.lean`'s own ambient `open SFS`
+        -- (bare `death`/`birth`/...); `open SFS in ...` scopes that opening to just
+        -- this one elaboration, not this whole file, avoiding the `Membership`
+        -- collision risk a blanket `open SFS` alongside this file's own
+        -- `open KerML.Root` would carry (the same hazard `SFS.lean` itself opens
+        -- `KerML.Root` selectively to avoid, from the opposite direction).
+        let wrappedStx ← `(open SFS in $assertStx)
+        let _ ← Elab.Term.elabTerm wrappedStx none
+  | _ => pure ()
   let elems ← Elab.liftMacroM (elabKernelDecl d)
   let stx ← Elab.liftMacroM (mkListTerm elems.toList)
   Elab.Term.elabTerm stx none
@@ -920,14 +982,21 @@ elab "kernel% " d:kernelDecl : term => do
 
 -- Allen.kerml's own real `precedes` predicate: `in`/`out` parameter declarations
 -- (no `feature` keyword) and a trailing bare-expression body giving the predicate
--- its own value -- both new (`kermlPredBody`) for this file. `@Assert{...}`
--- metadata (the formula this predicate's own body restates) and the surrounding
--- `library package`/`import` wrapper are out of scope for this pass.
+-- its own value -- both new (`kermlPredBody`) for this file. The surrounding
+-- `library package`/`import` wrapper is out of scope for this pass.
 #check kernel% predicate precedes {
   in x : Occurrence ;
   in y : Occurrence ;
   x.endShot < y.startShot
 }
+
+-- Allen.kerml's own real `@Assert{...}` on `precedes` -- the formula string is
+-- genuinely re-parsed and elaborated via Assert.lean's own dslAssert grammar/
+-- elabDslAssert (see the kernel% trigger's own doc comment), so this only
+-- type-checks because SFS.lean's real `death`/`birth : Occurrence → Time` exist and
+-- Time's DSLLt instance applies -- an actually malformed or type-incorrect formula
+-- string here would be a genuine compile error, not silently accepted.
+#check kernel% @Assert{n="precedes"; f="<<precedes : x~Occurrence, y~Occurrence : death(x) < birth(y) >>";}
 
 #check kexpr% 1 + 2 * 3
 #check kexpr% true and not false
