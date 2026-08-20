@@ -293,8 +293,8 @@ def elabDslType : TSyntax `dslType → MacroM (TSyntax `term)
     | "Point" => `(Point)
     | "Surface" => `(Surface)
     | "Class" => `(Part)
-    | "Anything" => `(KElement)
-    | "BooleanEvaluation" => `(KElement)
+    | "Anything" => `(KerML.Root.Element)
+    | "BooleanEvaluation" => `(KerML.Root.Element)
     | _ => `($t)
   | _ => Macro.throwUnsupported
 

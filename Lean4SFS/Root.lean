@@ -5,14 +5,18 @@ Lean 4 formalization of the KerML (Kernel Modeling Language, OMG SysML v2 Releas
 
 This is a *different* formalization concern from `SFS.lean`: `SFS.lean` translates
 `~/git3/set.mm/SFS.mm`'s Metamath-level Supplemental Formal Semantics content (BLESS
-Logic, Mereology, `df-model`, `df-rep`/`ElementRep`, `df-kind`/`ElementKind`, ...),
-where `KElement` is a deliberately opaque stand-in ("SFS.mm has no Element/design
-primitive to reuse"). *This* file instead formalizes the real KerML metamodel itself
--- the actual `Element`/`Relationship`/`Namespace`/... metaclasses the OMG spec
-defines -- as its own independent structure, not identified with `SFS.lean`'s
-`KElement`/`ElementRep`/`ElementKind` (those remain unchanged).
+Logic, Mereology, `df-model`, `df-rep`/`ElementRep`, `df-kind`/`ElementKind`, ...).
+*This* file instead formalizes the real KerML metamodel itself -- the actual
+`Element`/`Relationship`/`Namespace`/... metaclasses the OMG spec defines -- as its own
+independent structure. Originally `SFS.lean` had its own separate, deliberately opaque
+`KElement` stand-in ("SFS.mm has no Element/design primitive to reuse"), not identified
+with this file's `Element`; as of 2026-08-20 (a full-replacement redesign, once this
+file existed to replace it with), `KElement` is gone and `SFS.lean` now uses `Element`
+here directly (`open KerML.Root (Element)`) wherever it used to use `KElement` --
+`ElementRep`/`ElementKind`/`Model`/`Design`/`VT` in `SFS.lean` all reference this file's
+real `Element` now, not an opaque placeholder.
 
-## Scope (structural only, matching this project's established `KElement`/`Design`
+## Scope (structural only, matching this project's established `Design`-for-`df-type`
 precedent in `SFS.lean` for "whole containment graph" complexity)
 
 Each metaclass below is a Lean `structure`, using `extends` to mirror KerML's
@@ -27,8 +31,8 @@ fields. Most of what's dropped this way is exactly the containment-graph structu
 graph would need `Element` and `Relationship` to reference each other, and doing that
 justice (well-formedness of the ownership tree, name resolution, `qualifiedName`
 computation, ...) is a substantially bigger project, deliberately out of scope here,
-the same judgment call this project already made for `SFS.lean`'s opaque `KElement`
-and `Design`. What *is* kept: every metaclass's own non-derived, non-graph-structural
+the same judgment call this project already made for `SFS.lean`'s `Design`. What *is*
+kept: every metaclass's own non-derived, non-graph-structural
 attributes (`elementId`, `declaredName`, `client`/`supplier`, `memberName`,
 `visibility`, ...) and the generalization hierarchy itself.
 
@@ -37,8 +41,8 @@ metaclass's doc comment, not encoded as Lean propositions or proved -- consisten
 the same "structural, not deeply verified" scope already used for `ElementRep`/
 `ElementKind`/`Model` in `SFS.lean`.
 
-No file in this project currently depends on `Root.lean`; it's a freestanding
-formalization, imported by `Core.lean` (KerML §8.2.4/§8.3.3).
+Imported by `Core.lean` (KerML §8.2.4/§8.3.3) and, as of the `KElement` replacement
+above, by `SFS.lean` and (transitively, via `SFS.lean`) `DSL.lean` too.
 -/
 
 namespace KerML.Root

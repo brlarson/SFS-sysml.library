@@ -82,6 +82,8 @@ hypothesis-carrying design sidesteps this because it never evaluates outside `TI
 at all.)
 -/
 import Mathlib
+import Root
+import Core
 
 namespace SFS
 
@@ -983,55 +985,72 @@ axiom wonce : String
 appending the tag-boundary and a wonce. -/
 noncomputable def mkUid (ci : CI) : UI := ci ++ tb ++ wonce
 
-/-- Opaque carrier for "the universe of KerML elements a design can contain". SFS.mm has no
-`Element`/design primitive to reuse here: its Mereology/Region/Allen's-Intervals sections
-above axiomatize specific, narrower kinds of thing (`Part`, `Region`, `Occurrence`, ...), not
-a general KerML element -- so this is a fresh opaque type, deliberately not identified with
-`Item` (Allen's-Intervals' carrier) or any of the others, since the book doesn't make that
-identification either. -/
-axiom KElement : Type
+/- The former `KElement` -- an opaque stand-in for "the universe of KerML elements a
+design can contain" -- has been **replaced** (2026-08-20, full-replacement redesign) by
+the real `KerML.Root.Element` metaclass from `Root.lean`/`Core.lean` (a from-spec
+formalization of the actual OMG KerML metamodel, see the `[[project_kerml_metamodel_lean]]`
+memory). Only `Element` itself is brought into scope unqualified below -- *not* the rest
+of `KerML.Root`'s names (in particular not `Membership`, which would silently collide
+with Mathlib's own `Membership` typeclass powering `∈` notation). Reference other
+`Root`/`Core` names (`KerML.Core.KType`, etc.) fully qualified. -/
+open KerML.Root (Element)
 
 /-- SFS.mm `cID`: the class of identifiers (strings naming KerML elements -- previously
-declared but unused in `SFS.mm` until `df-type` reused it). -/
+declared but unused in `SFS.mm` until `df-type` reused it). Kept as a plain `String`
+alias for continuity with `SFS.mm`'s own `cID`, even though `Design`/`VT` below now hold
+real `Element`s rather than bare `ID`s -- `Element.declaredName : Option String` plays
+`ID`'s role directly. -/
 abbrev ID := String
 
-/-- SFS.mm `cType`/`cDesign`, `df-type`. `df-type` was revised (2026-08-20) to genuinely
-tie concrete KerML text "type A" to its semantics, rather than going through an
-unstructured stand-in predicate: `<. Type , A , C >. e. Design` *is* the formal reading
-of that declaration -- some design element's `df-rep`-shaped triple has kind `Type` and
-id `A` -- not a separate, disconnected fact about `A`. `DesignKind` is a fresh sum type
-(not `ElementKind`) because a `Design` triple's kind slot must hold *either* one of
-`ElementKind`'s 14 tags *or* `Type`, and `Type` is deliberately excluded from
-`ElementKind` itself (matching the book's own KerML §8.4.3.2 distinction, see
-`ElementKind`'s doc comment) -- `df-type` doesn't formally depend on `df-rep`/`ElementRep`
-in `SFS.mm` either (it cites the raw Kuratowski triple directly), so this isn't just
-`ElementRep` with a stray extra constructor.
+/-- SFS.mm `cType`/`cDesign`, `df-type`. `df-type` went through three designs in one
+session (see `[[reference_supplemental_semantics_book]]`'s and
+`[[project_kerml_metamodel_lean]]`'s memory for the full history): an opaque `Denote`
+function (rejected, still just a stand-in); a `Design : Set (DesignKind × ID × Set
+KElement)` triple tying KerML text to `df-rep`'s own shape (an improvement, but `ID`
+was still a bare, structurally-arbitrary string, not connected to anything KerML's own
+grammar actually populates); and now, with `Root.lean`/`Core.lean` available, this
+**full replacement**: `Design` holds real `KerML.Root.Element` values, whose
+`declaredName` field is populated directly by KerML's own `Identification` concrete-
+syntax rule (`TypeDeclaration → declaredName = NAME`) -- so "type A" can now be read as
+`isTypeDeclOf A e` below for a real `e : Element`, not an arbitrary tag. `DesignKind` is
+a fresh sum type (not `ElementKind`) because a `Design` triple's kind slot must hold
+*either* one of `ElementKind`'s 14 tags *or* `Type`, and `Type` is deliberately excluded
+from `ElementKind` itself (matching the book's own KerML §8.4.3.2 distinction, see
+`ElementKind`'s doc comment).
 
 Unlike SFS.mm's own `df-type`, which has to separately assert `C e. _V` (a genuine set,
 not an undefined/proper-class value -- not automatic in ZFC) given the triple-membership
-premise, **no such assertion is needed or possible here**: `Set KElement` already
+premise, **no such assertion is needed or possible here**: `Set Element` already
 guarantees `C` is a real value for every triple in `Design`, the same reason `dl_al`
 above needed no `ralv`-style bridging step -- there is no "proper class" for `Design`'s
-membership type to accidentally admit. So `df-type` needs no separate theorem: the
-`Design`/`DesignKind` declarations below already are the complete translation. -/
+membership type to accidentally admit. -/
 inductive DesignKind
   | ofElementKind (k : ElementKind)
   | type
 
-axiom Design : Set (DesignKind × ID × Set KElement)
+axiom Design : Set (DesignKind × Element × Set Element)
+
+/-- The Lean-level reading of concrete KerML text `"type A"`: a `Design` element tagged
+`.type` whose `declaredName` is literally `A` -- the genuine syntax-to-`Design`
+association `df-type`'s redesigns were chasing, now expressible because `Element`
+(unlike the old bare `ID`) actually carries a `declaredName` field populated by KerML's
+own grammar. -/
+def isTypeDeclOf (A : ID) (e : Element) : Prop :=
+  e.declaredName = some A ∧ ∃ C : Set Element, (DesignKind.type, e, C) ∈ Design
 
 /-- SFS.mm `cVT`: `V_T`, the set of all Types in the design (KerML Core Semantics
 §2.1.1's vocabulary triple `⟨V_T,V_C,V_F⟩`) -- a primitive `df-types` *constrains*
-rather than fully defines, matching `SFS.mm`'s own implication (not equation) form,
-so this stays an `axiom` rather than a derived `def`, unlike `Denote`/`mkUid` above. -/
-axiom VT : Set ID
+rather than fully defines, matching `SFS.mm`'s own implication (not equation) form, so
+this stays an `axiom` rather than a derived `def`, unlike `Denote`/`mkUid` above. Now
+`Set Element` (holding the actual design elements), not `Set ID`, matching `Design`'s
+own full-replacement redesign above. -/
+axiom VT : Set Element
 
-/-- SFS.mm `df-types`: for every identifier `x`, if `x` is declared with the bare
-`type` keyword (the same `Design`-triple-membership reading `df-type` gives that
-text), then `x ∈ VT`. Unlike `df-type` above, this genuinely needs to stay an axiom
-here too -- `VT` is independently primitive on both sides, so there's no automatic
-Lean-typing shortcut this time. -/
-axiom df_types : ∀ x : ID, (∃ y, (DesignKind.type, x, y) ∈ Design) → x ∈ VT
+/-- SFS.mm `df-types`: for every `Element` `e`, if `e` is declared with the bare `type`
+keyword (i.e. tagged `.type` in `Design`, the same reading `df-type` gives that text),
+then `e ∈ VT`. This genuinely needs to stay an axiom here too -- `VT` is independently
+primitive on both sides, so there's no automatic Lean-typing shortcut this time. -/
+axiom df_types : ∀ e : Element, (∃ C : Set Element, (DesignKind.type, e, C) ∈ Design) → e ∈ VT
 
 /-- `Chapter/CoreSemanticsChapter.tex` §2.1.3 `df-rep` ("Representation of Elements as
 Triples") -- book-only, like `Model` below: `df-rep` has no SFS.mm formalization, only
@@ -1041,15 +1060,15 @@ as a ZFC-class, but is *represented* as the triple `⟨k,id,C⟩`: `k` its `Elem
 `id` its unique/qualified-name identifier -- typed here as plain `String` rather than
 `UI` specifically, since `df-rep` itself doesn't commit to `id` always being a
 freshly-`mkUid`-minted value (a plain named identifier, per `df-rep`'s own prose, is
-just as valid); `C` the class the element defines (its extension: the `KElement`s it
+just as valid); `C` the class the element defines (its extension: the `Element`s it
 classifies/contains, the same "collection defined by a rule" reading `Model.E`'s doc
 comment below uses for a KerML element treated as a class). This describes the *shape*
-every `KElement` has under `df-rep`, not a new type distinct from `KElement` --
-`KElement` itself is left opaque, unchanged. -/
+every `Element` has under `df-rep`, not a new type distinct from `Element` -- `Element`
+itself is `Root.lean`'s real metaclass, unchanged here. -/
 structure ElementRep where
   k : ElementKind
   id : String
-  C : Set KElement
+  C : Set Element
 
 /-! ## The dynamic architecture model 𝔐 (`df-model`, `Supplemental-Semantics`
 `Chapter/KernelSemanticsChapter.tex`, *not* SFS.mm)
@@ -1062,10 +1081,12 @@ book states them as the first two components of the tuple, but this whole file a
 how SFS.mm's own `ctime`/`wtp` are likewise bare, file-level constants, not parameters to
 anything) -- a `Model` field for them would just rename what's already here. -/
 
-/-- `df-model`'s tuple, `𝔐 ≡ ⟨T,≺,D,E,P,I⟩`, bundled as a `structure`. -/
+/-- `df-model`'s tuple, `𝔐 ≡ ⟨T,≺,D,E,P,I⟩`, bundled as a `structure`. `D`/`E`/`P`/`I`
+now range over `Root.lean`'s real `Element` (2026-08-20 full-replacement redesign;
+formerly the opaque `KElement`). -/
 structure Model where
   /-- `D`: a design expressed in KerML. -/
-  D : Set KElement
+  D : Set Element
   /-- `E`: the KerML element selected to be modeled. The book states `E ∈ D` on first
   introduction, then immediately reinterprets `E` itself as a *class* ("`E` will be treated
   as a set theory class: a collection defined by a rule" -- "`E` may have many possible
@@ -1073,17 +1094,17 @@ structure Model where
   formalized here (`E ⊆ D`, not `E ∈ D`), since it's the one under which "interpretation
   picks one member of `E`" is meaningful at all; the first-stated `E ∈ D` is not separately
   restated as an axiom. -/
-  E : Set KElement
+  E : Set Element
   E_sub_D : E ⊆ D
   /-- `P(τ)`: the system boundary at `τ` -- sensor/actuator input/output, in the sense of the
   Parnas four-variable model (named in the book itself). Unrelated to the `PartOf` Mereology
   primitive above despite the letter `P` in both. -/
-  P : Time → Set KElement
-  /-- `I⟦d,τ⟧`: the interpretation of design element `d` at `τ`. Given a `Set KElement` value
+  P : Time → Set Element
+  /-- `I⟦d,τ⟧`: the interpretation of design element `d` at `τ`. Given a `Set Element` value
   at each instant, matching this file's own `Occurrence := TVal (Set Item)` convention for
   "the extent of a thing at a given time" (see the Allen's-Intervals section above) rather
   than inventing a differently-shaped codomain. -/
-  I : KElement → TVal (Set KElement)
+  I : Element → TVal (Set Element)
 
 /-! ## Feature access (`Lean4SFS/DSL.lean` elaboration support, not an SFS.mm
 translation)
@@ -1098,13 +1119,13 @@ way `Model` above isn't. -/
 
 /-- `d::f`: the feature `f` of occurrence `d`, itself an occurrence (KerML features
 are themselves typed elements, so themselves `Occurrence`-shaped here). -/
-axiom featureAccess : Occurrence → KElement → Occurrence
+axiom featureAccess : Occurrence → Element → Occurrence
 
 /-- `I[[d::f,tau]]`: the value of feature `f` of `d` at `tau`. -/
-def Get (d : Occurrence) (f : KElement) (tau : Time) : Set Item := interpValAt (featureAccess d f) tau
+def Get (d : Occurrence) (f : Element) (tau : Time) : Set Item := interpValAt (featureAccess d f) tau
 
 /-- `I[[d::f]]`: the (untimed/constant) value of feature `f` of `d`. -/
-def GetC (d : Occurrence) (f : KElement) : Set Item := interpVal (featureAccess d f)
+def GetC (d : Occurrence) (f : Element) : Set Item := interpVal (featureAccess d f)
 
 /-! ## `Lean4SFS/DSL.lean` name-compatibility aliases
 
