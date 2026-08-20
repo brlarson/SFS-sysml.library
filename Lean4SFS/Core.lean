@@ -372,12 +372,45 @@ partial def mkListTerm : List (TSyntax `term) → MacroM (TSyntax `term)
   | [] => `([])
   | t :: ts => do `($t :: $(← mkListTerm ts))
 
+/-- A bare `abstract` prefix flag, wrapped in its own trivial category (rather than
+used as a bare optional keyword directly) so it can be captured via `$[$abs:...]?`
+the same proven way `dslRange`'s own optional clauses are captured in `DSL.lean` --
+presence tested via `.isSome`, not stored (matches `KType`/`Classifier`/etc.'s own
+`isAbstract` field existing, just not yet threaded from parsed text into a value,
+same "not yet read from text" status as the other omitted prefix flags noted below).
+Shared here (not duplicated in `Kernel.lean`) since both `Core.lean`'s own
+`type`/`classifier`/`feature` and `Kernel.lean`'s nine classifier-like keywords need
+it to parse real KerML text like `Base.kerml`'s `abstract classifier Anything`. -/
+declare_syntax_cat kermlAbstractFlag
+syntax "abstract " : kermlAbstractFlag
+
+/-- A multiplicity bound: a bare integer or `*` (unbounded). -/
+declare_syntax_cat kermlMultBound
+syntax num : kermlMultBound
+syntax "*" : kermlMultBound
+
+/-- KerML §8.2.5.11 `MultiplicityBounds`, simplified: `[N]` (single bound) or
+`[N..M]` (range). Real `[...]` brackets from `Base.kerml` (`Anything[1]`,
+`[1..*]`, `[0..1]`, ...) now parse; the bound *values* aren't stored anywhere,
+though -- `MultiplicityRange`'s own Lean structure (`Kernel.lean`) has zero stored
+fields, `lowerBound`/`upperBound`/`bound` all being derived Expression-valued
+attributes this project's "structural only" scope already omits (see `Root.lean`'s
+header). Parsing the bracket just lets real text containing one be consumed;
+`kernelDecl`'s standalone `multiplicity` keyword (`Kernel.lean`) is what actually
+produces a `MultiplicityRange` element. -/
+declare_syntax_cat kermlMult
+syntax "[" kermlMultBound "]" : kermlMult
+syntax "[" kermlMultBound ".." kermlMultBound "]" : kermlMult
+
 declare_syntax_cat kermlDecl
 
-/-- KerML §8.2.4.1.1 `Type`, relationship-part subset (see scope note above): `type A
-[specializes B,+] [conjugates C] [disjoint from D,+] [unions U,+] [intersects I,+]
-[differences Df,+] ;`. -/
-syntax (name := kermlType) "type " ident
+/-- KerML §8.2.4.1.1 `Type`, relationship-part subset (see scope note above): `[abstract]
+type A [specializes B,+] [conjugates C] [disjoint from D,+] [unions U,+] [intersects
+I,+] [differences Df,+] ;`. `abstract` is parsed (see `kermlAbstractFlag` above) but
+not yet threaded into `KType.isAbstract` -- still not a *stored* field from this
+concrete-syntax layer's own text, same status as before, just no longer a token that
+blocks parsing real `abstract`-prefixed declarations like `Base.kerml`'s. -/
+syntax (name := kermlType) (kermlAbstractFlag)? "type " ident
   (" specializes " ident,+)?
   (" conjugates " ident)?
   (" disjoint" " from " ident,+)?
@@ -389,7 +422,7 @@ syntax (name := kermlType) "type " ident
 /-- KerML §8.2.4.2.1 `Classifier`, same shape as `Type` above except `specializes`
 produces `Subclassification` (not generic `Specialization`), per
 `SuperclassingPart : OwnedSubclassification`. -/
-syntax (name := kermlClassifier) "classifier " ident
+syntax (name := kermlClassifier) (kermlAbstractFlag)? "classifier " ident
   (" specializes " ident,+)?
   (" conjugates " ident)?
   (" disjoint" " from " ident,+)?
@@ -398,11 +431,17 @@ syntax (name := kermlClassifier) "classifier " ident
   (" differences " ident,+)?
   " ;" : kermlDecl
 
-/-- KerML §8.2.4.3.1 `Feature`, relationship-part subset: `feature f [typed by T,+]
-[subsets S,+] [references R] [crosses X] [redefines D,+] [chains C] [inverse of V]
-[featured by F,+] ;`. -/
-syntax (name := kermlFeature) "feature " ident
+/-- KerML §8.2.4.3.1 `Feature`, relationship-part subset: `[abstract] feature f
+([typed by T,+] | [: T,+]) [mult] [subsets S,+] [references R] [crosses X] [redefines
+D,+] [chains C] [inverse of V] [featured by F,+] ;`. Bare `: T,+` is an alternate
+spelling of `typed by T,+` (KerML's `TYPED_BY = ':' | 'typed' 'by'`, only the
+keyword form was covered before) -- both feed the same `FeatureTyping` elaboration.
+`[mult]` (`kermlMult` above) is parsed but not stored, matching that category's own
+note. -/
+syntax (name := kermlFeature) (kermlAbstractFlag)? "feature " ident
   (" typed" " by " ident,+)?
+  (" : " ident,+)?
+  (kermlMult)?
   (" subsets " ident,+)?
   (" references " ident)?
   (" crosses " ident)?
@@ -436,7 +475,7 @@ syntax "featuring " ident " by " ident " ;" : kermlDecl
 /-- `kermlDecl` → `List KerML.Root.Element` (see the scope note above for why a flat
 list, rather than a single value, is the faithful elaboration target). -/
 def elabKermlDecl : TSyntax `kermlDecl → MacroM (TSyntax `term)
-  | `(kermlDecl| type $a:ident
+  | `(kermlDecl| $[$_abs:kermlAbstractFlag]? type $a:ident
         $[specializes $specs,*]?
         $[conjugates $conj:ident]?
         $[disjoint from $disj,*]?
@@ -484,7 +523,7 @@ def elabKermlDecl : TSyntax `kermlDecl → MacroM (TSyntax `term)
       | none => pure #[]
     let all := #[← `(($aT).elt)] ++ specElems ++ conjElems ++ disjElems ++ uniElems ++ interElems ++ diffElems
     mkListTerm all.toList
-  | `(kermlDecl| classifier $a:ident
+  | `(kermlDecl| $[$_abs:kermlAbstractFlag]? classifier $a:ident
         $[specializes $specs,*]?
         $[conjugates $conj:ident]?
         $[disjoint from $disj,*]?
@@ -532,8 +571,10 @@ def elabKermlDecl : TSyntax `kermlDecl → MacroM (TSyntax `term)
       | none => pure #[]
     let all := #[← `(($aT).elt)] ++ specElems ++ conjElems ++ disjElems ++ uniElems ++ interElems ++ diffElems
     mkListTerm all.toList
-  | `(kermlDecl| feature $a:ident
+  | `(kermlDecl| $[$_abs:kermlAbstractFlag]? feature $a:ident
         $[typed by $tys,*]?
+        $[: $tys2,*]?
+        $[$_mult:kermlMult]?
         $[subsets $subs,*]?
         $[references $refF:ident]?
         $[crosses $crossF:ident]?
@@ -544,12 +585,11 @@ def elabKermlDecl : TSyntax `kermlDecl → MacroM (TSyntax `term)
         ;) => do
     let an := a.getId.toString
     let aT ← featureStubTerm a
-    let tyElems ← match tys with
-      | some ts => ts.getElems.mapM (fun g => do
-          let gT ← kTypeStubTerm g
-          let rel ← mkFeatureTypingTerm aT gT an g.getId.toString
-          `(($rel).elt))
-      | none => pure #[]
+    let tyTargets := (tys.map (·.getElems) |>.getD #[]) ++ (tys2.map (·.getElems) |>.getD #[])
+    let tyElems ← tyTargets.mapM (fun g => do
+        let gT ← kTypeStubTerm g
+        let rel ← mkFeatureTypingTerm aT gT an g.getId.toString
+        `(($rel).elt))
     let subElems ← match subs with
       | some ss => ss.getElems.mapM (fun g => do
           let gT ← featureStubTerm g
@@ -658,5 +698,15 @@ elab "kerml% " d:kermlDecl : term => do
 #check kerml% redefinition wheelCount redefines legacyWheelCount ;
 #check kerml% inverse spoke of hub ;
 #check kerml% featuring mass by Car ;
+
+-- Base.kerml's own real declarations (minus nested `{ ... }` bodies, `doc` blocks,
+-- `::`-qualified names, and unsupported flags like `nonunique` -- all still out of
+-- scope; see the concrete-syntax scope note above). `abstract`, bare `:` typing, and
+-- `[...]` multiplicity brackets are exercised here for the first time on real text.
+#check kerml% abstract classifier Anything ;
+#check kerml% abstract feature self : Anything [1] subsets things ;
+#check kerml% abstract feature things : Anything [1..*] ;
+#check kerml% abstract feature dataValues : DataValue [0..*] subsets things ;
+#check kerml% abstract feature naturals : Natural [0..*] subsets dataValues ;
 
 end KerML.Core
