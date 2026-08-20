@@ -380,6 +380,30 @@ file-level doc comment. -/
 theorem dl_im_sound (φ ψ : TProp) : interp (φ →ₜ ψ) → (interp φ → interp ψ) :=
   fun h hφ t => h t (hφ t)
 
+/-- SFS.mm `df-bl.bi` (untimed), sound direction only, same K-axiom-asymmetry
+character as `df-bl.or`/`df-bl.not`/`df-bl.im`. Unlike those three, the file-level doc
+comment above named this one as unsound too but never supplied its own witness -- added
+here (and the counterexample just below) to actually establish that claim before it's
+used to justify weakening `SFS.mm`'s `df-bl.bi`. -/
+theorem dl_bi_sound (φ ψ : TProp) : interp (φ ↔ₜ ψ) → (interp φ ↔ interp ψ) :=
+  fun h => ⟨fun hφ t => (h t).mp (hφ t), fun hψ t => (h t).mpr (hψ t)⟩
+
+-- Witness that the converse of `df-bl.bi` (untimed) is not derivable: `φ := (·=0)`,
+-- `ψ := (·=now)` are both non-tautological on `TIME` (each fails at the other's unique
+-- point, given `0 < now`), so `interp φ ↔ interp ψ` holds vacuously (`False ↔ False`),
+-- while `φ ↔ₜ ψ` itself fails at `0` (`φ` holds there, `ψ` doesn't), so
+-- `interp (φ ↔ₜ ψ)` is false -- `(True) → (False)`, the implication fails.
+example (hgt : 0 < now) :
+    (interp (fun t : Time => t.val = (0 : Instant)) ↔ interp (fun t : Time => t.val = now)) ∧
+    ¬ interp ((fun t : Time => t.val = (0 : Instant)) ↔ₜ (fun t : Time => t.val = now)) := by
+  have hφ0 : ¬ interp (fun t : Time => t.val = (0 : Instant)) :=
+    fun h => absurd (h ⟨now, dl_nowt⟩) (by linarith)
+  have hψ0 : ¬ interp (fun t : Time => t.val = now) :=
+    fun h => absurd (h ⟨0, TIME_nonempty⟩) (by linarith)
+  refine ⟨⟨fun h => (hφ0 h).elim, fun h => (hψ0 h).elim⟩, fun h => ?_⟩
+  have h0 := h ⟨0, TIME_nonempty⟩
+  exact absurd (h0.mp rfl) (by intro he; linarith [he.symm])
+
 /-- SFS.mm `bl.dfrex2`/`bl.ex` (untimed existential exportation), sound direction
 only. The converse (`interp (fun t => ∃ x, φ x t) → ∃ x, interp (φ x)`) is the classic
 invalid `∀∃`-to-`∃∀` swap: different instants may need different witnesses. Not
@@ -929,7 +953,7 @@ theorem next_uniq {t1 t2 t3 : Time} (h : next t1 t2) : t2 = t3 := absurd h (next
 -- being `wbr`-based) are subsumed by `next_dense`: since `next` is uniformly false
 -- here, nothing downstream ever needs their witnessing content.
 
-/-! ### KerML Element Representation (SFS.mm lines 3121-3149) -/
+/-! ### KerML Element Representation (SFS.mm lines 3246-3305) -/
 
 /-- SFS.mm `df-kind`: a set of 14 pairwise-distinct constants. The natural Lean
 counterpart of "these are new, pairwise-distinct atomic constants" is an
@@ -938,6 +962,52 @@ inductive ElementKind
   | Element | Relationship | Dependency | Feature | Classifier | DataType | Class
   | Structure | Association | Connector | Behavior | Function | Expression | Interaction
   deriving DecidableEq, Repr
+
+/-- SFS.mm `cci`/`cuid`: `CI`/`UI` (Class Identifiers / Unique Identifiers) are both
+described only as strings (a name, or a `::`-separated qualified name, or a
+fully-qualified name concatenated with a "wonce") -- `abbrev`s over `String`, not fresh
+opaque types, matching that description exactly rather than adding an unstated
+constraint. -/
+abbrev CI := String
+abbrev UI := String
+
+/-- SFS.mm `ctagb`/`cwonce`: the tag-boundary separator string and an unspecified wonce.
+Both are left as opaque `String`-valued primitives here, exactly mirroring SFS.mm's own
+`df-wonce`: neither SFS.mm's axiomatization nor the book's prose actually enforce
+"freshness" (a new, distinct wonce each time) as part of the definition itself -- that's
+an informal side condition on how `mkUid` gets *used*, not a fact `mkUid` itself proves. -/
+def tb : String := "\\#"
+axiom wonce : String
+
+/-- SFS.mm `df-wonce`: creation of a Unique Identifier from a Class Identifier by
+appending the tag-boundary and a wonce. -/
+noncomputable def mkUid (ci : CI) : UI := ci ++ tb ++ wonce
+
+/-- Opaque carrier for "the universe of KerML elements a design can contain". SFS.mm has no
+`Element`/design primitive to reuse here: its Mereology/Region/Allen's-Intervals sections
+above axiomatize specific, narrower kinds of thing (`Part`, `Region`, `Occurrence`, ...), not
+a general KerML element -- so this is a fresh opaque type, deliberately not identified with
+`Item` (Allen's-Intervals' carrier) or any of the others, since the book doesn't make that
+identification either. -/
+axiom KElement : Type
+
+/-- `Chapter/CoreSemanticsChapter.tex` §2.1.3 `df-rep` ("Representation of Elements as
+Triples") -- book-only, like `Model` below: `df-rep` has no SFS.mm formalization, only
+`df-kind` (translated as `ElementKind` above) and `df-wonce` (translated as `mkUid`
+above, covering `id`'s `CI`/`UI` domain) do. Ontologically a KerML element is *defined*
+as a ZFC-class, but is *represented* as the triple `⟨k,id,C⟩`: `k` its `ElementKind`;
+`id` its unique/qualified-name identifier -- typed here as plain `String` rather than
+`UI` specifically, since `df-rep` itself doesn't commit to `id` always being a
+freshly-`mkUid`-minted value (a plain named identifier, per `df-rep`'s own prose, is
+just as valid); `C` the class the element defines (its extension: the `KElement`s it
+classifies/contains, the same "collection defined by a rule" reading `Model.E`'s doc
+comment below uses for a KerML element treated as a class). This describes the *shape*
+every `KElement` has under `df-rep`, not a new type distinct from `KElement` --
+`KElement` itself is left opaque, unchanged. -/
+structure ElementRep where
+  k : ElementKind
+  id : String
+  C : Set KElement
 
 /-! ## The dynamic architecture model 𝔐 (`df-model`, `Supplemental-Semantics`
 `Chapter/KernelSemanticsChapter.tex`, *not* SFS.mm)
@@ -949,14 +1019,6 @@ book states them as the first two components of the tuple, but this whole file a
 `TIME`/`≺` as global, ambient primitives rather than something that varies per model (matching
 how SFS.mm's own `ctime`/`wtp` are likewise bare, file-level constants, not parameters to
 anything) -- a `Model` field for them would just rename what's already here. -/
-
-/-- Opaque carrier for "the universe of KerML elements a design can contain". SFS.mm has no
-`Element`/design primitive to reuse here: its Mereology/Region/Allen's-Intervals sections
-above axiomatize specific, narrower kinds of thing (`Part`, `Region`, `Occurrence`, ...), not
-a general KerML element -- so this is a fresh opaque type, deliberately not identified with
-`Item` (Allen's-Intervals' carrier) or any of the others, since the book doesn't make that
-identification either. -/
-axiom KElement : Type
 
 /-- `df-model`'s tuple, `𝔐 ≡ ⟨T,≺,D,E,P,I⟩`, bundled as a `structure`. -/
 structure Model where
