@@ -953,7 +953,7 @@ theorem next_uniq {t1 t2 t3 : Time} (h : next t1 t2) : t2 = t3 := absurd h (next
 -- being `wbr`-based) are subsumed by `next_dense`: since `next` is uniformly false
 -- here, nothing downstream ever needs their witnessing content.
 
-/-! ### KerML Element Representation (SFS.mm lines 3246-3305) -/
+/-! ### KerML Element Representation and Type Definition (SFS.mm lines 3246-3324) -/
 
 /-- SFS.mm `df-kind`: a set of 14 pairwise-distinct constants. The natural Lean
 counterpart of "these are new, pairwise-distinct atomic constants" is an
@@ -990,6 +990,48 @@ a general KerML element -- so this is a fresh opaque type, deliberately not iden
 `Item` (Allen's-Intervals' carrier) or any of the others, since the book doesn't make that
 identification either. -/
 axiom KElement : Type
+
+/-- SFS.mm `cID`: the class of identifiers (strings naming KerML elements -- previously
+declared but unused in `SFS.mm` until `df-type` reused it). -/
+abbrev ID := String
+
+/-- SFS.mm `cType`/`cDesign`, `df-type`. `df-type` was revised (2026-08-20) to genuinely
+tie concrete KerML text "type A" to its semantics, rather than going through an
+unstructured stand-in predicate: `<. Type , A , C >. e. Design` *is* the formal reading
+of that declaration -- some design element's `df-rep`-shaped triple has kind `Type` and
+id `A` -- not a separate, disconnected fact about `A`. `DesignKind` is a fresh sum type
+(not `ElementKind`) because a `Design` triple's kind slot must hold *either* one of
+`ElementKind`'s 14 tags *or* `Type`, and `Type` is deliberately excluded from
+`ElementKind` itself (matching the book's own KerML §8.4.3.2 distinction, see
+`ElementKind`'s doc comment) -- `df-type` doesn't formally depend on `df-rep`/`ElementRep`
+in `SFS.mm` either (it cites the raw Kuratowski triple directly), so this isn't just
+`ElementRep` with a stray extra constructor.
+
+Unlike SFS.mm's own `df-type`, which has to separately assert `C e. _V` (a genuine set,
+not an undefined/proper-class value -- not automatic in ZFC) given the triple-membership
+premise, **no such assertion is needed or possible here**: `Set KElement` already
+guarantees `C` is a real value for every triple in `Design`, the same reason `dl_al`
+above needed no `ralv`-style bridging step -- there is no "proper class" for `Design`'s
+membership type to accidentally admit. So `df-type` needs no separate theorem: the
+`Design`/`DesignKind` declarations below already are the complete translation. -/
+inductive DesignKind
+  | ofElementKind (k : ElementKind)
+  | type
+
+axiom Design : Set (DesignKind × ID × Set KElement)
+
+/-- SFS.mm `cVT`: `V_T`, the set of all Types in the design (KerML Core Semantics
+§2.1.1's vocabulary triple `⟨V_T,V_C,V_F⟩`) -- a primitive `df-types` *constrains*
+rather than fully defines, matching `SFS.mm`'s own implication (not equation) form,
+so this stays an `axiom` rather than a derived `def`, unlike `Denote`/`mkUid` above. -/
+axiom VT : Set ID
+
+/-- SFS.mm `df-types`: for every identifier `x`, if `x` is declared with the bare
+`type` keyword (the same `Design`-triple-membership reading `df-type` gives that
+text), then `x ∈ VT`. Unlike `df-type` above, this genuinely needs to stay an axiom
+here too -- `VT` is independently primitive on both sides, so there's no automatic
+Lean-typing shortcut this time. -/
+axiom df_types : ∀ x : ID, (∃ y, (DesignKind.type, x, y) ∈ Design) → x ∈ VT
 
 /-- `Chapter/CoreSemanticsChapter.tex` §2.1.3 `df-rep` ("Representation of Elements as
 Triples") -- book-only, like `Model` below: `df-rep` has no SFS.mm formalization, only
