@@ -19,6 +19,13 @@ argument type than this formula's `Occurrence` subject) is *expected* to fail wi
 honest "unknown identifier"/type-mismatch error, not silently coerced into something
 that type-checks but doesn't mean what the formula says.
 
+A formula may also reference identifiers that are neither header params nor
+`SFS.lean` names -- names visible in the surrounding KerML scope the `@Assert`
+attaches to (an implicit `self`, or a sibling feature of the annotated element),
+per the repo's `CLAUDE.md`. See the "Scope-visible identifiers" section below
+(`freeIdentsInTerm`/`freeIdentsInWff`, used from `elabDslAssert`) for how these are
+auto-bound as untyped `fun` parameters rather than causing an outright failure.
+
 ## Sources
 
 - `~/git4/Supplemental-Semantics/Chapter/TemporalLogic.tex` (Appendix J, "Domain
@@ -231,8 +238,18 @@ syntax ":=" : dslSep
 
 /-- A body is a formula, a term, or a named-result binding: `result~Type | wff`, e.g.
 `Location`'s `result~Region | o L result`, or `RegionSurface`'s
-`result~Surface | forall p~Point are ...`. -/
-syntax dslWff : dslBody
+`result~Surface | forall p~Point are ...`. `(priority := high)` on the `dslWff`
+alternative: a bare `ident(args)` (or any other shape valid under both `dslWff`'s and
+`dslTerm`'s own `ident(args)` productions) is ambiguous at *this* level too, not just
+within `dslWff` itself (see that production's own note) -- `dslBody`'s two
+alternatives being equal-priority by default left an unresolved `choice` node neither
+of `elabDslAssert`'s pattern-match arms could destructure, breaking the anonymous
+form whenever its entire body is a bare call (e.g. `<<during(self,
+thisPerformance)>>`, `Performances.kerml`'s real usage). Preferring `dslWff` is the
+sensible default -- `@Assert`/`inv{}` anonymous-form attachments are always
+constraints (propositions), and no real `:=`-separated (term-valued) named-form body
+is a bare call, so this doesn't affect that separator-disambiguated path. -/
+syntax (priority := high) dslWff : dslBody
 syntax dslTerm : dslBody
 syntax "result" "~" dslType " | " dslWff : dslBody
 
@@ -455,6 +472,144 @@ partial def elabDslWff : TSyntax `dslWff → MacroM (TSyntax `term)
 
 end
 
+/-! ## Scope-visible identifiers (repo `CLAUDE.md`: "The `<<Name : var~Type, ... :
+body>>` header only needs to declare identifiers that aren't otherwise resolvable. An
+identifier already visible in the lexical scope where the `@Assert` appears... does
+not need to be re-listed as a formula parameter"). Real formulas rely on this
+throughout the standard library, *outside* the SFS library's own formula-defining
+files -- e.g. `Performances.kerml`'s `<< during(self, thisPerformance) >>`,
+`Occurrences.kerml`'s `<< middleTimeSlice = startShot ,, endShot >>`,
+`Links.kerml`'s `<< thisThing = sameThing >>` -- where `self`/`thisPerformance`/
+`middleTimeSlice`/`startShot`/`endShot`/`thisThing`/`sameThing` are features of
+whatever KerML element the `@Assert`/`@Invariant` is attached to (or KerML's own
+implicit `self`), never declared in any header (these are all the *anonymous*
+`<<body>>` form, with no header at all) and not existing `SFS.lean` names either.
+
+Since this file has no access to the actual KerML element's feature list (no symbol
+table -- same "structural only" scope `Root.lean`/`Core.lean`/`Kernel.lean` already
+established), such names are handled by **auto-binding**: any identifier used in a
+`dslTerm`-leaf position (a call argument, an infix-relation operand, an arithmetic
+operand, ...) that isn't a header parameter, a quantifier-bound name, or `result`,
+becomes an additional, *untyped* `fun` binder wrapping the elaborated body -- Lean's
+own elaborator then infers its type from how it's used (e.g. `during self
+thisPerformance` against `SFS.lean`'s real `during : Occurrence → Occurrence →
+Prop` pins both to `Occurrence`). This is exactly `Elab.Term.elabTerm`'s existing
+job for `now`'s special case already did for one name; generalized here to any name.
+
+**Deliberately not extended to `dslWff`'s own bare-identifier case** (`xPy`-style,
+`syntax ident : dslWff` -- a WFF that's *only* one atomic name, not an argument to
+anything) -- unlike the cases above, no real formula was found using this position
+for a genuine scope-visible name; `Mereology.kerml`'s `PartOf`'s own body (`xPy`,
+informal "x P y" shorthand) is the one real instance, and it's *supposed* to keep
+failing honestly (per this file's own header note) rather than silently succeed as
+`fun xPy => xPy`, a vacuous, misleadingly type-correct term that would no longer
+mean "PartOf x y" at all. So `freeIdentsInWff`'s own bare-`ident` case always
+returns empty -- auto-binding only reaches names through `freeIdentsInTerm`. -/
+
+mutual
+
+/-- Free (unbound) identifiers in a `dslTerm`, given the names already bound by an
+enclosing header/quantifier/`result`. Call heads (`f` in `f(args)`) and infix
+relation names (`R` in `a R b`, in `freeIdentsInWff` below) are *never* free --
+they're meant to resolve as existing `SFS.lean` names, same as today. -/
+partial def freeIdentsInTerm (bound : List Name) : TSyntax `dslTerm → MacroM (List Name)
+  | `(dslTerm| result) => pure []
+  | `(dslTerm| $x:ident) => pure (if x.getId == `now || bound.contains x.getId then [] else [x.getId])
+  | `(dslTerm| $_n:num) => pure []
+  | `(dslTerm| $_f:ident($args,*)) => do
+    args.getElems.foldlM (fun acc a => return acc ++ (← freeIdentsInTerm bound a)) []
+  | `(dslTerm| I[[ $d:dslTerm :: $_f:ident $[, $tau:dslTerm]? ]]) => do
+    let s1 ← freeIdentsInTerm bound d
+    match tau with
+    | some t => return s1 ++ (← freeIdentsInTerm bound t)
+    | none => return s1
+  | `(dslTerm| timed $e:dslTerm at $tau:dslTerm) => do
+    return (← freeIdentsInTerm bound e) ++ (← freeIdentsInTerm bound tau)
+  | `(dslTerm| shifted $e:dslTerm by $n:dslTerm) => do
+    return (← freeIdentsInTerm bound e) ++ (← freeIdentsInTerm bound n)
+  | `(dslTerm| $a:dslTerm + $b:dslTerm) => return (← freeIdentsInTerm bound a) ++ (← freeIdentsInTerm bound b)
+  | `(dslTerm| $a:dslTerm - $b:dslTerm) => return (← freeIdentsInTerm bound a) ++ (← freeIdentsInTerm bound b)
+  | `(dslTerm| $a:dslTerm * $b:dslTerm) => return (← freeIdentsInTerm bound a) ++ (← freeIdentsInTerm bound b)
+  | `(dslTerm| $a:dslTerm / $b:dslTerm) => return (← freeIdentsInTerm bound a) ++ (← freeIdentsInTerm bound b)
+  | `(dslTerm| -$a:dslTerm) => freeIdentsInTerm bound a
+  | `(dslTerm| ($a:dslTerm)) => freeIdentsInTerm bound a
+  | `(dslTerm| numberof $xs,* ~ $_ty $[in $r:dslRange]? that $body:dslWff) => do
+    let bound' := bound ++ xs.getElems.toList.map (·.getId)
+    let s1 ← match r with | some rr => freeIdentsInRange bound' rr | none => pure []
+    return s1 ++ (← freeIdentsInWff bound' body)
+  | `(dslTerm| productof $xs,* ~ $_ty $[in $r:dslRange]? that $body:dslTerm) => do
+    let bound' := bound ++ xs.getElems.toList.map (·.getId)
+    let s1 ← match r with | some rr => freeIdentsInRange bound' rr | none => pure []
+    return s1 ++ (← freeIdentsInTerm bound' body)
+  | `(dslTerm| sumof $xs,* ~ $_ty $[in $r:dslRange]? that $body:dslTerm) => do
+    let bound' := bound ++ xs.getElems.toList.map (·.getId)
+    let s1 ← match r with | some rr => freeIdentsInRange bound' rr | none => pure []
+    return s1 ++ (← freeIdentsInTerm bound' body)
+  | _ => pure []
+
+/-- Free identifiers in a `dslRange` (interval bounds, or a bare `dslWff` guard). -/
+partial def freeIdentsInRange (bound : List Name) : TSyntax `dslRange → MacroM (List Name)
+  | `(dslRange| $a:dslTerm .. $b:dslTerm) => return (← freeIdentsInTerm bound a) ++ (← freeIdentsInTerm bound b)
+  | `(dslRange| $a:dslTerm ,, $b:dslTerm) => return (← freeIdentsInTerm bound a) ++ (← freeIdentsInTerm bound b)
+  | `(dslRange| $a:dslTerm ,. $b:dslTerm) => return (← freeIdentsInTerm bound a) ++ (← freeIdentsInTerm bound b)
+  | `(dslRange| $a:dslTerm ., $b:dslTerm) => return (← freeIdentsInTerm bound a) ++ (← freeIdentsInTerm bound b)
+  | `(dslRange| $φ:dslWff) => freeIdentsInWff bound φ
+  | _ => pure []
+
+/-- Free identifiers in a `dslWff`. The standalone bare-identifier case (`syntax
+ident : dslWff`) always contributes nothing -- see this section's header note. -/
+partial def freeIdentsInWff (bound : List Name) : TSyntax `dslWff → MacroM (List Name)
+  | `(dslWff| $_x:ident) => pure []
+  | `(dslWff| $_f:ident($args,*)) => do
+    args.getElems.foldlM (fun acc a => return acc ++ (← freeIdentsInTerm bound a)) []
+  | `(dslWff| $a:dslTerm $_r:ident $b:dslTerm) =>
+    return (← freeIdentsInTerm bound a) ++ (← freeIdentsInTerm bound b)
+  | `(dslWff| $a:dslTerm < $b:dslTerm) => return (← freeIdentsInTerm bound a) ++ (← freeIdentsInTerm bound b)
+  | `(dslWff| $a:dslTerm <= $b:dslTerm) => return (← freeIdentsInTerm bound a) ++ (← freeIdentsInTerm bound b)
+  | `(dslWff| $a:dslTerm > $b:dslTerm) => return (← freeIdentsInTerm bound a) ++ (← freeIdentsInTerm bound b)
+  | `(dslWff| $a:dslTerm >= $b:dslTerm) => return (← freeIdentsInTerm bound a) ++ (← freeIdentsInTerm bound b)
+  | `(dslWff| $a:dslTerm = $b:dslTerm) => return (← freeIdentsInTerm bound a) ++ (← freeIdentsInTerm bound b)
+  | `(dslWff| $a:dslTerm <> $b:dslTerm) => return (← freeIdentsInTerm bound a) ++ (← freeIdentsInTerm bound b)
+  | `(dslWff| $a:dslTerm in $b:dslTerm) => return (← freeIdentsInTerm bound a) ++ (← freeIdentsInTerm bound b)
+  | `(dslWff| $φ:dslWff @ $tau:dslTerm) => return (← freeIdentsInWff bound φ) ++ (← freeIdentsInTerm bound tau)
+  | `(dslWff| not $φ:dslWff) => freeIdentsInWff bound φ
+  | `(dslWff| $φ:dslWff and $ψ:dslWff) => return (← freeIdentsInWff bound φ) ++ (← freeIdentsInWff bound ψ)
+  | `(dslWff| $φ:dslWff or $ψ:dslWff) => return (← freeIdentsInWff bound φ) ++ (← freeIdentsInWff bound ψ)
+  | `(dslWff| $φ:dslWff implies $ψ:dslWff) => return (← freeIdentsInWff bound φ) ++ (← freeIdentsInWff bound ψ)
+  | `(dslWff| $φ:dslWff iff $ψ:dslWff) => return (← freeIdentsInWff bound φ) ++ (← freeIdentsInWff bound ψ)
+  | `(dslWff| forall $ps,* $[in $r:dslRange]? are $body:dslWff) => do
+    let bound' ← ps.getElems.foldlM (fun s p => return s ++ (← paramNames p)) bound
+    let s1 ← match r with | some rr => freeIdentsInRange bound' rr | none => pure []
+    return s1 ++ (← freeIdentsInWff bound' body)
+  | `(dslWff| forall $ps1,* $[in $r1:dslRange]? forall $ps2,* $[in $r2:dslRange]? are $body:dslWff) => do
+    let bound1 ← ps1.getElems.foldlM (fun s p => return s ++ (← paramNames p)) bound
+    let bound2 ← ps2.getElems.foldlM (fun s p => return s ++ (← paramNames p)) bound1
+    let s1 ← match r1 with | some rr => freeIdentsInRange bound1 rr | none => pure []
+    let s2 ← match r2 with | some rr => freeIdentsInRange bound2 rr | none => pure []
+    let s3 ← freeIdentsInWff bound2 body
+    return s1 ++ s2 ++ s3
+  | `(dslWff| exists $ps,* $[in $r:dslRange]? that $body:dslWff) => do
+    let bound' ← ps.getElems.foldlM (fun s p => return s ++ (← paramNames p)) bound
+    let s1 ← match r with | some rr => freeIdentsInRange bound' rr | none => pure []
+    return s1 ++ (← freeIdentsInWff bound' body)
+  | `(dslWff| ($φ:dslWff)) => freeIdentsInWff bound φ
+  | _ => pure []
+
+/-- The bound names a single `dslParam` group (`x,y,z~Class`) introduces. -/
+partial def paramNames : TSyntax `dslParam → MacroM (List Name)
+  | `(dslParam| $xs:ident,* ~ $_ty:dslType) => pure (xs.getElems.toList.map (·.getId))
+  | _ => pure []
+
+end
+
+/-- Wraps `acc` in an *untyped* `fun` binder for a scope-visible identifier found by
+`freeIdentsInTerm`/`freeIdentsInWff` above -- no type ascription, since this file has
+no way to know the identifier's real KerML feature type; Lean's own elaborator infers
+it from how the identifier is used inside `acc` (unification against whatever
+`SFS.lean` function/relation it's passed to). -/
+def mkAutoFun (id : Name) (acc : TSyntax `term) : MacroM (TSyntax `term) := do
+  `(fun $(mkIdent id) => $acc)
+
 /-- `<<Name : params sep body>>` → a curried Lean term over `params`: a `Prop`-valued
 function for a `:`-separated `dslWff` body, an ordinary value-valued function for a
 `:=`-separated `dslTerm` body, or (for the named-result form) a `Prop`-valued relation
@@ -463,23 +618,32 @@ def elabDslAssert : TSyntax `dslAssert → MacroM (TSyntax `term)
   | `(dslAssert| << $_name:ident : $params,* $_sep:dslSep $body:dslBody >>) => do
     let paramGroups ← params.getElems.mapM elabDslParam
     let binders := paramGroups.foldl (· ++ ·) #[]
+    let headerNames := binders.toList.map (·.1.getId)
     let mkFun (b : TSyntax `ident × TSyntax `term) (acc : TSyntax `term) : MacroM (TSyntax `term) :=
       `(fun ($(b.1) : $(b.2)) => $acc)
     match body with
-    | `(dslBody| $φ:dslWff) => do binders.foldrM mkFun (← elabDslWff φ)
-    | `(dslBody| $t:dslTerm) => do binders.foldrM mkFun (← elabDslTerm t)
+    | `(dslBody| $φ:dslWff) => do
+      let withAuto ← (← freeIdentsInWff headerNames φ).eraseDups.foldrM mkAutoFun (← elabDslWff φ)
+      binders.foldrM mkFun withAuto
+    | `(dslBody| $t:dslTerm) => do
+      let withAuto ← (← freeIdentsInTerm headerNames t).eraseDups.foldrM mkAutoFun (← elabDslTerm t)
+      binders.foldrM mkFun withAuto
     | `(dslBody| result ~ $rty:dslType | $φ:dslWff) => do
       let rty' ← elabDslType rty
       let inner ← `(fun ($resultIdent : $rty') => $(← elabDslWff φ))
-      binders.foldrM mkFun inner
+      let withAuto ← (← freeIdentsInWff (headerNames ++ [`result]) φ).eraseDups.foldrM mkAutoFun inner
+      binders.foldrM mkFun withAuto
     | _ => Macro.throwUnsupported
   | `(dslAssert| << $body:dslBody >>) => do
     match body with
-    | `(dslBody| $φ:dslWff) => elabDslWff φ
-    | `(dslBody| $t:dslTerm) => elabDslTerm t
+    | `(dslBody| $φ:dslWff) => do
+      (← freeIdentsInWff [] φ).eraseDups.foldrM mkAutoFun (← elabDslWff φ)
+    | `(dslBody| $t:dslTerm) => do
+      (← freeIdentsInTerm [] t).eraseDups.foldrM mkAutoFun (← elabDslTerm t)
     | `(dslBody| result ~ $rty:dslType | $φ:dslWff) => do
       let rty' ← elabDslType rty
-      `(fun ($resultIdent : $rty') => $(← elabDslWff φ))
+      let inner ← `(fun ($resultIdent : $rty') => $(← elabDslWff φ))
+      (← freeIdentsInWff [`result] φ).eraseDups.foldrM mkAutoFun inner
     | _ => Macro.throwUnsupported
   | _ => Macro.throwUnsupported
 
@@ -535,12 +699,29 @@ example : domain% <<Get : d~Occurrence, f~Anything, tau~Instant := I[[d::f,tau]]
 #check domain% << NOINTP : : forall r1,r2~Region are
   RegionOverlap(r1,r2) implies (RegionContainment(r1,r2) or RegionContainment(r2,r1)) >>
 
+-- Domain.kerml `SetNow`: `v` is a scope-visible identifier, not declared in this
+-- formula's own header (`d~Occurrence, f~Anything` only) -- per `CLAUDE.md`'s
+-- convention, presumably the `in`/`out` feature of the surrounding `.kerml`
+-- operation whose value is being set. Auto-bound by `freeIdentsInWff`/`mkAutoFun`
+-- above; its type (`Set Item`) is inferred from unifying against `Get`'s own result
+-- type, not declared anywhere in this formula string. Previously excluded here as an
+-- expected failure, before this auto-binding existed.
+#check domain% <<SetNow : d~Occurrence, f~Anything : I[[d::f,now]] = v >>
+
+-- Performances.kerml's own `<< during(self, thisPerformance) >>` (anonymous form, no
+-- header at all): both `self` and `thisPerformance` are scope-visible (KerML's
+-- implicit self-reference and a redefinable feature of `Performance`), auto-bound
+-- here with their types inferred from `SFS.lean`'s real `during : Occurrence →
+-- Occurrence → Prop`.
+#check domain% << during(self, thisPerformance) >>
+
 /- Formulas deliberately *not* included as live `#check`s here, because they are
 expected to fail to elaborate, honestly, rather than being forced:
-- `<<SetNow : d~Occurrence, f~Anything : I[[d::f,now]] = v >>` -- `v` is never bound
-  by this formula's own header (per `CLAUDE.md`'s convention, it's presumably an
-  `in`/`out` feature of the surrounding `.kerml` operation, visible in that lexical
-  scope but not this standalone one) -- fails with "unknown identifier v".
+- `Mereology.kerml`'s `PartOf`'s own body, `<< PartOf : x~Class, y~Class : xPy >>` --
+  `xPy` is a standalone bare-`dslWff`-identifier (informal "x P y" shorthand, not a
+  real scope-visible name), which `freeIdentsInWff`'s own bare-identifier case
+  deliberately never auto-binds (see that section's header note) -- still fails with
+  "unknown identifier xPy", honestly, exactly as before.
 - `<< Location : o~Occurrence := result~Region | o L result >>` -- `SFS.lean` has no
   `L`; its own `Location : Part → Region → Prop` also has a different (and
   incompatible) subject type (`Part`, not `Occurrence`) from this formula's `o`, so

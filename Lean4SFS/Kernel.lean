@@ -456,8 +456,9 @@ Two independent syntax/elaboration pieces, in `DSL.lean`/`Core.lean`'s house sty
 ### `kernelDecl` -- declaration keywords
 
 Mirrors `Core.lean`'s `kermlDecl` `Type`/`Classifier` productions exactly (same
-optional relationship parts, same "fresh stub, no symbol table" simplification, same
-`;`-only body), just for nine more KerML §8.2.5 declaration keywords:
+optional relationship parts, same "referenced names are scope-visible, stood in for
+by a stub rather than resolved via a symbol table this project doesn't have"
+treatment, same `;`-only body), just for nine more KerML §8.2.5 declaration keywords:
 `datatype`/`class`/`struct`/`assoc`/`behavior`/`function`/`predicate`/`interaction`
 (all "classifier-like" -- their `specializes` clause produces a `Subclassification`,
 reusing `Core.lean`'s own `mkSubclassificationTerm`/`mkConjugationTerm`/
@@ -652,6 +653,15 @@ invocation `f(a, b)`, `new T(a, b)` construction, feature chaining `.`, indexing
 directly from the spec's Table 6 (right-associative `^`/`**`, all others
 left-associative), with `&`/`|` collapsed into `and`/`or` (documented simplification,
 not a distinct KerML operator).
+
+A bare identifier (`x`, `self`, ...) always elaborates to a `FeatureReferenceExpression`
+stub, which is the semantically correct treatment, not just a fallback: per the repo's
+`CLAUDE.md`, such names "may include names or identifiers visible in the scope where
+they occur" -- a reference to some already-declared feature (an `in`/`out` feature of
+whatever this expression is attached to, e.g.), never a fresh declaration of one. The
+stub carries only the referenced name because this project has no symbol table to
+actually resolve it against (same limitation as `kernelDecl`'s own reference targets
+above), not because the reference is meant to be new.
 
 **Not covered** (documented, not guessed at): `..` range construction, `??` null
 coalescing, the classification/cast operators (`istype`/`hastype`/`@`/`@@`/`as`/

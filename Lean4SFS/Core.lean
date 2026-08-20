@@ -254,11 +254,16 @@ pure `MacroM (TSyntax `term)` elaborators, one top-level triggering `elab`).
   "structural only" scope, which already dropped the containment graph a `{ ... }`
   body would populate.
 - Qualified names are simplified to bare `ident` (no dotted/`::`-paths, no name
-  resolution): a referenced name like the `B` in `type A specializes B ;` becomes a
-  *fresh* minimal stub value (`mkKTypeStub`/`mkClassifierStub`/`mkFeatureStub`) built
-  from that name alone, not a lookup of some pre-existing declaration elsewhere -- this
-  project has no symbol table (see file header), and inventing one is a substantially
-  bigger project than this addition.
+  resolution): a referenced name like the `B` in `type A specializes B ;` is
+  genuinely a *reference* to something else -- an existing declaration, visible in
+  whatever scope this text occurs in (per the repo's `CLAUDE.md`: identifiers "may
+  include names or identifiers visible in the scope where they occur," not always
+  re-declared where used) -- not a fresh declaration of its own. This project has no
+  symbol table (see file header) to actually look `B` up, though, so it's represented
+  here by a minimal stub value (`mkKTypeStub`/`mkClassifierStub`/`mkFeatureStub`)
+  carrying just the referenced name -- a placeholder standing in for "whatever `B`
+  resolves to," not a claim that `B` is newly declared right here. Building a real
+  symbol table would be a substantially bigger project than this addition.
 - Every `kermlDecl` elaborates to a single `List Element` term: the primary
   `KType`/`Classifier`/`Feature`/relationship, followed by one further `Element` per
   relationship its text implies. This is *not* a simplification of the metamodel --
@@ -267,9 +272,10 @@ pure `MacroM (TSyntax `term)` elaborators, one top-level triggering `elab`).
   elements. A flat list of "the `Element`s this declaration text brings into being" is
   the faithful shape, not a shortcut. -/
 
-/-- Minimal stub values for a bare identifier reference in the concrete syntax below
-(see the scope note above: no name resolution, so a referenced name is always a fresh
-value carrying just that declared name). -/
+/-- Minimal stub values standing in for a bare identifier *reference* in the concrete
+syntax below (see the scope note above: these represent something already visible in
+scope, not a fresh declaration -- this project just has no symbol table to actually
+resolve the reference, so the stub carries only the referenced name). -/
 def mkKTypeStub (name : String) : KType := { elementId := name, declaredName := some name }
 def mkClassifierStub (name : String) : Classifier := { elementId := name, declaredName := some name }
 def mkFeatureStub (name : String) : Feature := { elementId := name, declaredName := some name }
