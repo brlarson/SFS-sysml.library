@@ -1533,14 +1533,13 @@ elab "kernel% " d:kernelDecl : term => do
 
 -- Regions.kerml's own real `function Location {...}` -- `inv{...}` now genuinely
 -- nested (new, via kermlKDecl) and the new `as` cast expression
--- (`(result as Region).frameOfReference`). Its own `@Assert` formula is still a
--- known gap (not attempted live), but a narrower one than when this was first
--- written: `Mereology.kerml`/`SFS.lean`'s `Part` was retired 2026-08-21 in favor of
--- `Occurrence` (see SFS.lean's own note near `PartOf`), so the argument-type half of
--- the old mismatch is gone -- `Location : Occurrence → Region → Prop` now matches
--- this formula's own `o~Occurrence` header exactly. What remains: `SFS.lean` has no
--- `L` (the infix operator `o L result` names), unrelated to the type fix -- see
--- [[project_assert_lean]]'s own updated note.
+-- (`(result as Region).frameOfReference`). Its own `@Assert` formula (`o L result`)
+-- is a known, permanent gap, at direct request: `SFS.lean`'s `Location` is now a
+-- real function (`Occurrence → Region`, 2026-08-21, matching Regions.kerml's own
+-- functional declaration), but the infix `L` notation those real formulas'
+-- *definitions* use is deliberately not wired up (no `L` alias added) -- disregarded
+-- on purpose, not an oversight. Confirmed via a real build attempt: still fails with
+-- "Unknown identifier `L`" specifically, nothing else.
 #check kernel% function Location {
   doc "The location function relates spatial occurrences to their region."
   in o : Occurrence ;
@@ -1593,16 +1592,25 @@ elab "kernel% " d:kernelDecl : term => do
     "forall r1~Region are ( RegionContainment(r,r1) implies r = r1 ) >>"; t="AtomicRegion";}
 
 -- LFU/LIN/EXPNS/APAR's own real formulas each call `Location(x)` as a one-argument
--- function returning a `Region` -- but `Location` is a genuine *two-argument*
--- relation in `SFS.lean` (`Occurrence → Region → Prop`, `Part` retired 2026-08-21,
--- see the note on `Location`'s own predicate above). Confirmed via a real build
--- attempt after that retirement (not assumed stale from before it): still fails,
--- now with `Type mismatch: Region but expected Region → Prop` (the one-arg-vs-
--- two-arg partial-application mismatch alone, no longer an argument-type mismatch
--- too) -- the same functional-KerML-vs-relational-`SFS.mm` gap already documented
--- for `RegionSurface`/`RegionFilm`/`RegionInterior` below, independent of the
--- `Part`/`Occurrence` question entirely. `NOINTP` (no `Location`/`PartOf` calls) and
--- `AtomicRegionDisjoint` (below) don't have this problem and elaborate live.
+-- function returning a `Region` -- now that `Location` is genuinely a
+-- one-argument function itself (`Occurrence → Region`, 2026-08-21), the previously-
+-- documented one-arg-call-vs-two-arg-relation mismatch is gone and all four
+-- elaborate live, confirmed via a real build attempt (not assumed from the type
+-- change alone).
+#check kernel% @Assert{n="locational functionality";
+    f="<< LFU : : forall x~Occurrence forall r1,r2~Region are"+
+      " ( (Location(x)=r1 and Location(x)=r2) implies r1=r2 ) >>"; t="lfu";}
+
+#check kernel% @Assert{n="injectivity of location";
+    f="<< LIN : : forall x,y~Occurrence forall r~Region are"+
+      " ( (Location(x)=r and Location(y)=r) implies x=y ) >>"; t="lin";}
+
+#check kernel% @Assert{n="EXPNS"; f="<< EXPNS : : forall x,y~Occurrence forall r1,r2~Region are "+
+    "( (Location(x)=r1 and Location(y)=r2 and PartOf(x,y)) implies RegionContainment(r2,r1) ) >>"; t="expansivity";}
+
+#check kernel% @Assert{n="APAR"; f="<< APAR : : forall x~Occurrence forall r~Region are "+
+    "(Location(x)=r and AtomicPart(x)) implies AtomicRegion(r) >>"; t="apar";}
+
 #check kernel% @Assert{n="NOINTP"; f="<< NOINTP : : forall r1,r2~Region are "+
     "RegionOverlap(r1,r2) implies (RegionContainment(r1,r2) or RegionContainment(r2,r1)) >>"; t="no_interpenetration";}
 

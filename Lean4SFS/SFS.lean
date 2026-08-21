@@ -826,23 +826,35 @@ axiom Point : Type
 axiom Surface : Type
 
 /-- SFS.mm `wloc`: primitive (relates an *occurrence*, not a point, to a region).
-Formerly `Part → Region → Prop` -- `Part`-typed no more, same 2026-08-21 change as
-`PartOf` above (this argument is shared with `PartOf`/`AtomPart` via `apar`/
-`expansivity` below, so it had to move too). This also resolves what was previously
-a documented, permanent type mismatch: `Regions.kerml`'s own real `Location` formula
-(`o~Occurrence := result~Region | o L result`) now matches this signature exactly --
-see `Assert.lean`'s own note on that, no longer accurate as written. -/
-axiom Location : Occurrence → Region → Prop
+**Function-valued (`Occurrence → Region`), not a relation** -- 2026-08-21 change, at
+direct request: `Regions.kerml`'s own real `Location` is declared as a function
+(`o~Occurrence := result~Region | o L result`, a `:=`-body, KerML's own functional
+shape for it), and `LFU`/`LIN`/`EXPNS`/`APAR` all call `Location(x)` as a one-argument
+function returning a `Region`, not a two-argument predicate -- matching that directly
+is more faithful than the earlier `Occurrence → Region → Prop` relation (itself just
+a straightforward, but not the only possible, `SFS.mm`-style rendering of `wloc`).
+Deliberately does **not** attempt to wire up the infix `L` notation those same real
+formulas' own *definitions* use (`o L result`) -- disregarded at request, `SFS.lean`
+still has no `L`, and `Location`'s own `@Assert` formula is expected to keep failing
+for that specific reason; see `Assert.lean`'s own note. -/
+axiom Location : Occurrence → Region
 /-- SFS.mm `win`: primitive. -/
 axiom InRegion : Point → Region → Prop
 /-- SFS.mm `won`: primitive. -/
 axiom OnSurface : Point → Surface → Prop
 
-/-- SFS.mm `df-lfu`: locational functionality, a genuine constraint on `Location`. -/
-axiom lfu {x : Occurrence} {r1 r2 : Region} : Location x r1 → Location x r2 → r1 = r2
+/-- SFS.mm `df-lfu`: locational functionality. Was a genuine axiom (a constraint on
+a *relation*, not derivable); now a real theorem, since a Lean function is
+automatically single-valued -- `Location`'s own new function-valued type already
+proves this, `lfu` just restates it in the `Location x = r1 → Location x = r2 →
+r1 = r2` shape downstream content still expects. -/
+theorem lfu {x : Occurrence} {r1 r2 : Region} (h1 : Location x = r1) (h2 : Location x = r2) :
+    r1 = r2 := h1 ▸ h2
 
-/-- SFS.mm `df-lin`: injectivity of location, a genuine constraint on `Location`. -/
-axiom lin {x y : Occurrence} {r : Region} : Location x r → Location y r → x = y
+/-- SFS.mm `df-lin`: injectivity of location -- still a genuine, non-derivable
+constraint even with `Location` function-valued (nothing forces a function to be
+injective), so this stays an `axiom`. -/
+axiom lin {x y : Occurrence} {r : Region} : Location x = r → Location y = r → x = y
 
 /-- SFS.mm `df-rov`. -/
 def RegionOverlap (r1 r2 : Region) : Prop := ∃ p, InRegion p r1 ∧ InRegion p r2
@@ -852,18 +864,18 @@ def RegionContainment (r1 r2 : Region) : Prop := ∀ p, InRegion p r2 → InRegi
 
 /-- SFS.mm `df-rat`. -/
 def AtomicRegion (r0 : Region) : Prop :=
-  ∀ (x : Occurrence) (r1 : Region), Location x r1 ∧ RegionContainment r0 r1 → r0 = r1
+  ∀ (x : Occurrence) (r1 : Region), Location x = r1 ∧ RegionContainment r0 r1 → r0 = r1
 
 /-- SFS.mm `df-rdi`: a genuine constraint (atomic regions are disjoint or equal). -/
 axiom rdi {r1 r2 : Region} : AtomicRegion r1 → AtomicRegion r2 → ¬ RegionOverlap r1 r2 ∨ r1 = r2
 
 /-- SFS.mm `df-apar`: a genuine constraint (atomic parts have atomic regions). -/
-axiom apar {x : Occurrence} {r0 : Region} : Location x r0 → AtomPart x → AtomicRegion r0
+axiom apar {x : Occurrence} {r0 : Region} : Location x = r0 → AtomPart x → AtomicRegion r0
 
 /-- SFS.mm `df-pec`: expansivity, a genuine constraint tying `PartOf` to
 `RegionContainment` via `Location`. -/
 axiom expansivity {x y : Occurrence} {r1 r2 : Region} :
-    Location x r1 → Location y r2 → PartOf x y → RegionContainment r1 r2
+    Location x = r1 → Location y = r2 → PartOf x y → RegionContainment r1 r2
 
 /-- SFS.mm `df-rni`: no interpenetration, a genuine constraint. -/
 axiom no_interpenetration {r1 r2 : Region} : RegionOverlap r1 r2 → RegionContainment r1 r2 ∨ RegionContainment r2 r1

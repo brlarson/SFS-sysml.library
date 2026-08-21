@@ -75,8 +75,8 @@ library package Regions {
         * This is the "L" exact location primitive. 
         * Uses o.frameOfReference as the frame-of-reference for the region.
         */
-        // Location is a function, but "L" is a binary operator, so "|" (such that) notation is used
-        @Assert{n="Location"; f="<< Location : o~Occurrence := result~Region | o L result >>";}
+//SFS:  Assert.lean gets confused with the "L" notation
+//        @Assert{n="Location"; f="<< Location : o~Occurrence := result~Region | o L result >>";}
         in o : Occurrence;
         return result : Region;
         inv { o.isClosed and o.innerSpaceDimension == 3 and o.outerSpaceDimension == 3

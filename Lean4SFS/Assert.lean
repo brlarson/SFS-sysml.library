@@ -804,18 +804,16 @@ expected to fail to elaborate, honestly, rather than being forced:
   real scope-visible name), which `freeIdentsInWff`'s own bare-identifier case
   deliberately never auto-binds (see that section's header note) -- still fails with
   "unknown identifier xPy", honestly, exactly as before.
-- `<< Location : o~Occurrence := result~Region | o L result >>` -- `SFS.lean` has no
-  `L` (would need an `L := Location` alias, not added since the type still wouldn't
-  line up cleanly for a `result~Type | wff`-shaped body either way, see next). Its
-  own `Location`'s argument type used to *also* mismatch (`Part`, not `Occurrence`)
-  but no longer does, since the 2026-08-21 `Part`-retirement (confirmed via a real
-  build, not assumed) -- the missing `L` is now the only remaining reason this one
-  fails, a narrower gap than before, still genuine and undecided (not something
-  `Assert.lean` should guess an alias for on its own).
-- `LFU`/`LIN`/`EXPNS`/`APAR` (`Regions.kerml`) each call `Location(x)` as a
-  *one-argument* function returning a `Region`, but `Location` (like
-  `RegionSurface`/`RegionFilm`/`RegionInterior` below) is a genuine *two-argument*
-  relation in `SFS.lean` -- the same functional-KerML-vs-relational-`SFS.mm`
-  modeling mismatch, independent of and unaffected by the `Part`-retirement above. -/
+- `<< Location : o~Occurrence := result~Region | o L result >>` -- `SFS.lean` now has
+  a real, function-valued `Location : Occurrence → Region` (2026-08-21, at direct
+  request, matching this formula's own functional declaration exactly), but the
+  infix `L` notation this formula's own *body* uses (`o L result`) was deliberately
+  not wired up alongside it -- no `L` alias added, disregarded on purpose per that
+  same request, not a leftover gap. `SFS.lean` genuinely has no `L`; this one still
+  fails, honestly, for that specific and only that reason (confirmed via a real
+  build). `LFU`/`LIN`/`EXPNS`/`APAR` (`Regions.kerml`), by contrast, call
+  `Location(x)` as a one-argument function -- now that `Location` really is one,
+  all four elaborate live (see `Kernel.lean`'s own `#check`s), no longer excluded
+  here. -/
 
 end SFS.Assert
