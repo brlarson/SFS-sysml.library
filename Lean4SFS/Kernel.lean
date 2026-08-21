@@ -1451,7 +1451,7 @@ elab "kernel% " d:kernelDecl : term => do
 #check kernel% @Assert{n="GetChange"; f="<<GetChange : d~Occurrence, f~Anything, tau~Instant : "+
     "(I[[d::f,tau]] <> I[[d::f,now]] and forall t~Instant in tau ., now are I[[d::f,t]] = I[[d::f,tau]])"+
     " implies v = I[[d::f,now]] >>";
-    t="df-bl.changed";}
+    t="GetChange";}
 
 -- Domain.kerml's own real `behavior GetBooleanChange :> GetChange {...}` -- the
 -- symbolic `:>` specializes header (new, `behavior`-only) and the anonymous
@@ -1471,7 +1471,7 @@ elab "kernel% " d:kernelDecl : term => do
 #check kernel% @Assert{n="GetBooleanChange"; f="<<GetBooleanChange : d~Occurrence, e~BooleanEvaluation, tau~Instant : "+
     "(I[[d::e,tau]] <> I[[d::e,now]] and forall t~Instant in tau ., now are I[[d::e,t]] = I[[d::e,tau]])"+
     " implies b = I[[d::e,now]] >>";
-    t="df-bl.changed";}
+    t="GetBooleanChange";}
 
 -- Domain.kerml's own real `behavior GetChangeToTrue :> GetBooleanChange{...}` --
 -- empty body (`;`-equivalent `{}`), no new machinery beyond the symbolic `:>` header

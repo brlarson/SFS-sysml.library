@@ -1250,6 +1250,28 @@ function *of* `now` to begin with. Formalizing `SetNow` this way is what makes t
 guarantee explicit and connects it to `Get`, not what creates it. -/
 def SetNow (d : Occurrence) (f : Element) (v : Set Item) : Prop := Get d f ⟨now, dl_nowt⟩ = v
 
+/-- `Domain.kerml`'s own `GetChange` behavior, formalized 2026-08-21 at direct
+request, same treatment as `SetNow` immediately above: not a new primitive, just the
+exact proposition `Domain.kerml`'s own `GetChange` assertion names -- "if the value
+of `d::f` was stable at `Get d f tau` throughout `[tau, now)`, and has changed as of
+`now`, then `v` is that new (changed) value." `t="df-bl.changed"` (the `@Assert`'s
+citation) was previously left unupdated because no `SFS.lean` declaration existed to
+cite; now one does. -/
+def GetChange (d : Occurrence) (f : Element) (tau : Time) (v : Set Item) : Prop :=
+  (Get d f tau ≠ Get d f ⟨now, dl_nowt⟩ ∧ ∀ t ∈ Set.Ico tau (⟨now, dl_nowt⟩ : Time), Get d f t = Get d f tau)
+    → v = Get d f ⟨now, dl_nowt⟩
+
+/-- `Domain.kerml`'s own `GetBooleanChange` behavior, formalized 2026-08-21 at direct
+request. `GetBooleanChange`'s real KerML declaration (`behavior GetBooleanChange :>
+GetChange`) genuinely specializes `GetChange` -- its own `@Assert` formula is
+`GetChange`'s, verbatim, with `e`/`b` in place of `f`/`v` (still via `Get`'s value
+reading, not `GetP`, despite `e~BooleanEvaluation` -- `GetChangeToTrue`/
+`GetChangeToFalse`, which do use the predicate reading, come later and aren't this
+declaration). Defined directly in terms of `GetChange` rather than repeating its body,
+mirroring that same specialization at the Lean level, not just the KerML one. -/
+def GetBooleanChange (d : Occurrence) (e : Element) (tau : Time) (b : Set Item) : Prop :=
+  GetChange d e tau b
+
 /-! ## `Lean4SFS/Assert.lean` name-compatibility aliases
 
 Real `@Assert{n="..."}` names in `sysml.library/**/*.kerml` use the full KerML

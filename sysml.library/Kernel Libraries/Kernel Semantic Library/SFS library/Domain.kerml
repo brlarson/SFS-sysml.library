@@ -77,9 +77,9 @@ library package Domain {
 		doc /* GetChange(d,f) waits for value of the feature d::f to change
 		     * from its value at time tau. */
 		@Assert{n="GetChange"; f="<<GetChange : d~Occurrence, f~Anything, tau~Instant : "+
-				"(I[[d::f,tau]] <> I[[d::f,now]] and forall t~Instant in tau ., now are I[[d::f,t]] = I[[d::f,tau]])"+ 
-				" implies v = I[[d::f,now]] >>"; 
-				t="df-bl.changed";}
+				"(I[[d::f,tau]] <> I[[d::f,now]] and forall t~Instant in tau ., now are I[[d::f,t]] = I[[d::f,tau]])"+
+				" implies v = I[[d::f,now]] >>";
+				t="GetChange";}
 		in feature d : Occurrence[1] {  //onOccurrence
 		  feature f : Anything[1];  //accessedFeature
 		}
@@ -92,7 +92,7 @@ library package Domain {
 		@Assert{n="GetBooleanChange"; f="<<GetBooleanChange : d~Occurrence, e~BooleanEvaluation, tau~Instant : "+
 				"(I[[d::e,tau]] <> I[[d::e,now]] and forall t~Instant in tau ., now are I[[d::e,t]] = I[[d::e,tau]])"+
 				" implies b = I[[d::e,now]] >>";
-				t="df-bl.changed";}
+				t="GetBooleanChange";}
 		in feature :>> d {
 			feature e : BooleanEvaluation[1] :>> f;
 		}

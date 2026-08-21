@@ -796,6 +796,25 @@ example : domain% <<Get : d~Occurrence, f~Anything, tau~Instant := I[[d::f,tau]]
 
 example : domain% <<SetNow : d~Occurrence, f~Anything : I[[d::f,now]] = v >> = SetNow := rfl
 
+-- Domain.kerml `GetChange`: `v` is scope-visible (the surrounding behavior's own
+-- `out feature v`), same auto-binding as `SetNow`'s `v` above. Elaborates to exactly
+-- `SFS.lean`'s own new `GetChange` (2026-08-21).
+#check domain% <<GetChange : d~Occurrence, f~Anything, tau~Instant : (I[[d::f,tau]] <> I[[d::f,now]]
+  and forall t~Instant in tau ., now are I[[d::f,t]] = I[[d::f,tau]]) implies v = I[[d::f,now]] >>
+
+example : domain% <<GetChange : d~Occurrence, f~Anything, tau~Instant : (I[[d::f,tau]] <> I[[d::f,now]]
+  and forall t~Instant in tau ., now are I[[d::f,t]] = I[[d::f,tau]]) implies v = I[[d::f,now]] >> = GetChange := rfl
+
+-- Domain.kerml `GetBooleanChange`: `b` is scope-visible (the surrounding behavior's
+-- own `out feature b`), same auto-binding pattern. Elaborates to exactly `SFS.lean`'s
+-- own new `GetBooleanChange` (2026-08-21) -- itself defined as `GetChange d e tau b`,
+-- mirroring `GetBooleanChange :> GetChange`'s real KerML specialization.
+#check domain% <<GetBooleanChange : d~Occurrence, e~BooleanEvaluation, tau~Instant : (I[[d::e,tau]] <> I[[d::e,now]]
+  and forall t~Instant in tau ., now are I[[d::e,t]] = I[[d::e,tau]]) implies b = I[[d::e,now]] >>
+
+example : domain% <<GetBooleanChange : d~Occurrence, e~BooleanEvaluation, tau~Instant : (I[[d::e,tau]] <> I[[d::e,now]]
+  and forall t~Instant in tau ., now are I[[d::e,t]] = I[[d::e,tau]]) implies b = I[[d::e,now]] >> = GetBooleanChange := rfl
+
 -- Performances.kerml's own `<< during(self, thisPerformance) >>` (anonymous form, no
 -- header at all): both `self` and `thisPerformance` are scope-visible (KerML's
 -- implicit self-reference and a redefinable feature of `Performance`), auto-bound
