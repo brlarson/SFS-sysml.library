@@ -1127,6 +1127,26 @@ def Get (d : Occurrence) (f : Element) (tau : Time) : Set Item := interpValAt (f
 /-- `I[[d::f]]`: the (untimed/constant) value of feature `f` of `d`. -/
 def GetC (d : Occurrence) (f : Element) : Set Item := interpVal (featureAccess d f)
 
+/-- The predicate-reading counterpart to `featureAccess` above, for `d::f` when `f`
+is itself Boolean-valued (KerML's `BooleanEvaluation`, `Domain.kerml`'s own real
+`GetBooleanChange`/`GetChangeToTrue`/`GetChangeToFalse` -- `I[[d::e,tau]]` used bare,
+not compared against anything). `Item` is a fully opaque axiom (no internal
+true/false structure), so there is no sound way to *derive* "this `Occurrence`
+denotes true" from `featureAccess`'s `Set Item` result -- this is a genuinely new,
+independently-axiomatized accessor, mirroring `featureAccess` exactly except its
+codomain is `TProp` (a time-varying `Prop`) instead of `Occurrence` (a time-varying
+`Set Item`), matching KerML's own `\S`3.13.1 distinction between class-expressions
+(`A`, evaluated via `I[[·,·]]`/`Get`) and Boolean expressions/predicates (`φ`,
+evaluated via this and `GetP` below) -- the same "class vs. wff" split `Assert.lean`'s
+own `dslTerm`/`dslWff` categories already make, now given a real target on this side
+too. -/
+axiom featureAccessProp : Occurrence → Element → TProp
+
+/-- `I[[d::e,tau]]`, predicate reading: whether Boolean feature `e` of `d` holds at
+`tau` -- `interpAt` (already used for `\S`3.13.1's `φ @ τ`) applied to
+`featureAccessProp` the same way `Get` applies `interpValAt` to `featureAccess`. -/
+def GetP (d : Occurrence) (f : Element) (tau : Time) : Prop := interpAt (featureAccessProp d f) tau
+
 /-! ## `Lean4SFS/Assert.lean` name-compatibility aliases
 
 Real `@Assert{n="..."}` names in `sysml.library/**/*.kerml` use the full KerML

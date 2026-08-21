@@ -540,9 +540,12 @@ syntax (name := kermlClassifier) (kermlAbstractFlag)? "classifier " ident
 
 /-- KerML §8.2.4.3.1 `Feature`, relationship-part subset: `[abstract] feature f
 ([typed by T,+] | [: T,+]) [mult] [subsets S,+] [references R] [crosses X] [redefines
-D,+] [chains C] [inverse of V] [featured by F,+] ;`. Bare `: T,+` is an alternate
-spelling of `typed by T,+` (KerML's `TYPED_BY = ':' | 'typed' 'by'`, only the
-keyword form was covered before) -- both feed the same `FeatureTyping` elaboration.
+D,+ | :>> D,+] [chains C] [inverse of V] [featured by F,+] ;`. Bare `: T,+` is an
+alternate spelling of `typed by T,+` (KerML's `TYPED_BY = ':' | 'typed' 'by'`, only
+the keyword form was covered before) -- both feed the same `FeatureTyping`
+elaboration; `:>> D,+` is likewise the symbolic alternate spelling of `redefines D,+`
+(`REDEFINES = 'redefines' | ':>>'`, `Domain.kerml`'s own real `feature e :
+BooleanEvaluation[1] :>> f;`), both feeding the same `Redefinition` elaboration.
 `[mult]` (`kermlMult` above) is parsed but not stored, matching that category's own
 note. -/
 syntax (name := kermlFeature) (kermlAbstractFlag)? "feature " ident
@@ -553,6 +556,7 @@ syntax (name := kermlFeature) (kermlAbstractFlag)? "feature " ident
   (" references " kermlQualName)?
   (" crosses " kermlQualName)?
   (" redefines " kermlQualName,+)?
+  (" :>> " kermlQualName,+)?
   (" chains " kermlQualName)?
   (" inverse" " of " kermlQualName)?
   (" featured" " by " kermlQualName,+)?
@@ -743,6 +747,7 @@ partial def elabKermlDecl : TSyntax `kermlDecl → MacroM (Array (TSyntax `term)
         $[references $refF:kermlQualName]?
         $[crosses $crossF:kermlQualName]?
         $[redefines $redefs,*]?
+        $[:>> $redefs2,*]?
         $[chains $chainF:kermlQualName]?
         $[inverse of $invF:kermlQualName]?
         $[featured by $feats,*]?
@@ -772,12 +777,11 @@ partial def elabKermlDecl : TSyntax `kermlDecl → MacroM (Array (TSyntax `term)
           let rel ← mkCrossSubsettingTerm aT gT an (qualNameStr g)
           pure #[← `(($rel).elt)]
       | none => pure #[]
-    let redefElems ← match redefs with
-      | some rs => rs.getElems.mapM (fun g => do
-          let gT ← featureStubTermQ g
-          let rel ← mkRedefinitionTerm aT gT an (qualNameStr g)
-          `(($rel).elt))
-      | none => pure #[]
+    let redefTargets := (redefs.map (·.getElems) |>.getD #[]) ++ (redefs2.map (·.getElems) |>.getD #[])
+    let redefElems ← redefTargets.mapM (fun g => do
+        let gT ← featureStubTermQ g
+        let rel ← mkRedefinitionTerm aT gT an (qualNameStr g)
+        `(($rel).elt))
     let chainElems ← match chainF with
       | some g => do
           let gT ← featureStubTermQ g
@@ -945,5 +949,10 @@ elab "kerml% " d:kermlDecl : term => do
   import Assertion::Assert ;
   feature self : Widget ;
 }
+
+-- Domain.kerml's own real `feature e : BooleanEvaluation[1] :>> f;` (nested inside
+-- `GetBooleanChange`'s anonymous `in feature :>> d {...}`, out of scope for
+-- `Kernel.lean` in this smoke test but the `:>>` clause itself is Core.lean's own).
+#check kerml% feature e : BooleanEvaluation[1] :>> f ;
 
 end KerML.Core

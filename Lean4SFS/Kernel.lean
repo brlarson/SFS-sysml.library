@@ -208,7 +208,7 @@ Boolean result: true if `isNegated = false`, false if `isNegated = true`. Constr
 (not encoded): must specialize `Performances::falseEvaluations` (if negated) or
 `Performances::trueEvaluations` (otherwise). -/
 structure Invariant extends BooleanExpression where
-  isNegated : Bool := false
+  isNegated : Bool := Bool.false
   deriving Repr
 
 /-- KerML §8.3.4.7 `Predicate`. A `KFunction` whose result parameter has type
@@ -394,8 +394,8 @@ a bound value or initial value, and can be a concrete value or a default
 (overridable) value; a `Feature` can have at most one `FeatureValue` (constraint, not
 encoded). -/
 structure FeatureValue extends OwningMembership where
-  isDefault : Bool := false
-  isInitial : Bool := false
+  isDefault : Bool := Bool.false
+  isInitial : Bool := Bool.false
   deriving Repr
 
 /-! ## 8.3.4.11 Multiplicities -/
@@ -447,7 +447,7 @@ library; it and everything it (directly/indirectly) contains are library element
 `isStandard` should only be true for `LibraryPackage`s in the standard Kernel Model
 Libraries, or in normative model libraries for a language built on KerML. -/
 structure LibraryPackage extends Package where
-  isStandard : Bool := false
+  isStandard : Bool := Bool.false
   deriving Repr
 
 /-! ## Concrete syntax (KerML §8.2.5 "Kernel Concrete Syntax")
@@ -591,7 +591,7 @@ unique name from content that has none in the real grammar either. -/
 def mkInvariantStub (name : String := "invariant") : Invariant := { elementId := name }
 def Invariant.elt (i : Invariant) : Element := i.toBooleanExpression.toExpression.elt
 def mkFeatureValueStub : FeatureValue :=
-  { elementId := "value", memberElement := { elementId := "value" }, isDefault := true }
+  { elementId := "value", memberElement := { elementId := "value" }, isDefault := Bool.true }
 def FeatureValue.elt (v : FeatureValue) : Element := v.toOwningMembership.toMembership.toRelationship.toElement
 
 /-- A `Feature`'s direction prefix, spelled with an explicit `feature` keyword right
@@ -632,6 +632,14 @@ def dirFlagTerm : TSyntax `kermlDirFlag → MacroM (TSyntax `term)
   | `(kermlDirFlag| inout) => `(FeatureDirectionKind.inoutDir)
   | _ => Macro.throwUnsupported
 
+/-- Like `mkDirFeatureStub` (`Core.lean`), but `declaredName := none` -- for the
+anonymous `in feature :>> d {...}` form (`kermlKDecl` below), which really has no
+name in real KerML either. `elemId` is still synthesized (this project's `Element`
+values always need one to be constructible/distinguishable, per `mkFeatureValueStub`'s
+own precedent above), just not surfaced as `declaredName`. -/
+def mkAnonDirFeatureStub (elemId : String) (dir : FeatureDirectionKind) : Feature :=
+  { elementId := elemId, declaredName := none, direction := some dir }
+
 declare_syntax_cat kernelDecl
 /-- Declared here (category name only, matching `Assert.lean`'s own "declare every
 category up front" lesson for forward references) so `predicate`'s own `syntax`
@@ -660,7 +668,17 @@ syntax (kermlAbstractFlag)? "struct " ident (" specializes " kermlQualName,+)? (
 syntax (kermlAbstractFlag)? "assoc " ident (" specializes " kermlQualName,+)? (" conjugates " kermlQualName)?
   (" disjoint" " from " kermlQualName,+)? (" unions " kermlQualName,+)? (" intersects " kermlQualName,+)?
   (" differences " kermlQualName,+)? kermlBody : kernelDecl
-syntax (kermlAbstractFlag)? "behavior " ident (" specializes " kermlQualName,+)? (" conjugates " kermlQualName)?
+/-- `behavior` alone (of the nine classifier-like keywords) also accepts the symbolic
+`:>` alternate spelling of `specializes` (`Domain.kerml`'s own real `behavior
+GetBooleanChange :> GetChange {...}` / `behavior GetChangeToTrue :>
+GetBooleanChange{...}`) -- `:>` is KerML's general "specialize-or-subset" symbol,
+disambiguated by whether the owner is a `Classifier` (specializes) or `Feature`
+(subsets); here the owner is always a `Classifier` (`behavior`), so it always means
+`specializes`, feeding the same `Subclassification` elaboration as the keyword form.
+Not added to the other eight classifier-like keywords -- no real file in this repo
+uses `:>` on them, keeping the diff scoped to what's actually needed. -/
+syntax (kermlAbstractFlag)? "behavior " ident (" specializes " kermlQualName,+)? (" :> " kermlQualName,+)?
+  (" conjugates " kermlQualName)?
   (" disjoint" " from " kermlQualName,+)? (" unions " kermlQualName,+)? (" intersects " kermlQualName,+)?
   (" differences " kermlQualName,+)? kermlPredBody : kernelDecl
 syntax (kermlAbstractFlag)? "function " ident (" specializes " kermlQualName,+)? (" conjugates " kermlQualName)?
@@ -955,9 +973,21 @@ comment for the same underlying file-ordering reason):
    `feature start : Instant = 0.0 [s] {...}`. -/
 declare_syntax_cat kermlKDecl
 syntax kermlDecl : kermlKDecl
-syntax kermlDirFlag "feature " kermlIdent (" : " kermlQualName,+)? (kermlMult)? (" = " kermlExpr)? kermlBody : kermlKDecl
+syntax kermlDirFlag "feature " kermlIdent (" : " kermlQualName,+)? (kermlMult)? (" :>> " kermlQualName)?
+  (" = " kermlExpr)? kermlBody : kermlKDecl
 syntax "return " kermlIdent " : " kermlQualName (kermlMult)? (" = " kermlExpr)? kermlBody : kermlKDecl
 syntax "feature " kermlIdent " : " kermlQualName (kermlMult)? " = " kermlExpr kermlBody : kermlKDecl
+/-- An **anonymous** direction-prefixed `Feature` -- no declared name at all, just a
+`:>>` (`redefines`) target and its own nested body, `Domain.kerml`'s own real
+`in feature :>> d { feature e : BooleanEvaluation[1] :>> f; }` (`GetBooleanChange`
+redefining `GetChange`'s inherited `d` parameter to add a nested `e` feature, without
+renaming `d`). Legitimate per the real grammar: `FeatureDeclaration`'s own
+`Identification` is optional, and a `BasicFeaturePrefix` (`in`) plus a
+`FeatureSpecializationPart` (`:>> d`) already disambiguate that a `Feature` is being
+declared even with no name. `elementId`/`declaredName` are synthesized from the
+redefined target's name (`declaredName` stays `none`, matching the real anonymity) --
+see its own elaborator arm for why. -/
+syntax kermlDirFlag "feature " " :>> " kermlQualName kermlBody : kermlKDecl
 
 /-- Shared by the plain `feature ... = ...` production of `kermlKDecl` below (usable
 nested inside a `predicate`/`function`/`behavior` body) and the identically-shaped
@@ -979,7 +1009,7 @@ def elabFeatureDefaultElems (an : String) (ty : TSyntax `kermlQualName)
 def elabKermlKDecl : TSyntax `kermlKDecl → MacroM (Array (TSyntax `term))
   | `(kermlKDecl| $d:kermlDecl) => elabKermlDecl d
   | `(kermlKDecl| $dir:kermlDirFlag feature $a:kermlIdent $[: $tys,*]? $[$_mult:kermlMult]?
-        $[= $val:kermlExpr]? $body:kermlBody) => do
+        $[:>> $redefT:kermlQualName]? $[= $val:kermlExpr]? $body:kermlBody) => do
     let an := kermlIdentStr a
     let dT ← dirFlagTerm dir
     let aT ← `(mkDirFeatureStub $(quote an) $dT)
@@ -987,11 +1017,26 @@ def elabKermlKDecl : TSyntax `kermlKDecl → MacroM (Array (TSyntax `term))
         let gT ← kTypeStubTermQ g
         let rel ← mkFeatureTypingTerm aT gT an (qualNameStr g)
         `(($rel).elt))
+    let redefElems ← match redefT with
+      | some g => do
+          let gT ← featureStubTermQ g
+          let rel ← mkRedefinitionTerm aT gT an (qualNameStr g)
+          pure #[← `(($rel).elt)]
+      | none => pure #[]
     let valElems ← match val with
       | some v => do pure (#[← `((mkFeatureValueStub).elt)] ++ (← elabKermlExpr v))
       | none => pure #[]
     let bodyElems ← elabKermlBody body
-    pure (#[← `(($aT).elt)] ++ tyElems ++ valElems ++ bodyElems)
+    pure (#[← `(($aT).elt)] ++ tyElems ++ redefElems ++ valElems ++ bodyElems)
+  | `(kermlKDecl| $dir:kermlDirFlag feature :>> $redefT:kermlQualName $body:kermlBody) => do
+    let dT ← dirFlagTerm dir
+    let redefN := qualNameStr redefT
+    let elemId := "anon-redefines-" ++ redefN
+    let aT ← `(mkAnonDirFeatureStub $(quote elemId) $dT)
+    let gT ← featureStubTermQ redefT
+    let rel ← mkRedefinitionTerm aT gT elemId redefN
+    let bodyElems ← elabKermlBody body
+    pure (#[← `(($aT).elt), ← `(($rel).elt)] ++ bodyElems)
   | `(kermlKDecl| return $a:kermlIdent : $ty:kermlQualName $[$_mult:kermlMult]?
         $[= $val:kermlExpr]? $body:kermlBody) => do
     let an := kermlIdentStr a
@@ -1095,10 +1140,20 @@ def elabKernelDecl : TSyntax `kernelDecl → MacroM (Array (TSyntax `term))
         $[disjoint from $disj,*]? $[unions $uni,*]? $[intersects $inter,*]? $[differences $diff,*]? $body:kermlBody) => do
     let declElems ← classifierLikeDeclElems associationStubTerm a specs conj disj uni inter diff
     pure (declElems ++ (← elabKermlBody body))
-  | `(kernelDecl| $[$_abs:kermlAbstractFlag]? behavior $a:ident $[specializes $specs,*]? $[conjugates $conj:kermlQualName]?
+  | `(kernelDecl| $[$_abs:kermlAbstractFlag]? behavior $a:ident $[specializes $specs,*]? $[:> $specs2,*]?
+        $[conjugates $conj:kermlQualName]?
         $[disjoint from $disj,*]? $[unions $uni,*]? $[intersects $inter,*]? $[differences $diff,*]? $body:kermlPredBody) => do
     let declElems ← classifierLikeDeclElems behaviorStubTerm a specs conj disj uni inter diff
-    pure (declElems ++ (← elabKermlPredBody body))
+    let an := a.getId.toString
+    let symSpecElems ← match specs2 with
+      | some ss => ss.getElems.mapM (fun g => do
+          let aT ← behaviorStubTerm an
+          let aC ← `(($aT).toClassifierC)
+          let gC ← classifierStubTermQ g
+          let rel ← mkSubclassificationTerm aC gC an (qualNameStr g)
+          `(($rel).elt))
+      | none => pure #[]
+    pure (declElems ++ symSpecElems ++ (← elabKermlPredBody body))
   | `(kernelDecl| $[$_abs:kermlAbstractFlag]? function $a:ident $[specializes $specs,*]? $[conjugates $conj:kermlQualName]?
         $[disjoint from $disj,*]? $[unions $uni,*]? $[intersects $inter,*]? $[differences $diff,*]? $body:kermlPredBody) => do
     let declElems ← classifierLikeDeclElems kFunctionStubTerm a specs conj disj uni inter diff
@@ -1367,6 +1422,44 @@ elab "kernel% " d:kernelDecl : term => do
     "(I[[d::f,tau]] <> I[[d::f,now]] and forall t~Instant in tau ., now are I[[d::f,t]] = I[[d::f,tau]])"+
     " implies v = I[[d::f,now]] >>";
     t="df-bl.changed";}
+
+-- Domain.kerml's own real `behavior GetBooleanChange :> GetChange {...}` -- the
+-- symbolic `:>` specializes header (new, `behavior`-only) and the anonymous
+-- `in feature :>> d {...}` redefining `GetChange`'s own `d` parameter (new,
+-- `kermlKDecl`), whose own nested `feature e : BooleanEvaluation[1] :>> f;` uses the
+-- symbolic `:>>` redefines clause on Core.lean's plain `feature` (new). `out feature
+-- b : Boolean[1] :>> v;` closes the loop with `:>>` on the named direction-prefixed
+-- form too (new).
+#check kernel% behavior GetBooleanChange :> GetChange {
+  doc "GetBooleanChange, like GetChange, waits for d::e to toggle"
+  in feature :>> d {
+    feature e : BooleanEvaluation[1] :>> f ;
+  }
+  in feature tau : Instant[1] ;
+  out feature b : Boolean[1] :>> v ;
+}
+#check kernel% @Assert{n="GetBooleanChange"; f="<<GetBooleanChange : d~Occurrence, e~BooleanEvaluation, tau~Instant : "+
+    "(I[[d::e,tau]] <> I[[d::e,now]] and forall t~Instant in tau ., now are I[[d::e,t]] = I[[d::e,tau]])"+
+    " implies b = I[[d::e,now]] >>";
+    t="df-bl.changed";}
+
+-- Domain.kerml's own real `behavior GetChangeToTrue :> GetBooleanChange{...}` --
+-- empty body (`;`-equivalent `{}`), no new machinery beyond the symbolic `:>` header
+-- already exercised above.
+#check kernel% behavior GetChangeToTrue :> GetBooleanChange {
+  doc "GetChangeToTrue does not wait if d::e is already true"
+}
+#check kernel% @Assert{n="GetChangeToTrue"; f="<<GetChangeToTrue : d~Occurrence, e~BooleanEvaluation, tau~Instant : "+
+    "(I[[d::e,now]] and forall t~Instant in tau ., now are not I[[d::e,t]] )"+
+    " implies b = true >>";}
+
+-- Domain.kerml's own real `behavior GetChangeToFalse :> GetBooleanChange{...}`.
+#check kernel% behavior GetChangeToFalse :> GetBooleanChange {
+  doc "GetChangeToFalse does not wait if d::e is already false"
+}
+#check kernel% @Assert{n="GetChangeToFalse"; f="<<GetChangeToFalse : d~Occurrence, e~BooleanEvaluation, tau~Instant : "+
+    "(not I[[d::e,now]] and forall t~Instant in tau ., now are I[[d::e,t]] )"+
+    " implies b = false >>";}
 
 #check kexpr% 1 + 2 * 3
 #check kexpr% true and not false

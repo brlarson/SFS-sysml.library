@@ -99,6 +99,20 @@ because `"result"` is *also* used as a leading keyword (in `dslBody`'s result-bi
 production), which reserves it out of plain `ident`. -/
 syntax "result" : dslTerm
 
+/-- Boolean literals (`Domain.kerml`'s own real `b = true`/`b = false`,
+`GetChangeToTrue`/`GetChangeToFalse`). A separate rule from the `ident` one above,
+same reason as `"result"` above but from the *other* direction: `Assert.lean` itself
+never reserves `"true"`/`"false"`, but `Kernel.lean` (which imports `Assert.lean` for
+`@Assert` wiring) does, for its own `kermlExpr` grammar -- once a `@Assert{...}`
+formula's `f="..."` string gets re-parsed via `Lean.Parser.runParserCategory` inside
+*that* file's environment (not this one), a bare `true`/`false` is no longer
+available as a plain `ident` token, the same file-wide keyword-reservation collision
+hit repeatedly elsewhere in this project. Explicit literal productions here make
+`dslTerm`'s own boolean literals robust regardless of what other keywords get
+registered by whatever file re-parses this text. -/
+syntax "true" : dslTerm
+syntax "false" : dslTerm
+
 /-- A numeral. -/
 syntax num : dslTerm
 
@@ -188,6 +202,25 @@ Not seen spelled this way in a real `f="..."` string (they go through `I[[·,τ]
 instead), included for fidelity to `df-bl0wff`. -/
 syntax dslWff " @ " dslTerm : dslWff
 
+/-- `I[[d::e,tau]]`, the *predicate* reading of the interpretation-bracket notation --
+same concrete syntax as `dslTerm`'s own `I[[...]]` production above, registered
+separately under `dslWff` so the identical real text (`Domain.kerml`'s own
+`GetBooleanChange`/`GetChangeToTrue`/`GetChangeToFalse`, e.g. bare `not
+I[[d::e,t]]`/`I[[d::e,now]] and ...`) elaborates via `SFS.lean`'s `GetP` (a genuine
+`Prop`) instead of `Get` (a `Set Item`) whenever it appears where a `dslWff` is
+expected, disambiguated purely by grammatical position -- no new spelling, matching
+KerML's own `\S`3.13.1 class-expression (`A`) vs. Boolean-expression (`φ`) split.
+The untimed form (`I[[d::e]]`, no `tau`) has no `GetPC`-style counterpart -- no real
+formula in this repo needs it yet, so it's a genuine (documented, not silent) macro
+error rather than a guessed definition. **This makes a bare `I[[d::f,tau]]` genuinely
+ambiguous** against `dslTerm`'s own identical-looking `I[[...]]` production (`Get`/
+`GetNow`'s real `:=`-bodies are exactly this bare shape, needing the `dslTerm`/`Get`
+reading) -- resolved not here but at `dslAssert`'s own level, see the dedicated
+`:=`-body production below `dslBody`'s declaration, which realizes the `:`/`:=` split
+`dslSep`'s own doc comment already promised but (until this ambiguity actually
+existed) never needed to enforce. -/
+syntax "I[[" dslTerm "::" ident ("," dslTerm)? "]]" : dslWff
+
 syntax:75 "not " dslWff:75 : dslWff
 syntax:40 dslWff:41 " and " dslWff:40 : dslWff
 syntax:35 dslWff:36 " or " dslWff:35 : dslWff
@@ -257,6 +290,21 @@ syntax "result" "~" dslType " | " dslWff : dslBody
 tau2 and not exists tau~Instant that (tau1 < tau and tau < tau2))>>`, or
 `<<Get : d~Occurrence, f~Anything, tau~Instant := I[[d::f,tau]]>>`. -/
 syntax "<<" ident ":" dslParam,* dslSep dslBody ">>" : dslAssert
+
+/-- `:=`-separated bodies are always value-definitions (`dslTerm`), per `dslSep`'s own
+doc comment (`:` for a `dslWff`, `:=` for a `dslTerm`) -- but the generic production
+above doesn't actually *enforce* that split; it just tries `dslBody`'s `(priority :=
+high) dslWff` alternative first, same as it would for a `:`-separated body. This was
+harmless as long as no real `dslWff` production could also match a `:=`-body's own
+text -- no longer true once `I[[...]]` became valid `dslWff` too (`Get`/`GetNow`'s
+own real `:=`-bodies, `I[[d::f,tau]]`/`I[[d::f,now]]`, are exactly this bare shape,
+needing `dslTerm`'s `Get` reading, not the new `dslWff` `GetP` one). `(priority :=
+high)`, tried before the generic production above, so a genuine `:=` separator always
+forces the `dslTerm` reading regardless of what else the body text could also parse
+as. Only covers a bare `dslTerm` body (not `result~Type | wff`) -- no real `:=`-body
+in this repo uses that shape; anything else still falls through to the generic
+production's own `dslTerm : dslBody` alternative, unaffected by this addition. -/
+syntax (priority := high) "<<" ident ":" dslParam,* ":=" dslTerm ">>" : dslAssert
 
 /-- The anonymous form, `<<body>>` with no `Name :` header at all -- common in `inv{}`
 attachments outside the SFS library folder proper (`Performances.kerml`,
@@ -337,6 +385,8 @@ mutual
 /-- `dslTerm` → the `SFS.lean`/Lean term it denotes. -/
 partial def elabDslTerm : TSyntax `dslTerm → MacroM (TSyntax `term)
   | `(dslTerm| result) => `($resultIdent)
+  | `(dslTerm| true) => `(Bool.true)
+  | `(dslTerm| false) => `(Bool.false)
   | `(dslTerm| $x:ident) => do
     -- `now` is special-cased: every real formula uses it in a `Time`-typed position
     -- (`I[[d::f,now]]`'s `tau` argument, or a range's upper bound alongside another
@@ -447,6 +497,13 @@ partial def elabDslWff : TSyntax `dslWff → MacroM (TSyntax `term)
     `(DSLMem.mem $(← elabDslTerm a) $(← elabDslTerm b))
   | `(dslWff| $φ:dslWff @ $tau:dslTerm) => do
     `(interpAt $(← elabDslWff φ) $(← elabDslTerm tau))
+  | `(dslWff| I[[ $d:dslTerm :: $f:ident $[, $tau:dslTerm]? ]]) => do
+    let d' ← elabDslTerm d
+    match tau with
+    | some tau => do let tau' ← elabDslTerm tau; `(GetP $d' $f $tau')
+    | none => Macro.throwError "I[[d::f]] (untimed) as a wff: no GetPC-style \
+        predicate reading is defined yet -- every real formula using this position \
+        gives an explicit time (I[[d::f,tau]])"
   | `(dslWff| not $φ:dslWff) => do `(¬ $(← elabDslWff φ))
   | `(dslWff| $φ:dslWff and $ψ:dslWff) => do `($(← elabDslWff φ) ∧ $(← elabDslWff ψ))
   | `(dslWff| $φ:dslWff or $ψ:dslWff) => do `($(← elabDslWff φ) ∨ $(← elabDslWff ψ))
@@ -514,6 +571,8 @@ relation names (`R` in `a R b`, in `freeIdentsInWff` below) are *never* free --
 they're meant to resolve as existing `SFS.lean` names, same as today. -/
 partial def freeIdentsInTerm (bound : List Name) : TSyntax `dslTerm → MacroM (List Name)
   | `(dslTerm| result) => pure []
+  | `(dslTerm| true) => pure []
+  | `(dslTerm| false) => pure []
   | `(dslTerm| $x:ident) => pure (if x.getId == `now || bound.contains x.getId then [] else [x.getId])
   | `(dslTerm| $_n:num) => pure []
   | `(dslTerm| $_f:ident($args,*)) => do
@@ -615,6 +674,13 @@ function for a `:`-separated `dslWff` body, an ordinary value-valued function fo
 `:=`-separated `dslTerm` body, or (for the named-result form) a `Prop`-valued relation
 between `params` and an explicit trailing `result` parameter. -/
 def elabDslAssert : TSyntax `dslAssert → MacroM (TSyntax `term)
+  | `(dslAssert| << $_name:ident : $params,* := $t:dslTerm >>) => do
+    let paramGroups ← params.getElems.mapM elabDslParam
+    let binders := paramGroups.foldl (· ++ ·) #[]
+    let headerNames := binders.toList.map (·.1.getId)
+    let withAuto ← (← freeIdentsInTerm headerNames t).eraseDups.foldrM mkAutoFun (← elabDslTerm t)
+    binders.foldrM (fun (b : TSyntax `ident × TSyntax `term) (acc : TSyntax `term) =>
+      `(fun ($(b.1) : $(b.2)) => $acc)) withAuto
   | `(dslAssert| << $_name:ident : $params,* $_sep:dslSep $body:dslBody >>) => do
     let paramGroups ← params.getElems.mapM elabDslParam
     let binders := paramGroups.foldl (· ++ ·) #[]
@@ -694,6 +760,13 @@ example : domain% <<next : tau1~Instant, tau2~Instant : (tau1 < tau2 and
 #check domain% <<Get : d~Occurrence, f~Anything, tau~Instant := I[[d::f,tau]] >>
 
 example : domain% <<Get : d~Occurrence, f~Anything, tau~Instant := I[[d::f,tau]] >> = Get := rfl
+
+-- Domain.kerml `GetChangeToTrue`, exercising `I[[...]]`'s *predicate* reading (new):
+-- a bare `I[[d::e,now]]` as the left operand of `and`, and `not I[[d::e,t]]` --
+-- both `GetP`, a genuine `Prop`, not `Get`'s `Set Item`.
+#check domain% <<GetChangeToTrue : d~Occurrence, e~BooleanEvaluation, tau~Instant :
+  (I[[d::e,now]] and forall t~Instant in tau ., now are not I[[d::e,t]] )
+    implies b = true >>
 
 -- Regions.kerml `NOINTP`.
 #check domain% << NOINTP : : forall r1,r2~Region are
