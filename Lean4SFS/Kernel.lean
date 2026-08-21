@@ -582,6 +582,56 @@ def classifierLikeDeclElems (mkStub : String → MacroM (TSyntax `term)) (a : TS
     | none => pure #[]
   pure (#[← `(($aT).elt)] ++ specElems ++ conjElems ++ disjElems ++ uniElems ++ interElems ++ diffElems)
 
+/-- `Invariant` (KerML §8.3.4.7) and `FeatureValue` (§8.3.4.10) stubs -- both types
+already existed in this file (from the original structural-only pass) but were never
+wired to any concrete syntax until `Domain.kerml`'s own `inv {...}` blocks and
+`feature ... = ...` default values needed them. Fixed, generic `elementId`s (`"invariant"`/
+`"value"`), matching `mkDocumentationStub`'s own precedent of not trying to derive a
+unique name from content that has none in the real grammar either. -/
+def mkInvariantStub (name : String := "invariant") : Invariant := { elementId := name }
+def Invariant.elt (i : Invariant) : Element := i.toBooleanExpression.toExpression.elt
+def mkFeatureValueStub : FeatureValue :=
+  { elementId := "value", memberElement := { elementId := "value" }, isDefault := true }
+def FeatureValue.elt (v : FeatureValue) : Element := v.toOwningMembership.toMembership.toRelationship.toElement
+
+/-- A `Feature`'s direction prefix, spelled with an explicit `feature` keyword right
+after it (`Domain.kerml`'s own real `in feature d : Occurrence[1] {...}` /
+`out feature v : Anything[0..1];` -- distinct from `Core.lean`'s bare `in x : T ;`
+short form, which never uses the `feature` keyword; both are legitimate per the real
+grammar, just different concrete choices different files happen to make). `return`
+(KerML's `ReturnParameterMember`) is deliberately **not** one of these three -- it
+never takes an explicit `feature` keyword in real text either (`Domain.kerml`'s own
+`return result : Anything[0..1] = Get(d, now);`), so it gets its own dedicated
+`kermlKDecl` production below instead of forcing an artificial shared shape. -/
+declare_syntax_cat kermlDirFlag
+syntax "in " : kermlDirFlag
+syntax "out " : kermlDirFlag
+syntax "inout " : kermlDirFlag
+
+/-- A declared name that might be the literal word `result` -- an ordinary
+identifier in real KerML (not a keyword there), but unusable as a bare `ident` in
+*this* grammar once `Assert.lean` is imported (for `@Assert` wiring, see that entry
+above): `Assert.lean` registers `"result"` as its own leading keyword (`dslTerm`'s
+result-binding form), which reserves the word file-wide the same way `"true"`/
+`"false"`/`"Assert"` did earlier -- not a KerML restriction, just this tool's. Used
+at the return-parameter name position below (`Domain.kerml`'s own real `return
+result : ...;`), the one place in this repo's real files the collision actually
+surfaces. -/
+declare_syntax_cat kermlIdent
+syntax ident : kermlIdent
+syntax "result" : kermlIdent
+
+def kermlIdentStr : TSyntax `kermlIdent → String
+  | `(kermlIdent| $i:ident) => i.getId.toString
+  | `(kermlIdent| result) => "result"
+  | _ => ""
+
+def dirFlagTerm : TSyntax `kermlDirFlag → MacroM (TSyntax `term)
+  | `(kermlDirFlag| in) => `(FeatureDirectionKind.inDir)
+  | `(kermlDirFlag| out) => `(FeatureDirectionKind.outDir)
+  | `(kermlDirFlag| inout) => `(FeatureDirectionKind.inoutDir)
+  | _ => Macro.throwUnsupported
+
 declare_syntax_cat kernelDecl
 /-- Declared here (category name only, matching `Assert.lean`'s own "declare every
 category up front" lesson for forward references) so `predicate`'s own `syntax`
@@ -589,7 +639,13 @@ declaration below can end in it; its actual productions -- which need `kermlExpr
 declared much later in this file -- are added alongside `elabKermlPredBody` after
 that section. See that declaration's own doc comment for why `predicate` alone (not
 the other eight classifier-like keywords) needs a body category richer than
-`kermlBody`. -/
+`kermlBody`. **Since generalized to `behavior`/`function` too** (`Domain.kerml`'s
+`function Get`/`GetNow`, `behavior SetNow`/`GetChange`, ... all need the same
+`kermlExpr`-dependent parameter/return/default-value shapes `predicate` already
+established the pattern for) -- kept the original name rather than renaming, since
+every doc comment and smoke test referencing "predicate's own body category" already
+existed before this widened its actual usage; treat "predicate" in older comments as
+"predicate/function/behavior" from here on. -/
 declare_syntax_cat kermlPredBody
 
 syntax (kermlAbstractFlag)? "datatype " ident (" specializes " kermlQualName,+)? (" conjugates " kermlQualName)?
@@ -606,10 +662,10 @@ syntax (kermlAbstractFlag)? "assoc " ident (" specializes " kermlQualName,+)? ("
   (" differences " kermlQualName,+)? kermlBody : kernelDecl
 syntax (kermlAbstractFlag)? "behavior " ident (" specializes " kermlQualName,+)? (" conjugates " kermlQualName)?
   (" disjoint" " from " kermlQualName,+)? (" unions " kermlQualName,+)? (" intersects " kermlQualName,+)?
-  (" differences " kermlQualName,+)? kermlBody : kernelDecl
+  (" differences " kermlQualName,+)? kermlPredBody : kernelDecl
 syntax (kermlAbstractFlag)? "function " ident (" specializes " kermlQualName,+)? (" conjugates " kermlQualName)?
   (" disjoint" " from " kermlQualName,+)? (" unions " kermlQualName,+)? (" intersects " kermlQualName,+)?
-  (" differences " kermlQualName,+)? kermlBody : kernelDecl
+  (" differences " kermlQualName,+)? kermlPredBody : kernelDecl
 syntax (kermlAbstractFlag)? "predicate " ident (" specializes " kermlQualName,+)? (" conjugates " kermlQualName)?
   (" disjoint" " from " kermlQualName,+)? (" unions " kermlQualName,+)? (" intersects " kermlQualName,+)?
   (" differences " kermlQualName,+)? kermlPredBody : kernelDecl
@@ -633,13 +689,34 @@ syntax "standard " "library " "package " ident kermlBody : kernelDecl
 bracket there -- `MultiplicityRange` has zero stored fields. -/
 syntax "multiplicity " ident kermlMult kermlBody : kernelDecl
 
-/-- One `name="value";` redefinition inside an `@Assert{...}`/`@Invariant{...}`
+/-- A `MetadataBodyFeature` attribute *value* (KerML §8.2.5.12): a bare string, a
+`+`-concatenated chain of strings (`Domain.kerml`'s own real multi-line `f="..."+
+"...";` formulas, split across lines for readability -- real KerML attribute values
+are general `Expression`s, and string concatenation via `+` is a legitimate one, not
+a new construct), or a parenthesized tuple of strings (`Domain.kerml`'s own real
+`t=("Get","now");`, KerML's `t[0..*]` multiplicity spelled out literally). Only the
+resulting *string content* is kept (`kermlMetaAttrValStr` below) -- `f=`'s value is
+what actually gets re-parsed/elaborated (see the `kernel%` trigger's own doc
+comment); `n=`/`t=` are bookkeeping only, so a tuple's exact structure (vs. a single
+joined string) is never inspected downstream. -/
+declare_syntax_cat kermlMetaAttrVal
+syntax str (" + " str)* : kermlMetaAttrVal
+syntax "(" str,+ ")" : kermlMetaAttrVal
+
+def kermlMetaAttrValStr : TSyntax `kermlMetaAttrVal → String
+  | `(kermlMetaAttrVal| $s:str $[+ $more:str]*) =>
+      ((#[s] ++ more).map (·.getString)).foldl (· ++ ·) ""
+  | `(kermlMetaAttrVal| ($ss,*)) =>
+      String.intercalate "," (ss.getElems.map (·.getString)).toList
+  | _ => ""
+
+/-- One `name=value;` redefinition inside an `@Assert{...}`/`@Invariant{...}`
 `MetadataBody` (KerML §8.2.5.12's `MetadataBodyFeature`, simplified to just a
 name/string-value pair -- real KerML allows a full nested feature redefinition here,
 this only covers the attribute-assignment shape every real `@Assert{...}` in this
 repo actually uses). -/
 declare_syntax_cat kermlMetaAttr
-syntax ident " = " str " ;" : kermlMetaAttr
+syntax ident " = " kermlMetaAttrVal " ;" : kermlMetaAttr
 
 /-- KerML §8.2.5.12 `MetadataFeature`, scoped to the one real shape this repo uses
 throughout (per `CLAUDE.md`): `@Assert{n="..."; f="<<...>>"; t="...";}`. Produces a
@@ -757,6 +834,13 @@ syntax "new " ident "(" kermlExpr,* ")" : kermlExpr
 
 syntax:90 kermlExpr:90 "." ident : kermlExpr
 syntax:90 kermlExpr:90 "#" "(" kermlExpr,* ")" : kermlExpr
+/-- A unit-bracket suffix on a value, `Domain.kerml`'s own `feature start : Instant =
+0.0 [s] {...}` (a `QuantityValue`-style unit-annotated literal, per the Kernel
+Semantic/Quantities libraries, out of scope here). Not real `Quantity` semantics --
+just captures both pieces of text as flat sibling elements (the value's own elements,
+plus a `FeatureReferenceExpression` stub for the bracketed unit name), the same
+"structure without semantics" trade this whole grammar already makes throughout. -/
+syntax:90 kermlExpr:90 "[" kermlQualName "]" : kermlExpr
 
 syntax:80 "-" kermlExpr:80 : kermlExpr
 syntax:80 "not " kermlExpr:80 : kermlExpr
@@ -807,6 +891,9 @@ partial def elabKermlExpr : TSyntax `kermlExpr → MacroM (Array (TSyntax `term)
     let eElems ← elabKermlExpr e
     let argElems ← args.getElems.mapM elabKermlExpr
     pure (#[← `((mkIndexStub "index-expr").elt)] ++ eElems ++ argElems.foldl (· ++ ·) #[])
+  | `(kermlExpr| $e:kermlExpr [$u:kermlQualName]) => do
+    let eElems ← elabKermlExpr e
+    pure (eElems ++ #[← `((mkFeatureReferenceStub $(quote (qualNameStr u))).elt)])
   | `(kermlExpr| -$e:kermlExpr) => do
     let eElems ← elabKermlExpr e
     pure (#[← `((mkOperatorStub "unary-minus" "-").elt)] ++ eElems)
@@ -847,29 +934,130 @@ elab "kexpr% " e:kermlExpr : term => do
   let stx ← Elab.liftMacroM (mkListTerm elems.toList)
   Elab.Term.elabTerm stx none
 
-/-- `predicate`'s own body category (see its `declare_syntax_cat` above): everything
-`kermlBody` already covers (`;` / `{ kermlDecl* }`), plus a *new* shape --
+/-- `predicate`/`function`/`behavior`'s own body-item category: either a plain
+`Core.lean` `kermlDecl` (passthrough, elaborated via `Core.lean`'s own
+`elabKermlDecl`), or one of two new shapes `kermlDecl` itself can't express because
+they need `kermlExpr` (compiled after `Core.lean`, see `kermlPredBody`'s own doc
+comment for the same underlying file-ordering reason):
+1. A direction-prefixed *explicit* `feature` keyword form, `Domain.kerml`'s own real
+   `in feature d : Occurrence[1] {...}` / `out feature v : Anything[0..1];` --
+   distinct from `Core.lean`'s bare `in x : T ;` short form (no `feature` keyword),
+   which stays as-is; both are legitimate concrete spellings of the same abstract
+   `Feature` with a `direction`. Optionally carries a trailing `= kermlExpr` default
+   value too (not exercised by any real `in`/`out feature` in this repo yet, but
+   symmetric with the `return`/plain-`feature` forms below, so not artificially
+   dropped).
+2. `return`'s own dedicated form (no `feature` keyword at all, per the real grammar --
+   see `kermlDirFlag`'s own doc comment) and plain `feature`'s own form *with* a
+   mandatory `= kermlExpr` default (mandatory so it never overlaps with the
+   `kermlDecl`-passthrough `feature` production, which has no default-value clause at
+   all): `Domain.kerml`'s own `return result : Anything[0..1] = Get(d, now);` and
+   `feature start : Instant = 0.0 [s] {...}`. -/
+declare_syntax_cat kermlKDecl
+syntax kermlDecl : kermlKDecl
+syntax kermlDirFlag "feature " kermlIdent (" : " kermlQualName,+)? (kermlMult)? (" = " kermlExpr)? kermlBody : kermlKDecl
+syntax "return " kermlIdent " : " kermlQualName (kermlMult)? (" = " kermlExpr)? kermlBody : kermlKDecl
+syntax "feature " kermlIdent " : " kermlQualName (kermlMult)? " = " kermlExpr kermlBody : kermlKDecl
+
+/-- Shared by the plain `feature ... = ...` production of `kermlKDecl` below (usable
+nested inside a `predicate`/`function`/`behavior` body) and the identically-shaped
+`kernelDecl` production declared further down (usable standalone/top-level, e.g.
+`Domain.kerml`'s own package-level `feature start : Instant = 0.0 [s] {...}`) -- the
+same declaration text is valid in both positions in real KerML, and this project's
+grammar otherwise has no single category reachable from *both* `kernel%`'s top-level
+trigger and a nested `kermlPredBody`, so the two productions/elaborator dispatches
+stay separate, sharing just this one function. -/
+def elabFeatureDefaultElems (an : String) (ty : TSyntax `kermlQualName)
+    (val : TSyntax `kermlExpr) (body : TSyntax `kermlBody) : MacroM (Array (TSyntax `term)) := do
+  let aT ← `(mkFeatureStub $(quote an))
+  let tT ← kTypeStubTermQ ty
+  let rel ← mkFeatureTypingTerm aT tT an (qualNameStr ty)
+  let valElems ← elabKermlExpr val
+  let bodyElems ← elabKermlBody body
+  pure (#[← `(($aT).elt), ← `(($rel).elt), ← `((mkFeatureValueStub).elt)] ++ valElems ++ bodyElems)
+
+def elabKermlKDecl : TSyntax `kermlKDecl → MacroM (Array (TSyntax `term))
+  | `(kermlKDecl| $d:kermlDecl) => elabKermlDecl d
+  | `(kermlKDecl| $dir:kermlDirFlag feature $a:kermlIdent $[: $tys,*]? $[$_mult:kermlMult]?
+        $[= $val:kermlExpr]? $body:kermlBody) => do
+    let an := kermlIdentStr a
+    let dT ← dirFlagTerm dir
+    let aT ← `(mkDirFeatureStub $(quote an) $dT)
+    let tyElems ← (tys.map (·.getElems) |>.getD #[]).mapM (fun g => do
+        let gT ← kTypeStubTermQ g
+        let rel ← mkFeatureTypingTerm aT gT an (qualNameStr g)
+        `(($rel).elt))
+    let valElems ← match val with
+      | some v => do pure (#[← `((mkFeatureValueStub).elt)] ++ (← elabKermlExpr v))
+      | none => pure #[]
+    let bodyElems ← elabKermlBody body
+    pure (#[← `(($aT).elt)] ++ tyElems ++ valElems ++ bodyElems)
+  | `(kermlKDecl| return $a:kermlIdent : $ty:kermlQualName $[$_mult:kermlMult]?
+        $[= $val:kermlExpr]? $body:kermlBody) => do
+    let an := kermlIdentStr a
+    let aT ← `(mkDirFeatureStub $(quote an) FeatureDirectionKind.outDir)
+    let tT ← kTypeStubTermQ ty
+    let rel ← mkFeatureTypingTerm aT tT an (qualNameStr ty)
+    let valElems ← match val with
+      | some v => do pure (#[← `((mkFeatureValueStub).elt)] ++ (← elabKermlExpr v))
+      | none => pure #[]
+    let bodyElems ← elabKermlBody body
+    pure (#[← `(($aT).elt), ← `(($rel).elt)] ++ valElems ++ bodyElems)
+  | `(kermlKDecl| feature $a:kermlIdent : $ty:kermlQualName $[$_mult:kermlMult]? = $val:kermlExpr $body:kermlBody) =>
+    elabFeatureDefaultElems (kermlIdentStr a) ty val body
+  | _ => Macro.throwUnsupported
+
+/-- `predicate`/`function`/`behavior`'s own body category (see its
+`declare_syntax_cat` above): everything `kermlBody` already covers (`;` / `{
+kermlDecl* }`, now via `kermlKDecl`'s own passthrough), plus a *new* shape --
 declarations followed by a trailing bare `kermlExpr` -- matching how real KerML
 predicates give their own value (`Allen.kerml`'s `predicate precedes { ... in x :
 Occurrence; in y : Occurrence; x.endShot < y.startShot }`, the last line an
-unwrapped expression, not a further declaration). This is `predicate`-specific (not
-folded into `kermlBody` itself, usable by all nine classifier-like keywords) because
-`kermlBody`/`elabKermlBody` live in `Core.lean`, compiled *before* `kermlExpr`
-exists -- extending `kermlBody`'s own category from here would parse fine (Lean's
-`syntax` categories are open across files) but `Core.lean`'s already-compiled
-`elabKermlBody` could never dispatch on the new shape, silently dropping it. Giving
-`predicate` alone a separate, richer category defined entirely in this file (both
-grammar and elaborator) sidesteps that instead of fighting it. -/
-syntax kermlBody : kermlPredBody
-syntax " {" kermlDecl* kermlExpr "}" : kermlPredBody
+unwrapped expression, not a further declaration). This is `predicate`/`function`/
+`behavior`-specific (not folded into `kermlBody` itself, usable by all nine
+classifier-like keywords) because `kermlBody`/`elabKermlBody` live in `Core.lean`,
+compiled *before* `kermlExpr` exists -- extending `kermlBody`'s own category from
+here would parse fine (Lean's `syntax` categories are open across files) but
+`Core.lean`'s already-compiled `elabKermlBody` could never dispatch on the new shape,
+silently dropping it. Giving these three keywords a separate, richer category defined
+entirely in this file (both grammar and elaborator) sidesteps that instead of
+fighting it. -/
+syntax " ;" : kermlPredBody
+syntax " {" kermlKDecl* "}" : kermlPredBody
+syntax " {" kermlKDecl* kermlExpr "}" : kermlPredBody
 
 def elabKermlPredBody : TSyntax `kermlPredBody → MacroM (Array (TSyntax `term))
-  | `(kermlPredBody| $b:kermlBody) => elabKermlBody b
-  | `(kermlPredBody| { $decls:kermlDecl* $e:kermlExpr }) => do
-    let declElems ← decls.mapM elabKermlDecl
+  | `(kermlPredBody| ;) => pure #[]
+  | `(kermlPredBody| { $decls:kermlKDecl* }) => do
+    let declElems ← decls.mapM elabKermlKDecl
+    pure (declElems.foldl (· ++ ·) #[])
+  | `(kermlPredBody| { $decls:kermlKDecl* $e:kermlExpr }) => do
+    let declElems ← decls.mapM elabKermlKDecl
     let exprElems ← elabKermlExpr e
     pure (declElems.foldl (· ++ ·) #[] ++ exprElems)
   | _ => pure #[]
+
+/-- KerML §8.3.4.7 `Invariant`, standalone body form: `inv { <expr> }`
+(`Domain.kerml`'s own real `inv {lowerBound <= upperBound}`, inside `classifier
+Interval {...}`'s body). **Not** nestable inside `classifier`'s own body in this
+grammar -- `classifier` is `Core.lean`'s own keyword, whose body is `Core.lean`'s
+`kermlBody` (`kermlDecl*`, compiled before `kermlExpr`/`Invariant` exist), the exact
+same category-layering constraint documented at length for `library package`
+vs. `predicate`/`@Assert` in `Allen.kerml`'s own entry -- kept as a separate, sibling
+`kernelDecl`/`#check` instead, not nested inside `Interval`'s own smoke test. Real
+negated invariants (`inv not {...}`) aren't covered -- not present in any real file
+this project's smoke tests target. -/
+syntax "inv " "{" kermlExpr "}" : kernelDecl
+
+/-- Standalone/top-level counterpart to `kermlKDecl`'s own `feature ... = ...`
+production (see `elabFeatureDefaultElems`'s own doc comment for why these are two
+separate productions sharing one elaborator): `Domain.kerml`'s own package-level
+`feature start : Instant = 0.0 [s] {...}` sits directly inside `library package
+Domain {...}`'s body, not nested inside a `predicate`/`function`/`behavior` -- but
+(same constraint as `inv`/`@Assert` above) can't actually nest inside the wrapper's
+own `#check` either, since `library package`'s body is `Core.lean`'s `kermlBody`,
+compiled before `kermlExpr` exists; kept as its own sibling `#check`. -/
+syntax "feature " kermlIdent " : " kermlQualName (kermlMult)? " = " kermlExpr kermlBody : kernelDecl
 
 /-- `kernelDecl` → `Array (TSyntax term)`, matching `Core.lean`'s own
 `elabKermlDecl` convention (adopted there first, for the same "nested `kermlBody`
@@ -887,7 +1075,7 @@ down here once that dependency existed, even though the *syntax* declarations it
 pattern-matches against are still declared earlier (grammar categories don't have
 this ordering constraint, only the elaborator `def` does). -/
 def kermlMetaAttrPair : TSyntax `kermlMetaAttr → (String × String)
-  | `(kermlMetaAttr| $k:ident = $v:str ;) => (k.getId.toString, v.getString)
+  | `(kermlMetaAttr| $k:ident = $v:kermlMetaAttrVal ;) => (k.getId.toString, kermlMetaAttrValStr v)
   | _ => ("", "")
 
 def elabKernelDecl : TSyntax `kernelDecl → MacroM (Array (TSyntax `term))
@@ -908,13 +1096,13 @@ def elabKernelDecl : TSyntax `kernelDecl → MacroM (Array (TSyntax `term))
     let declElems ← classifierLikeDeclElems associationStubTerm a specs conj disj uni inter diff
     pure (declElems ++ (← elabKermlBody body))
   | `(kernelDecl| $[$_abs:kermlAbstractFlag]? behavior $a:ident $[specializes $specs,*]? $[conjugates $conj:kermlQualName]?
-        $[disjoint from $disj,*]? $[unions $uni,*]? $[intersects $inter,*]? $[differences $diff,*]? $body:kermlBody) => do
+        $[disjoint from $disj,*]? $[unions $uni,*]? $[intersects $inter,*]? $[differences $diff,*]? $body:kermlPredBody) => do
     let declElems ← classifierLikeDeclElems behaviorStubTerm a specs conj disj uni inter diff
-    pure (declElems ++ (← elabKermlBody body))
+    pure (declElems ++ (← elabKermlPredBody body))
   | `(kernelDecl| $[$_abs:kermlAbstractFlag]? function $a:ident $[specializes $specs,*]? $[conjugates $conj:kermlQualName]?
-        $[disjoint from $disj,*]? $[unions $uni,*]? $[intersects $inter,*]? $[differences $diff,*]? $body:kermlBody) => do
+        $[disjoint from $disj,*]? $[unions $uni,*]? $[intersects $inter,*]? $[differences $diff,*]? $body:kermlPredBody) => do
     let declElems ← classifierLikeDeclElems kFunctionStubTerm a specs conj disj uni inter diff
-    pure (declElems ++ (← elabKermlBody body))
+    pure (declElems ++ (← elabKermlPredBody body))
   | `(kernelDecl| $[$_abs:kermlAbstractFlag]? predicate $a:ident $[specializes $specs,*]? $[conjugates $conj:kermlQualName]?
         $[disjoint from $disj,*]? $[unions $uni,*]? $[intersects $inter,*]? $[differences $diff,*]? $body:kermlPredBody) => do
     let declElems ← classifierLikeDeclElems predicateStubTerm a specs conj disj uni inter diff
@@ -935,6 +1123,10 @@ def elabKernelDecl : TSyntax `kernelDecl → MacroM (Array (TSyntax `term))
   | `(kernelDecl| multiplicity $a:ident $_mult:kermlMult $body:kermlBody) => do
     let mT ← multiplicityRangeStubTerm a.getId.toString
     pure (#[← `(($mT).elt)] ++ (← elabKermlBody body))
+  | `(kernelDecl| inv { $e:kermlExpr }) => do
+    pure (#[← `((mkInvariantStub).elt)] ++ (← elabKermlExpr e))
+  | `(kernelDecl| feature $a:kermlIdent : $ty:kermlQualName $[$_mult:kermlMult]? = $val:kermlExpr $body:kermlBody) =>
+    elabFeatureDefaultElems (kermlIdentStr a) ty val body
   | `(kernelDecl| @ $mc:ident { $attrs:kermlMetaAttr* }) => do
     let pairs := attrs.map kermlMetaAttrPair
     let nameVal := (pairs.find? (·.1 == "n")).map (·.2)
@@ -1044,6 +1236,137 @@ elab "kernel% " d:kernelDecl : term => do
 -- Time's DSLLt instance applies -- an actually malformed or type-incorrect formula
 -- string here would be a genuine compile error, not silently accepted.
 #check kernel% @Assert{n="precedes"; f="<<precedes : x~Occurrence, y~Occurrence : death(x) < birth(y) >>";}
+
+-- Domain.kerml's own real `library package Domain { ... }` wrapper: nine real
+-- `private import ...;` statements (the new `kermlVisibilityFlag`, Core.lean),
+-- Kernel-layer content (`classifier`/`predicate`/`function`/`behavior`) kept as
+-- separate sibling `#check`s below, same constraint/precedent as Allen.kerml's own
+-- wrapper above.
+#check kernel% library package Domain {
+  private import ScalarValues::Real ;
+  private import ScalarValues::Boolean ;
+  private import Base::DataValue ;
+  private import Assertion::Assert ;
+  private import Occurrences::Occurrence ;
+  private import SI::s ;
+  private import Performances::BooleanEvaluation ;
+  private import Base::Anything ;
+  private import ISQSpaceTime::TimeValue ;
+}
+
+-- Domain.kerml's own real `type Instant specializes TimeValue {...}` -- already
+-- fully covered by existing `Core.lean` grammar, no new machinery.
+#check kerml% type Instant specializes TimeValue {
+  doc "an instant of time"
+}
+
+-- Domain.kerml's own real `classifier Interval {...}` -- `inv {...}` kept separate
+-- below (see `inv`'s own doc comment for why it can't nest here).
+#check kerml% classifier Interval {
+  doc "an interval is a duration between two instants"
+  feature lowerBound : Instant ;
+  feature upperBound : Instant ;
+  feature openLeft : Boolean ;
+  feature openRight : Boolean ;
+}
+
+-- Domain.kerml's own real `inv {lowerBound <= upperBound}`, `Interval`'s own
+-- invariant (new `inv` production).
+#check kernel% inv { lowerBound <= upperBound }
+
+-- Domain.kerml's own real `feature now : Instant {...}` -- plain top-level feature,
+-- no default value, already covered by existing `Core.lean` grammar.
+#check kerml% feature now : Instant {
+  doc "the current instant of time"
+}
+
+-- Domain.kerml's own real `feature start : Instant = 0.0 [s] {...}` -- the new
+-- mandatory-default `feature` form (`kermlKDecl`) plus the new unit-bracket
+-- `kermlExpr` postfix.
+#check kernel% feature start : Instant = 0.0 [s] {
+  doc "the beginning of system operation, start=0"
+}
+
+-- Domain.kerml's own real `predicate next {...}` -- two `in feature` parameters
+-- (explicit `feature` keyword, unlike Allen.kerml's bare `in x : T` form), no
+-- trailing bare expression (predicate's own declarations-only `kermlPredBody`
+-- alternative). `@Assert{...}` kept as a separate sibling `#check` below, same as
+-- Allen.kerml's own `precedes`/`@Assert` split above -- the `elab "kernel% "`
+-- trigger's own formula-validation special-case only fires when `@Assert{...}` is
+-- the *entire* outer `kernelDecl` being checked, not when it's nested inside
+-- another declaration's body (nesting still produces the right structural
+-- `MetadataFeature` stub via `elabKermlKDecl`'s plain `kernelDecl`-shaped-content
+-- passthrough is *not* wired for `@Assert` specifically, so it would in fact fail to
+-- parse there at all -- kept out of every nested body below for this reason, not
+-- just the weaker formula-validation one).
+#check kernel% predicate next {
+  doc "tau1 precedes tau2 and there are no instants in between"
+  in feature tau1 : Instant ;
+  in feature tau2 : Instant ;
+}
+#check kernel% @Assert{n="next"; f="<<next : tau1~Instant, tau2~Instant : (tau1 < tau2 and "+
+  " not exists tau~Instant that (tau1 < tau and tau < tau2) )  >>";
+    t="next";}
+
+-- Domain.kerml's own real `function Get {...}` -- a nested `in feature d : ... {
+-- feature f : ...; }` (own body, Core.lean-layer `feature` nested inside a
+-- Kernel-layer `in feature`), and `return result : ...;` with no default (the new
+-- keyword-less `return` form). `result` is an ordinary identifier in real KerML,
+-- not a keyword -- it only needs `kermlIdent` (rather than bare `ident`) here
+-- because `Assert.lean` (imported for `@Assert` wiring, see that entry above)
+-- separately reserves `"result"` as its own leading keyword (`dslTerm`'s
+-- result-binding form), the same file-wide keyword-reservation collision already
+-- hit twice before (`true`/`false`, `Assert`) -- this tool's limitation, not
+-- KerML's.
+#check kernel% function Get {
+  doc "Get(d,f,tau) returns the value of the feature d::f at time tau."
+  in feature d : Occurrence[1] {
+    feature f : Anything[1] ;
+  }
+  in feature tau : Instant[1] ;
+  return result : Anything[0..1] ;
+}
+#check kernel% @Assert{n="Get"; f="<<Get : d~Occurrence, f~Anything, tau~Instant := I[[d::f,tau]] >>";
+    t="Get";}
+
+-- Domain.kerml's own real `function GetNow {...}` -- `return`'s own default-value
+-- form, `= Get(d, now)` (a real function-call `kermlExpr`).
+#check kernel% function GetNow {
+  doc "GetNow(d,f) returns the value of the feature d::f at the current time, now."
+  in feature d : Occurrence[1] {
+    feature f : Anything[1] ;
+  }
+  return result : Anything[0..1] = Get(d, now) ;
+}
+#check kernel% @Assert{n="GetNow"; f="<<GetNow : d~Occurrence, f~Anything := I[[d::f,now]] >>";
+    t=("Get","now");}
+
+-- Domain.kerml's own real `behavior SetNow {...}` -- two `in feature` parameters,
+-- no return.
+#check kernel% behavior SetNow {
+  doc "SetNow(d,f,v) sets the value of the feature d::f to v at the current time, now."
+  in feature d : Occurrence[1] {
+    feature f : Anything[1] ;
+  }
+  in feature v : Anything[1] ;
+}
+#check kernel% @Assert{n="SetNow"; f="<<SetNow : d~Occurrence, f~Anything : I[[d::f,now]] = v >>";
+    t="df-model";}
+
+-- Domain.kerml's own real `behavior GetChange {...}` -- adds `out feature v : ...;`
+-- (the new `out`-direction explicit-`feature`-keyword form).
+#check kernel% behavior GetChange {
+  doc "GetChange(d,f) waits for value of the feature d::f to change from its value at time tau."
+  in feature d : Occurrence[1] {
+    feature f : Anything[1] ;
+  }
+  in feature tau : Instant[1] ;
+  out feature v : Anything[0..1] ;
+}
+#check kernel% @Assert{n="GetChange"; f="<<GetChange : d~Occurrence, f~Anything, tau~Instant : "+
+    "(I[[d::f,tau]] <> I[[d::f,now]] and forall t~Instant in tau ., now are I[[d::f,t]] = I[[d::f,tau]])"+
+    " implies v = I[[d::f,now]] >>";
+    t="df-bl.changed";}
 
 #check kexpr% 1 + 2 * 3
 #check kexpr% true and not false

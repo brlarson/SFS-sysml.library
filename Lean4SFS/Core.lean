@@ -390,6 +390,15 @@ it to parse real KerML text like `Base.kerml`'s `abstract classifier Anything`. 
 declare_syntax_cat kermlAbstractFlag
 syntax "abstract " : kermlAbstractFlag
 
+/-- A `Membership`/`Import` visibility prefix: `private`/`public`. Parsed but
+discarded, same status as `abstract` above -- `Import`'s own visibility already
+defaults to `.private` (see `import`'s own doc comment below), so `private import
+...` (`Domain.kerml`'s own real form, e.g. `private import ScalarValues::Real;`)
+just needs to *parse*, not actually flip a field. Only `private` is wired (the only
+value any real file in this repo uses); `public` isn't a production here. -/
+declare_syntax_cat kermlVisibilityFlag
+syntax "private " : kermlVisibilityFlag
+
 /-- A multiplicity bound: a bare integer or `*` (unbounded). -/
 declare_syntax_cat kermlMultBound
 syntax num : kermlMultBound
@@ -618,8 +627,8 @@ Assertion::Assert;` earlier in the same scope -- is not attempted; this project 
 no symbol table anywhere, and a bare reference already always becomes its own fresh
 stub regardless of what's been imported, same as before this addition.) Visibility
 (`private`/`public`) isn't parsed -- defaults to `Import`'s own `.private`. -/
-syntax "import " kermlQualName "::" "*" " ;" : kermlDecl
-syntax "import " kermlQualName " ;" : kermlDecl
+syntax (kermlVisibilityFlag)? "import " kermlQualName "::" "*" " ;" : kermlDecl
+syntax (kermlVisibilityFlag)? "import " kermlQualName " ;" : kermlDecl
 
 mutual
 
@@ -842,9 +851,9 @@ partial def elabKermlDecl : TSyntax `kermlDecl → MacroM (Array (TSyntax `term)
     let tT ← kTypeStubTermQ t
     let rel ← mkFeatureTypingTerm aT tT a.getId.toString (qualNameStr t)
     pure #[← `(($aT).elt), ← `(($rel).elt)]
-  | `(kermlDecl| import $q:kermlQualName :: * ;) => do
+  | `(kermlDecl| $[$_vis:kermlVisibilityFlag]? import $q:kermlQualName :: * ;) => do
     pure #[← `((mkNamespaceImportStub $(quote (qualNameStr q))).elt)]
-  | `(kermlDecl| import $q:kermlQualName ;) => do
+  | `(kermlDecl| $[$_vis:kermlVisibilityFlag]? import $q:kermlQualName ;) => do
     pure #[← `((mkMembershipImportStub $(quote (qualNameStr q))).elt)]
   | _ => Macro.throwUnsupported
 
@@ -921,14 +930,17 @@ elab "kerml% " d:kermlDecl : term => do
 #check kerml% out y : Occurrence ;
 #check kerml% inout z : Occurrence ;
 
--- Allen.kerml's own real import statements (visibility keyword not parsed, see
--- that production's own note) -- both standalone and nested inside a body,
--- confirming the second is genuinely usable anywhere the first is: a sibling in
--- the same flat scope as whatever else the body declares, not restricted to a
+-- Allen.kerml's own real import statements -- both standalone and nested inside a
+-- body, confirming the second is genuinely usable anywhere the first is: a sibling
+-- in the same flat scope as whatever else the body declares, not restricted to a
 -- fixed leading position.
 #check kerml% import Assertion::Assert ;
 #check kerml% import Occurrences::Occurrence ;
 #check kerml% import Kernel::* ;
+-- Domain.kerml's own real `private import ...;` form (visibility keyword now
+-- parsed, still not threaded into a stored field -- see kermlVisibilityFlag's own
+-- doc comment).
+#check kerml% private import ScalarValues::Real ;
 #check kerml% classifier Widget {
   import Assertion::Assert ;
   feature self : Widget ;
