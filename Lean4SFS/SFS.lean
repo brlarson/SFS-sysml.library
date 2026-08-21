@@ -843,6 +843,21 @@ axiom InRegion : Point → Region → Prop
 /-- SFS.mm `won`: primitive. -/
 axiom OnSurface : Point → Surface → Prop
 
+/-- `Regions.kerml`'s own real `Adj(p)` ("the set of adjacent points to `p`"),
+`df-adjp`, was previously genuinely unformalized -- `Regions.kerml`'s own comment
+already called it future work, and it was never attempted in `SFS.mm` either. Added
+2026-08-21, at direct request, as a real primitive relation (not translating any
+`SFS.mm` content -- same "new primitive, not an `SFS.mm` translation" status as
+`featureAccess`/`Get` above): `p1`/`p2` are infinitesimally close points. No further
+constraint (symmetry, irreflexivity, ...) is asserted -- none was requested, and
+inventing one would be exactly the kind of forced semantics this file avoids
+elsewhere. `Regions.kerml`'s own `RegionSurface`/`RegionFilm` formulas, which used to
+call the now-real `Adjacent` via the set-membership idiom `p2 in Adj(p)`, are updated
+to call it directly as `Adjacent(p, p2)` instead -- a proper predicate application,
+not the informal `xPy`-style bare-identifier form `Adjacent`'s *own* `@Assert`
+formula uses (see `Regions.kerml`), so those two formulas now elaborate live. -/
+axiom Adjacent : Point → Point → Prop
+
 /-- SFS.mm `df-lfu`: locational functionality. Was a genuine axiom (a constraint on
 a *relation*, not derivable); now a real theorem, since a Lean function is
 automatically single-valued -- `Location`'s own new function-valued type already
@@ -880,31 +895,68 @@ axiom expansivity {x y : Occurrence} {r1 r2 : Region} :
 /-- SFS.mm `df-rni`: no interpenetration, a genuine constraint. -/
 axiom no_interpenetration {r1 r2 : Region} : RegionOverlap r1 r2 → RegionContainment r1 r2 ∨ RegionContainment r2 r1
 
-/-- SFS.mm `df-rs`. SFS.mm's own text has a third conjunct `r_1 RegionSurface r_0`
-in the body, self-referentially -- but with a *region* (`r_1`) plugged into
-`RegionSurface`'s first (surface-typed) argument slot, which cannot be what was
-intended (and `r_0`/`r_1` are already swapped relative to the rest of the clause).
-Rather than guess a specific fix, that conjunct is dropped here (flagged, not
-silently "corrected" to some particular reading); the definition below reflects
-only the two conjuncts whose meaning is unambiguous. Defined before
-`RegionInterior` so the latter can cite it directly, unlike SFS.mm's own order. -/
-def RegionSurface (s : Surface) (r0 : Region) : Prop :=
-  ∃ r1 : Region, ∀ p, OnSurface p s → InRegion p r0 ∧ ¬ InRegion p r1
+/-- SFS.mm `wrs`, function-valued (`Region → Surface`), not a relation -- 2026-08-21
+change, at direct request, same reasoning as `Location` above:
+`Regions.kerml`'s own real `RegionSurface`/`RegionInterior`/`RegionFilm` are all
+declared as one-argument functions (`r~Region := result~Surface | ...`), and every
+real formula calling them (`RegionInterior`'s/`RegionFilm`'s own bodies,
+`ExternallyConnected`/`FilmConnected`) does so as a one-arg call, not a two-arg
+predicate. **Unlike `Location`, this is genuinely new primitive content, not just a
+tightened restatement of something already axiomatized**: the old `RegionSurface`
+(a `def`, derived purely from `InRegion`/`OnSurface`) never asserted uniqueness --
+`SFS.mm`/`df-rs` describes *a* satisfying surface, not *the* surface. Making
+`RegionSurface` a function asserts, for the first time, that every region has
+*exactly one* surface -- a real modeling decision, not a mechanical consequence of
+anything already stated, done here because it matches `Regions.kerml`'s own
+functional declaration and was explicitly requested, not derived. -/
+axiom RegionSurface : Region → Surface
 
-/-- SFS.mm `df-ri`. -/
-def RegionInterior (r1 r2 : Region) : Prop :=
-  ∃ s : Surface, ∀ p, InRegion p r1 → InRegion p r2 ∧ ¬ OnSurface p s ∧ RegionSurface s r2
+/-- SFS.mm `df-rs`'s defining property, restated for the function above (`s` from the
+old relation replaced by `RegionSurface r0`). SFS.mm's own text has a third conjunct
+`r_1 RegionSurface r_0` in the body, self-referentially -- but with a *region*
+(`r_1`) plugged into `RegionSurface`'s old surface-typed argument slot, which cannot
+be what was intended (and `r_0`/`r_1` are already swapped relative to the rest of the
+clause). Rather than guess a specific fix, that conjunct is dropped here (flagged,
+not silently "corrected" to some particular reading); this reflects only the two
+conjuncts whose meaning is unambiguous, same as before the function change. -/
+axiom regionSurfaceProp (r0 : Region) :
+    ∃ r1 : Region, ∀ p, OnSurface p (RegionSurface r0) → InRegion p r0 ∧ ¬ InRegion p r1
 
-/-- SFS.mm `df-rf`. -/
-def RegionFilm (s : Surface) (r0 : Region) : Prop := ∃ r1, RegionInterior r0 r1 ∧ RegionSurface s r1
+/-- SFS.mm `wri`, function-valued (`Region → Region`) for the same reason as
+`RegionSurface` above -- same caveat too: genuinely new content (region-interior
+uniqueness), not a tightened restatement. -/
+axiom RegionInterior : Region → Region
 
-/-- SFS.mm `df-exc`. -/
+/-- SFS.mm `df-ri`'s defining property, restated for the function above (the old
+relation's existential surface `s` and result-region `r2` both replaced by function
+applications: `RegionSurface (RegionInterior r1)` for `s`, `RegionInterior r1` for
+`r2`). -/
+axiom regionInteriorProp (r1 : Region) :
+    ∀ p, InRegion p r1 → InRegion p (RegionInterior r1) ∧ ¬ OnSurface p (RegionSurface (RegionInterior r1))
+
+/-- SFS.mm `df-rf`. Unlike `RegionSurface`/`RegionInterior`, this one needs **no new
+axiom at all** -- once both of those are functions, "the film of `r0`" (SFS.mm: "the
+surface of the interior of `r0`") is already fully determined as `RegionSurface
+(RegionInterior r0)`, a genuine `def`, not a fresh primitive. The old relational
+`RegionFilm s r0 := ∃ r1, RegionInterior r0 r1 ∧ RegionSurface s r1` collapses to
+exactly this once `RegionInterior`/`RegionSurface` are single-valued by construction
+(the `∃ r1` no longer does any work -- `r1` is pinned to `RegionInterior r0`).
+`noncomputable`: unlike `Get`/`GetP` above (whose bodies bottom out in `Set`/`Prop`,
+erased at compile time), this returns a genuine `Surface` value built from opaque
+axioms with no actual implementation to compile. -/
+noncomputable def RegionFilm (r0 : Region) : Surface := RegionSurface (RegionInterior r0)
+
+/-- SFS.mm `df-exc`. Simplified the same way `RegionFilm` was: the old relation's
+`∃ s1 s2 : Surface, RegionSurface s1 r1 ∧ RegionSurface s2 r2 ∧ ...` collapses once
+`RegionSurface` is a function -- `s1`/`s2` are pinned to `RegionSurface r1`/
+`RegionSurface r2`, no longer independently existential. -/
 def ExternallyConnected (r1 r2 : Region) : Prop :=
-  ∃ (s1 s2 : Surface) (p : Point), (RegionSurface s1 r1 ∧ RegionSurface s2 r2) ∧ OnSurface p s1 ∧ OnSurface p s2
+  ∃ p : Point, OnSurface p (RegionSurface r1) ∧ OnSurface p (RegionSurface r2)
 
-/-- SFS.mm `df-flmc`. -/
+/-- SFS.mm `df-flmc`. Same simplification as `ExternallyConnected`, via `RegionFilm`
+instead of `RegionSurface`. -/
 def FilmConnected (r1 r2 : Region) : Prop :=
-  ∃ (s1 s2 : Surface) (p : Point), (RegionFilm s1 r1 ∧ RegionFilm s2 r2) ∧ OnSurface p s1 ∧ OnSurface p s2
+  ∃ p : Point, OnSurface p (RegionFilm r1) ∧ OnSurface p (RegionFilm r2)
 
 /-! ### Time -- Allen's Intervals (SFS.mm lines 2962-3117) -/
 

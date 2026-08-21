@@ -1622,21 +1622,39 @@ elab "kernel% " d:kernelDecl : term => do
     "   ( (AtomicRegion(r1) and AtomicRegion(r2)) implies "+
     "     (not RegionOverlap(r1,r2) or r1=r2) ) >>"; t="rdi";}
 
+-- Regions.kerml's own real `predicate Adjacent {...}` -- `p1`/`p2` infinitesimally
+-- close points, now a real `SFS.lean` primitive (`axiom Adjacent : Point → Point →
+-- Prop`, 2026-08-21). Its own `@Assert` formula body (`p1Ap2`) is the same
+-- informal, bare-`dslWff`-identifier shorthand `Mereology.kerml`'s own `PartOf`
+-- formula uses (`xPy`) for a genuinely primitive relation with no further
+-- reduction -- expected to keep failing honestly (`freeIdentsInWff`'s own
+-- bare-identifier case deliberately never auto-binds this), not attempted live,
+-- same as `PartOf`'s own body above. `Adjacent(p1,p2)` used as a real predicate
+-- *application* elsewhere (below) is a different case entirely and does resolve.
+#check kernel% predicate Adjacent {
+  doc "Adjacent is the infinitesimal-closeness relation p1Ap2 -- p1 and p2 are infinitesimally close points."
+  in p1 : Point ;
+  in p2 : Point ;
+}
+
 -- RegionSurface/RegionInterior/RegionFilm's own structural declarations (including
--- `inv{...}`'s new `as` cast) elaborate fine; their `@Assert` formulas don't, for two
--- already-documented, pre-existing reasons (both confirmed via a real build attempt):
--- `RegionSurface(r)`/`RegionFilm(r)` called as *one-argument* functions returning a
--- `Surface`, but `SFS.lean`'s real `RegionSurface`/`RegionFilm : Surface → Region →
--- Prop` are *two-argument* relations (same "functional KerML vs. relational SFS.mm"
--- mismatch [[project_assert_lean]] already found for these exact three); and `Adj`
--- (the "set of adjacent points," `df-adjp`) is genuinely unformalized in `SFS.lean`
--- -- `Regions.kerml`'s own comment already calls this future work.
+-- `inv{...}`'s new `as` cast) elaborate fine. `RegionSurface`/`RegionFilm : Region →
+-- Surface` and `RegionInterior : Region → Region` are real one-argument functions in
+-- `SFS.lean` (2026-08-21, same as `Location`), so their own `RegionSurface(r)`/
+-- `RegionFilm(r)` calls don't arity-mismatch; and now that `Adjacent` is a real
+-- primitive too, `RegionSurface`'s/`RegionFilm`'s own formulas (which replace
+-- `Regions.kerml`'s old `p2 in Adj(p)` set-membership idiom with a direct
+-- `Adjacent(p,p2)` predicate application) elaborate live as well -- no longer
+-- excluded.
 #check kernel% function RegionSurface {
   doc "The surface of a region is all the points on its boundary"
   in r : Region ;
   return result : Surface ;
   inv { r.frameOfReference == (result as Surface).frameOfReference }
 }
+#check kernel% @Assert{n="RegionSurface"; f="<< RegionSurface : r~Region := result~Surface | "+
+    "forall p~Point are (PointOnSurface(p,result) iff (PointInRegion(p,r) and "+
+    "  exists p2~Point that ( Adjacent(p,p2) and not PointInRegion(p2,r) ))) >>"; t="RegionSurface";}
 
 #check kernel% function RegionInterior {
   doc "The interior of a region includes all the points in a region not on its surface"
@@ -1644,6 +1662,9 @@ elab "kernel% " d:kernelDecl : term => do
   return result : Region ;
   inv { r.frameOfReference == (result as Region).frameOfReference }
 }
+#check kernel% @Assert{n="RegionInterior"; f="<< RegionInterior : r~Region := result~Region | "+
+    "forall p~Point are (PointInRegion(p,result) iff "+
+    "  (PointInRegion(p,r) and not PointOnSurface(p,RegionSurface(r))) ) >>"; t="RegionInterior";}
 
 #check kernel% function RegionFilm {
   doc "The film of a region is a surface of which it's the interior"
@@ -1651,18 +1672,22 @@ elab "kernel% " d:kernelDecl : term => do
   return result : Surface ;
   inv { r.frameOfReference == (result as Surface).frameOfReference }
 }
+#check kernel% @Assert{n="RegionFilm"; f="<< RegionFilm : r~Region := result~Surface | "+
+    " forall p~Point are ( PointOnSurface(p,result) iff "+
+    " (not PointInRegion(p,r) and exists p2~Point that "+
+    "    (PointOnSurface(p2,RegionSurface(r)) and Adjacent(p,p2)))) >>"; t="RegionFilm";}
 
--- ExternallyConnected/FilmConnected's own structural declarations elaborate fine;
--- their `@Assert` formulas hit the same `RegionFilm(r1)` one-arg-vs-two-arg mismatch
--- as `RegionSurface`/`RegionInterior`/`RegionFilm` above (confirmed via a real build
--- attempt), even though `SFS.lean` already has real, matching two-arg
--- `ExternallyConnected`/`FilmConnected : Region → Region → Prop` defs of its own.
+-- ExternallyConnected/FilmConnected each call `RegionFilm(r1)` as a one-argument
+-- function too -- now that `RegionFilm` really is one, both elaborate live
+-- (confirmed via a real build attempt), no longer excluded.
 #check kernel% predicate ExternallyConnected {
   doc "This is the externally connected (EC) relation of Region Connection Calculus"
   in r1 : Region ;
   in r2 : Region ;
   inv { r1.frameOfReference == r2.frameOfReference }
 }
+#check kernel% @Assert{n="ExternallyConnected"; f="<< ExternallyConnected : r1~Region, r2~Region : "+
+    " not RegionOverlap(r1,r2) and exists p~Point that ( PointOnSurface(p,RegionFilm(r1)) and PointInRegion(p,r2) ) >>"; t="ExternallyConnected";}
 
 #check kernel% predicate FilmConnected {
   doc "This is needed for Occurrences::JustOutsideOf."
@@ -1670,6 +1695,8 @@ elab "kernel% " d:kernelDecl : term => do
   in r2 : Region ;
   inv { r1.frameOfReference == r2.frameOfReference }
 }
+#check kernel% @Assert{n="FilmConnected"; f="<< FilmConnected : r1~Region, r2~Region :"+
+    " exists p~Point that ( PointOnSurface(p,RegionFilm(r1)) and PointOnSurface(p,RegionFilm(r2)) ) >>";}
 
 #check kexpr% 1 + 2 * 3
 #check kexpr% true and not false

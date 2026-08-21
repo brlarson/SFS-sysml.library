@@ -162,21 +162,27 @@ library package Regions {
     @Assert{n="APAR"; f="<< APAR : : forall x~Occurrence forall r~Region are "+
             "(Location(x)=r and AtomicPart(x)) implies AtomicRegion(r) >>"; t="apar";}
  
-    // Adjacent points are infinitessimly close, the set of adjacent points to p
-    // is Adj(p) defined by df-adjp
+    abstract predicate Adjacent specializes BooleanEvaluation {
+        doc /* SFS: Adjacent is the infinitesimal-closeness relation p1Ap2 --
+          * p1 and p2 are infinitesimally close points. This is the "Adj" set
+          * used informally below (df-adjp): p2 in Adj(p) reads Adjacent(p,p2). */
+        @Assert{n="Adjacent"; f="<< Adjacent : p1~Point, p2~Point : p1Ap2 >>";}
+        in p1 : Point;
+        in p2 : Point;
+    }
 
     function RegionSurface {
         doc /* SFS: The surface of a region is all the points on its boundary */
         @Assert{n="RegionSurface"; f="<< RegionSurface : r~Region := result~Surface | "+
                 "forall p~Point are (PointOnSurface(p,result) iff (PointInRegion(p,r) and "+
-                "  exists p2~Point that ( p2 in Adj(p) and not PointInRegion(p2,r) ))) >>"; t="RegionSurface";}
+                "  exists p2~Point that ( Adjacent(p,p2) and not PointInRegion(p2,r) ))) >>"; t="RegionSurface";}
         in r : Region;
         return result : Surface;
         inv { r.frameOfReference == (result as Surface).frameOfReference}
     }
-  
+
     function RegionInterior {
-        doc /* SFS:  The interior of a region includes all the points in a region 
+        doc /* SFS:  The interior of a region includes all the points in a region
           * not on its surface */
         @Assert{n="RegionInterior"; f="<< RegionInterior : r~Region := result~Region | "+
             "forall p~Point are (PointInRegion(p,result) iff "+
@@ -191,7 +197,7 @@ library package Regions {
         @Assert{n="RegionFilm"; f="<< RegionFilm : r~Region := result~Surface | "+
             " forall p~Point are ( PointOnSurface(p,result) iff "+
             " (not PointInRegion(p,r) and exists p2~Point that "+
-            "    (PointOnSurface(p2,RegionSurface(r)) and p2 in Adj(p)))) >>"; t="RegionFilm";}
+            "    (PointOnSurface(p2,RegionSurface(r)) and Adjacent(p,p2)))) >>"; t="RegionFilm";}
         in r : Region;
         return result : Surface;
         inv { r.frameOfReference == (result as Surface).frameOfReference}
