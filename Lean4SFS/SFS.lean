@@ -1038,14 +1038,6 @@ theorem next_uniq {t1 t2 t3 : Time} (h : next t1 t2) : t2 = t3 := absurd h (next
 
 /-! ### KerML Element Representation and Type Definition (SFS.mm lines 3246-3324) -/
 
-/-- SFS.mm `df-kind`: a set of 14 pairwise-distinct constants. The natural Lean
-counterpart of "these are new, pairwise-distinct atomic constants" is an
-`inductive` enum (constructor-distinctness is free), not an `axiom`. -/
-inductive ElementKind
-  | Element | Relationship | Dependency | Feature | Classifier | DataType | Class
-  | Structure | Association | Connector | Behavior | Function | Expression | Interaction
-  deriving DecidableEq, Repr
-
 /-- SFS.mm `cci`/`cuid`: `CI`/`UI` (Class Identifiers / Unique Identifiers) are both
 described only as strings (a name, or a `::`-separated qualified name, or a
 fully-qualified name concatenated with a "wonce") -- `abbrev`s over `String`, not fresh
@@ -1076,40 +1068,23 @@ with Mathlib's own `Membership` typeclass powering `∈` notation). Reference ot
 `Root`/`Core` names (`KerML.Core.KType`, etc.) fully qualified. -/
 open KerML.Root (Element)
 
+/- `ElementKind`/`DesignKind`/`Design`/`VT`/`Specializes`/`df_specializes`/
+`df_multspec` moved to `Core.lean` 2026-08-21: they describe the KerML *model
+representation* itself (which real metaclasses exist in a design, tagged and typed
+against `Element`), so they belong alongside `Element`/`KType`/`Specialization` there
+rather than across the import boundary -- the reverse direction is impossible
+(`Core.lean` cannot import `SFS.lean`: `Kernel.lean` imports `Assert.lean` which
+imports `SFS.lean`, so `SFS → Core` and `Core → SFS` together would close a cycle).
+`isTypeDeclOf`/`df_types` below still need `Design`/`DesignKind`/`VT`, so they're
+brought back in here; `ElementKind` is needed too, for `ElementRep` further down. -/
+open KerML.Core (ElementKind DesignKind Design VT)
+
 /-- SFS.mm `cID`: the class of identifiers (strings naming KerML elements -- previously
 declared but unused in `SFS.mm` until `df-type` reused it). Kept as a plain `String`
-alias for continuity with `SFS.mm`'s own `cID`, even though `Design`/`VT` below now hold
-real `Element`s rather than bare `ID`s -- `Element.declaredName : Option String` plays
-`ID`'s role directly. -/
+alias for continuity with `SFS.mm`'s own `cID`, even though `Design`/`VT` (now in
+`Core.lean`) hold real `Element`s rather than bare `ID`s -- `Element.declaredName :
+Option String` plays `ID`'s role directly. -/
 abbrev ID := String
-
-/-- SFS.mm `cType`/`cDesign`, `df-type`. `df-type` went through three designs in one
-session (see `[[reference_supplemental_semantics_book]]`'s and
-`[[project_kerml_metamodel_lean]]`'s memory for the full history): an opaque `Denote`
-function (rejected, still just a stand-in); a `Design : Set (DesignKind × ID × Set
-KElement)` triple tying KerML text to `df-rep`'s own shape (an improvement, but `ID`
-was still a bare, structurally-arbitrary string, not connected to anything KerML's own
-grammar actually populates); and now, with `Root.lean`/`Core.lean` available, this
-**full replacement**: `Design` holds real `KerML.Root.Element` values, whose
-`declaredName` field is populated directly by KerML's own `Identification` concrete-
-syntax rule (`TypeDeclaration → declaredName = NAME`) -- so "type A" can now be read as
-`isTypeDeclOf A e` below for a real `e : Element`, not an arbitrary tag. `DesignKind` is
-a fresh sum type (not `ElementKind`) because a `Design` triple's kind slot must hold
-*either* one of `ElementKind`'s 14 tags *or* `Type`, and `Type` is deliberately excluded
-from `ElementKind` itself (matching the book's own KerML §8.4.3.2 distinction, see
-`ElementKind`'s doc comment).
-
-Unlike SFS.mm's own `df-type`, which has to separately assert `C e. _V` (a genuine set,
-not an undefined/proper-class value -- not automatic in ZFC) given the triple-membership
-premise, **no such assertion is needed or possible here**: `Set Element` already
-guarantees `C` is a real value for every triple in `Design`, the same reason `dl_al`
-above needed no `ralv`-style bridging step -- there is no "proper class" for `Design`'s
-membership type to accidentally admit. -/
-inductive DesignKind
-  | ofElementKind (k : ElementKind)
-  | type
-
-axiom Design : Set (DesignKind × Element × Set Element)
 
 /-- The Lean-level reading of concrete KerML text `"type A"`: a `Design` element tagged
 `.type` whose `declaredName` is literally `A` -- the genuine syntax-to-`Design`
@@ -1119,14 +1094,6 @@ own grammar. -/
 def isTypeDeclOf (A : ID) (e : Element) : Prop :=
   e.declaredName = some A ∧ ∃ C : Set Element, (DesignKind.type, e, C) ∈ Design
 
-/-- SFS.mm `cVT`: `V_T`, the set of all Types in the design (KerML Core Semantics
-§2.1.1's vocabulary triple `⟨V_T,V_C,V_F⟩`) -- a primitive `df-types` *constrains*
-rather than fully defines, matching `SFS.mm`'s own implication (not equation) form, so
-this stays an `axiom` rather than a derived `def`, unlike `Denote`/`mkUid` above. Now
-`Set Element` (holding the actual design elements), not `Set ID`, matching `Design`'s
-own full-replacement redesign above. -/
-axiom VT : Set Element
-
 /-- SFS.mm `df-types`: for every `Element` `e`, if `e` is declared with the bare `type`
 keyword (i.e. tagged `.type` in `Design`, the same reading `df-type` gives that text),
 then `e ∈ VT`. This genuinely needs to stay an axiom here too -- `VT` is independently
@@ -1135,8 +1102,9 @@ axiom df_types : ∀ e : Element, (∃ C : Set Element, (DesignKind.type, e, C) 
 
 /-- `Chapter/CoreSemanticsChapter.tex` §2.1.3 `df-rep` ("Representation of Elements as
 Triples") -- book-only, like `Model` below: `df-rep` has no SFS.mm formalization, only
-`df-kind` (translated as `ElementKind` above) and `df-wonce` (translated as `mkUid`
-above, covering `id`'s `CI`/`UI` domain) do. Ontologically a KerML element is *defined*
+`df-kind` (translated as `Core.lean`'s `ElementKind`, opened above) and `df-wonce`
+(translated as `mkUid` above, covering `id`'s `CI`/`UI` domain) do. Ontologically a
+KerML element is *defined*
 as a ZFC-class, but is *represented* as the triple `⟨k,id,C⟩`: `k` its `ElementKind`;
 `id` its unique/qualified-name identifier -- typed here as plain `String` rather than
 `UI` specifically, since `df-rep` itself doesn't commit to `id` always being a

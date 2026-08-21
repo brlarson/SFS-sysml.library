@@ -13,8 +13,9 @@ independent structure. Originally `SFS.lean` had its own separate, deliberately 
 with this file's `Element`; as of 2026-08-20 (a full-replacement redesign, once this
 file existed to replace it with), `KElement` is gone and `SFS.lean` now uses `Element`
 here directly (`open KerML.Root (Element)`) wherever it used to use `KElement` --
-`ElementRep`/`ElementKind`/`Model`/`Design`/`VT` in `SFS.lean` all reference this file's
-real `Element` now, not an opaque placeholder.
+`ElementRep`/`Model` in `SFS.lean`, and `ElementKind`/`Design`/`VT` in `Core.lean`
+(moved there 2026-08-21), all reference this file's real `Element` now, not an opaque
+placeholder.
 
 ## Scope (structural only, matching this project's established `Design`-for-`df-type`
 precedent in `SFS.lean` for "whole containment graph" complexity)
@@ -38,8 +39,8 @@ attributes (`elementId`, `declaredName`, `client`/`supplier`, `memberName`,
 
 OCL **constraints** (derivation/semantic/validation) are noted in prose in each
 metaclass's doc comment, not encoded as Lean propositions or proved -- consistent with
-the same "structural, not deeply verified" scope already used for `ElementRep`/
-`ElementKind`/`Model` in `SFS.lean`.
+the same "structural, not deeply verified" scope already used for `ElementRep`/`Model`
+in `SFS.lean` and `ElementKind` in `Core.lean`.
 
 Imported by `Core.lean` (KerML §8.2.4/§8.3.3) and, as of the `KElement` replacement
 above, by `SFS.lean` and (transitively, via `SFS.lean`) `Assert.lean` too.

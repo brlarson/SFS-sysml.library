@@ -30,6 +30,7 @@ only; boolean prefix flags and name resolution are out of scope).
 
 import Root
 import Lean
+import Mathlib.Data.Set.Defs
 
 namespace KerML.Core
 
@@ -229,6 +230,92 @@ structure TypeFeaturing extends Relationship where
   featureOfType : Feature
   featuringType : KType
   deriving Repr
+
+/-! ## SFS bridge: `Design`, `VT`, `Specializes` (`Chapter/CoreSemanticsChapter.tex`
+§2.1/§2.2.1) -- moved here from `SFS.lean` 2026-08-21: unlike the Domain-logic content
+that stays in `SFS.lean` (Mereology, temporal `TVal`/`TProp`, ...), these describe the
+KerML *model representation* itself (which real metaclasses exist in a design, tagged
+and typed against `Element`), so they belong alongside `Element`/`KType`/
+`Specialization` here rather than across the import boundary. `SFS.lean`'s own
+`isTypeDeclOf`/`df_types` still reference `Design`/`DesignKind`/`VT` from here (via
+`open KerML.Core (...)`), since `SFS.lean` already imports `Core`; the reverse
+direction is impossible (`Core.lean` cannot import `SFS.lean`: `Kernel.lean` imports
+`Assert.lean` which imports `SFS.lean`, so `SFS → Core` and `Core → SFS` together would
+close a cycle). -/
+
+/-- SFS.mm `df-kind`: a set of 14 pairwise-distinct constants, one per real KerML
+metaclass. The natural Lean counterpart of "these are new, pairwise-distinct atomic
+constants" is an `inductive` enum (constructor-distinctness is free), not an `axiom`. -/
+inductive ElementKind
+  | Element | Relationship | Dependency | Feature | Classifier | DataType | Class
+  | Structure | Association | Connector | Behavior | Function | Expression | Interaction
+  deriving DecidableEq, Repr
+
+/-- SFS.mm `cType`/`cDesign`, `df-type`. `df-type` went through three designs in one
+session (see `[[reference_supplemental_semantics_book]]`'s and
+`[[project_kerml_metamodel_lean]]`'s memory for the full history): an opaque `Denote`
+function (rejected, still just a stand-in); a `Design : Set (DesignKind × ID × Set
+KElement)` triple tying KerML text to `df-rep`'s own shape (an improvement, but `ID`
+was still a bare, structurally-arbitrary string, not connected to anything KerML's own
+grammar actually populates); and now, with `Element` available, this **full
+replacement**: `Design` holds real `Element` values, whose `declaredName` field is
+populated directly by KerML's own `Identification` concrete-syntax rule
+(`TypeDeclaration → declaredName = NAME`) -- so "type A" can now be read as
+`SFS.isTypeDeclOf A e` for a real `e : Element`, not an arbitrary tag. `DesignKind` is
+a fresh sum type (not `ElementKind`) because a `Design` triple's kind slot must hold
+*either* one of `ElementKind`'s 14 tags *or* `Type`, and `Type` is deliberately excluded
+from `ElementKind` itself (matching the book's own KerML §8.4.3.2 distinction).
+
+Unlike SFS.mm's own `df-type`, which has to separately assert `C e. _V` (a genuine set,
+not an undefined/proper-class value -- not automatic in ZFC) given the triple-membership
+premise, **no such assertion is needed or possible here**: `Set Element` already
+guarantees `C` is a real value for every triple in `Design` -- there is no "proper
+class" for `Design`'s membership type to accidentally admit. -/
+inductive DesignKind
+  | ofElementKind (k : ElementKind)
+  | type
+
+axiom Design : Set (DesignKind × Element × Set Element)
+
+/-- SFS.mm `cVT`: `V_T`, the set of all Types in the design (KerML Core Semantics
+§2.1.1's vocabulary triple `⟨V_T,V_C,V_F⟩`) -- a primitive `df-types` *constrains*
+rather than fully defines, matching `SFS.mm`'s own implication (not equation) form, so
+this stays an `axiom` rather than a derived `def`. Holds real `Element`s (matching
+`Design`'s own full-replacement redesign above), not bare `ID`s. -/
+axiom VT : Set Element
+
+/-- `Chapter/CoreSemanticsChapter.tex` §2.2.1 `specializes` (KerML's own textual
+keyword, elaborated structurally above as a `Specialization`/`Subclassification`
+value, e.g. via `mkSpecializationTerm`) -- book-only, no `SFS.mm` formalization. That
+structural elaboration carries no semantic content of its own (its doc comment's
+"every instance of `specific` is also an instance of `general`" is prose, not an
+encoded constraint), and -- being a bare, unconstrained `structure` -- isn't tied to
+"what's actually asserted in the current model" the way `Design` is: any `Element`
+pair could trivially satisfy `∃ s : Specialization, s.specific.elt = a ∧ s.general.elt
+= b`, making that an unfaithful (vacuous) reading of `specializes`. So, like `VT`, a
+fresh `Element`-level primitive is needed here instead. -/
+axiom Specializes : Element → Element → Prop
+
+/-- `Chapter/CoreSemanticsChapter.tex` §2.2.1 `df-specializes`: a type's specialization
+implies its extension (the content set `Design` associates with its `.type` triple, the
+same set-of-instances reading `df-type` gives that triple's third component) is a subset
+of its generalization's extension. A genuine constraint, not derivable from `Specializes`
+being a bare `Prop`-valued relation, so this stays an `axiom` here too, same reasoning as
+`VT`/`df_types` above. -/
+axiom df_specializes {ts tg : Element} {Cs Cg : Set Element}
+    (hs : (DesignKind.type, ts, Cs) ∈ Design) (hg : (DesignKind.type, tg, Cg) ∈ Design) :
+    Specializes ts tg → Cs ⊆ Cg
+
+/-- `Chapter/CoreSemanticsChapter.tex` §2.2.1 `df-multspec`: multiple specialization
+bounds the specific type's extension within the *intersection* of every one of its
+generalizations' extensions -- proved directly from `df_specializes` applied to each
+generalization independently, exactly as the book's own prose describes it (`§2.2.1`,
+just below `df-specializes`), so this one genuinely is a `theorem`. -/
+theorem df_multspec {ts tg th : Element} {Cs Cg Ch : Set Element}
+    (hs : (DesignKind.type, ts, Cs) ∈ Design) (hg : (DesignKind.type, tg, Cg) ∈ Design)
+    (hh : (DesignKind.type, th, Ch) ∈ Design)
+    (hsg : Specializes ts tg) (hsh : Specializes ts th) : Cs ⊆ Cg ∩ Ch :=
+  fun _ hx => ⟨df_specializes hs hg hsg hx, df_specializes hs hh hsh hx⟩
 
 /-! ## Concrete syntax (KerML §8.2.4 "Core Concrete Syntax")
 
