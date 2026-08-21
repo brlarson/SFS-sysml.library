@@ -1228,6 +1228,28 @@ axiom featureAccessProp : Occurrence → Element → TProp
 `featureAccessProp` the same way `Get` applies `interpValAt` to `featureAccess`. -/
 def GetP (d : Occurrence) (f : Element) (tau : Time) : Prop := interpAt (featureAccessProp d f) tau
 
+/-- `Domain.kerml`'s own `SetNow` behavior, formalized 2026-08-21 at direct request
+("SetNow is crucial to SFS modal world semantics... formalize the interpretation
+I[[...]] so that SetNow has the desired result"). Not a separate operational
+primitive -- `SetNow d f v` *is* `Domain.kerml`'s own `SetNow` assertion
+(`I[[d::f,now]] = v`) by definition, so this `def` adds no new axiomatic content;
+it names the exact proposition the KerML behavior already asserts, so `Assert.lean`
+elaborating that formula produces this term up to `rfl` (see its own smoke test).
+
+**Why this already gives "the desired result" (worlds don't retroactively change,
+only the current one is being set), with no extra persistence axiom needed**:
+`Occurrence := Time → Set Item` is a pure, total function -- `Get d f t0` for any
+instant `t0` is just that function applied to `t0`, a fixed value with no dependence
+on *when* it's evaluated (Lean has no mutable state to make it otherwise).
+`SetNow d f v` only constrains `Get d f now`, i.e. `featureAccess d f` applied to
+*one specific* argument (`now`); it says nothing about `featureAccess d f` applied to
+any other instant `t0 ≠ now`. So once `now` has advanced past some earlier `t0`,
+`Get d f t0` is unaffected by anything asserted about `now` today, in either
+direction -- not because some new axiom protects it, but because it was never a
+function *of* `now` to begin with. Formalizing `SetNow` this way is what makes that
+guarantee explicit and connects it to `Get`, not what creates it. -/
+def SetNow (d : Occurrence) (f : Element) (v : Set Item) : Prop := Get d f ⟨now, dl_nowt⟩ = v
+
 /-! ## `Lean4SFS/Assert.lean` name-compatibility aliases
 
 Real `@Assert{n="..."}` names in `sysml.library/**/*.kerml` use the full KerML

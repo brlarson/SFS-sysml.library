@@ -1436,7 +1436,7 @@ elab "kernel% " d:kernelDecl : term => do
   in feature v : Anything[1] ;
 }
 #check kernel% @Assert{n="SetNow"; f="<<SetNow : d~Occurrence, f~Anything : I[[d::f,now]] = v >>";
-    t="df-model";}
+    t="SetNow";}
 
 -- Domain.kerml's own real `behavior GetChange {...}` -- adds `out feature v : ...;`
 -- (the new `out`-direction explicit-`feature`-keyword form).

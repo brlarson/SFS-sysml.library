@@ -785,9 +785,16 @@ example : domain% <<Get : d~Occurrence, f~Anything, tau~Instant := I[[d::f,tau]]
 -- convention, presumably the `in`/`out` feature of the surrounding `.kerml`
 -- operation whose value is being set. Auto-bound by `freeIdentsInWff`/`mkAutoFun`
 -- above; its type (`Set Item`) is inferred from unifying against `Get`'s own result
--- type, not declared anywhere in this formula string. Previously excluded here as an
--- expected failure, before this auto-binding existed.
+-- type, not declared anywhere in this formula string. `v~Anything` was tried in the
+-- header directly (2026-08-21) and rejected: `Anything` maps to `KerML.Root.Element`
+-- (correct for `f`, a genuine feature reference), but `v` needs `Set Item` (matching
+-- `Get`'s own return type) -- a real type conflict, not fixable by picking a
+-- different name for the same clash. Elaborates to *exactly* `SFS.lean`'s own new
+-- `SetNow` (2026-08-21) -- not a coincidence, `SetNow`'s own definition is this
+-- formula's elaborated content, verbatim.
 #check domain% <<SetNow : d~Occurrence, f~Anything : I[[d::f,now]] = v >>
+
+example : domain% <<SetNow : d~Occurrence, f~Anything : I[[d::f,now]] = v >> = SetNow := rfl
 
 -- Performances.kerml's own `<< during(self, thisPerformance) >>` (anonymous form, no
 -- header at all): both `self` and `thisPerformance` are scope-visible (KerML's

@@ -66,7 +66,7 @@ library package Domain {
 	behavior SetNow {  // replaces FeatureReferencingPerformances::FeatureWritePerformance
 		doc /* SetNow(d,f,v) sets the value of the feature d::f to v at the current time, now. */
 		@Assert{n="SetNow"; f="<<SetNow : d~Occurrence, f~Anything : I[[d::f,now]] = v >>";
-				t="df-model";}
+				t="SetNow";}
 		in feature d : Occurrence[1] {  //onOccurrence
 		  feature f : Anything[1];  //accessedFeature
 		}
