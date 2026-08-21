@@ -285,6 +285,13 @@ scope notes), `direction` is the entire point of the `in`/`out`/`inout`-prefixed
 short `Feature` form below, so it's threaded through, not dropped. -/
 def mkDirFeatureStub (name : String) (dir : FeatureDirectionKind) : Feature :=
   { elementId := name, declaredName := some name, direction := some dir }
+/-- An anonymous `Feature` -- no declared name at all, `Regions.kerml`'s own real
+`feature :>> clock = universalClock;` (redefining `FrameOfReference`'s inherited
+`clock` with a different default, without a name of its own -- real KerML per
+`FeatureDeclaration`'s optional `Identification`, same legitimacy as
+`Kernel.lean`'s own direction-prefixed anonymous form, `mkAnonDirFeatureStub`, just
+without a `direction`). `elemId` synthesized, `declaredName` genuinely `none`. -/
+def mkAnonFeatureStub (elemId : String) : Feature := { elementId := elemId, declaredName := none }
 
 /-- `.toElement` composed through each structure's `extends` chain, so every metaclass
 constructed below can be placed in a single flat `List Element` result. -/
@@ -539,18 +546,25 @@ syntax (name := kermlClassifier) (kermlAbstractFlag)? "classifier " ident
   kermlBody : kermlDecl
 
 /-- KerML §8.2.4.3.1 `Feature`, relationship-part subset: `[abstract] feature f
-([typed by T,+] | [: T,+]) [mult] [subsets S,+] [references R] [crosses X] [redefines
-D,+ | :>> D,+] [chains C] [inverse of V] [featured by F,+] ;`. Bare `: T,+` is an
-alternate spelling of `typed by T,+` (KerML's `TYPED_BY = ':' | 'typed' 'by'`, only
-the keyword form was covered before) -- both feed the same `FeatureTyping`
+([typed by T,+] | [: T,+]) [default V] [mult] [subsets S,+] [references R] [crosses
+X] [redefines D,+ | :>> D,+] [chains C] [inverse of V] [featured by F,+] ;`. Bare `: T,+`
+is an alternate spelling of `typed by T,+` (KerML's `TYPED_BY = ':' | 'typed' 'by'`,
+only the keyword form was covered before) -- both feed the same `FeatureTyping`
 elaboration; `:>> D,+` is likewise the symbolic alternate spelling of `redefines D,+`
 (`REDEFINES = 'redefines' | ':>>'`, `Domain.kerml`'s own real `feature e :
 BooleanEvaluation[1] :>> f;`), both feeding the same `Redefinition` elaboration.
 `[mult]` (`kermlMult` above) is parsed but not stored, matching that category's own
-note. -/
+note. `default V` (KerML's `FeatureValue`'s own bare-`default`-keyword spelling, no
+`=`/`:=` at all -- `Regions.kerml`'s own real `feature clock : Clock default
+universalClock;`) is likewise parsed but not stored: a real `FeatureValue` element
+would need `Kernel.lean`'s own type (not available here, wrong dependency direction,
+same reason `inv`/`Invariant` can't live in `Core.lean` either), and `V` is always a
+bare qualified name in every real use of this clause in this repo, never a general
+expression that would additionally need `kermlExpr`. -/
 syntax (name := kermlFeature) (kermlAbstractFlag)? "feature " ident
   (" typed" " by " kermlQualName,+)?
   (" : " kermlQualName,+)?
+  (" default " kermlQualName)?
   (kermlMult)?
   (" subsets " kermlQualName,+)?
   (" references " kermlQualName)?
@@ -561,6 +575,15 @@ syntax (name := kermlFeature) (kermlAbstractFlag)? "feature " ident
   (" inverse" " of " kermlQualName)?
   (" featured" " by " kermlQualName,+)?
   kermlBody : kermlDecl
+
+/-- Undirected anonymous `Feature`: `feature :>> D [= V] ;` -- `Regions.kerml`'s own
+real `feature :>> clock = universalClock;` (see `mkAnonFeatureStub`'s own doc
+comment). `= V` (`V` always a bare qualified name in real use, same as `default`
+above) is parsed but not stored, same reason. Distinct from `Kernel.lean`'s own
+*directed* anonymous form (`in feature :>> d {...}`, `Domain.kerml`'s
+`GetBooleanChange`) -- this one has no `kermlDirFlag` prefix at all, and lives here
+in `Core.lean` since it needs nothing `Kernel.lean`-only (no `kermlExpr`). -/
+syntax "feature " " :>> " kermlQualName (" = " kermlQualName)? kermlBody : kermlDecl
 
 /-- KerML §8.2.4.1.2 `Specialization`, standalone form: `subtype A specializes B ;`.
 Both `A`/`B` are `QualifiedName` references (`SpecificType`/`GeneralType`), not
@@ -742,6 +765,7 @@ partial def elabKermlDecl : TSyntax `kermlDecl → MacroM (Array (TSyntax `term)
   | `(kermlDecl| $[$_abs:kermlAbstractFlag]? feature $a:ident
         $[typed by $tys,*]?
         $[: $tys2,*]?
+        $[default $_defV:kermlQualName]?
         $[$_mult:kermlMult]?
         $[subsets $subs,*]?
         $[references $refF:kermlQualName]?
@@ -803,6 +827,14 @@ partial def elabKermlDecl : TSyntax `kermlDecl → MacroM (Array (TSyntax `term)
     let bodyElems ← elabKermlBody body
     pure (#[← `(($aT).elt)] ++ tyElems ++ subElems ++ refElems ++ crossElems ++ redefElems ++
       chainElems ++ invElems ++ featElems ++ bodyElems)
+  | `(kermlDecl| feature :>> $g:kermlQualName $[= $_v:kermlQualName]? $body:kermlBody) => do
+    let gn := qualNameStr g
+    let elemId := "anon-redefines-" ++ gn
+    let aT ← `(mkAnonFeatureStub $(quote elemId))
+    let gT ← featureStubTermQ g
+    let rel ← mkRedefinitionTerm aT gT elemId gn
+    let bodyElems ← elabKermlBody body
+    pure (#[← `(($aT).elt), ← `(($rel).elt)] ++ bodyElems)
   | `(kermlDecl| subtype $a:kermlQualName specializes $b:kermlQualName ;) => do
     let aT ← kTypeStubTermQ a; let bT ← kTypeStubTermQ b
     let rel ← mkSpecializationTerm aT bT (qualNameStr a) (qualNameStr b)
@@ -954,5 +986,11 @@ elab "kerml% " d:kermlDecl : term => do
 -- `GetBooleanChange`'s anonymous `in feature :>> d {...}`, out of scope for
 -- `Kernel.lean` in this smoke test but the `:>>` clause itself is Core.lean's own).
 #check kerml% feature e : BooleanEvaluation[1] :>> f ;
+
+-- Regions.kerml's own real `feature clock : Clock default universalClock;` (new
+-- `default` clause) and `feature :>> clock = universalClock;` (new undirected
+-- anonymous feature).
+#check kerml% feature clock : Clock default universalClock ;
+#check kerml% feature :>> clock = universalClock ;
 
 end KerML.Core

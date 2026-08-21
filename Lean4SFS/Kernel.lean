@@ -845,6 +845,15 @@ syntax scientific : kermlExpr
 syntax str : kermlExpr
 syntax "*" : kermlExpr
 syntax "null" : kermlExpr
+/-- `result`, KerML's automatically-bound result feature (`Expression::result`),
+referenced as a bare value -- `Regions.kerml`'s own real `(result as Region)...`
+(`Location`/`RegionSurface`/`RegionInterior`/`RegionFilm`'s own `inv{...}` bodies). A
+separate production from the bare-`kermlQualName` one below, same reason
+`kermlIdent`/`Assert.lean`'s own `"result"` production exist: `Assert.lean` (imported
+for `@Assert` wiring) reserves `"result"` as its own `dslTerm` keyword, unusable as a
+plain `ident` (hence `kermlQualName`'s own `ident` component) anywhere in this file's
+grammar once that import exists. -/
+syntax "result" : kermlExpr
 syntax kermlQualName : kermlExpr
 
 syntax (priority := high) ident "(" kermlExpr,* ")" : kermlExpr
@@ -859,6 +868,14 @@ just captures both pieces of text as flat sibling elements (the value's own elem
 plus a `FeatureReferenceExpression` stub for the bracketed unit name), the same
 "structure without semantics" trade this whole grammar already makes throughout. -/
 syntax:90 kermlExpr:90 "[" kermlQualName "]" : kermlExpr
+/-- KerML's `as` classification-cast operator (§7.4.6's `AsExpression`), `Regions.kerml`'s
+own real `(result as Region).frameOfReference` (`Location`/`RegionSurface`/
+`RegionInterior`/`RegionFilm`'s own `inv{...}` bodies). No `AsExpression` abstract-syntax
+structure exists in this project (never extracted from the spec, structural-only scope) --
+the cast target is parsed but discarded, and the operand's own elements pass through
+unchanged, matching every other "structure without semantics" simplification this grammar
+already makes (`kermlMult`, unit brackets, ...). -/
+syntax:90 kermlExpr:90 " as " kermlQualName : kermlExpr
 
 syntax:80 "-" kermlExpr:80 : kermlExpr
 syntax:80 "not " kermlExpr:80 : kermlExpr
@@ -893,6 +910,7 @@ partial def elabKermlExpr : TSyntax `kermlExpr → MacroM (Array (TSyntax `term)
   | `(kermlExpr| $s:str) => do pure #[← `((mkLiteralStringStub "lit-str" $s).elt)]
   | `(kermlExpr| *) => do pure #[← `((mkLiteralInfinityStub "infinity").elt)]
   | `(kermlExpr| null) => do pure #[← `((mkNullExpressionStub "null-expr").elt)]
+  | `(kermlExpr| result) => do pure #[← `((mkFeatureReferenceStub "result").elt)]
   | `(kermlExpr| $x:kermlQualName) => do
     pure #[← `((mkFeatureReferenceStub $(quote (qualNameStr x))).elt)]
   | `(kermlExpr| $f:ident($args,*)) => do
@@ -912,6 +930,7 @@ partial def elabKermlExpr : TSyntax `kermlExpr → MacroM (Array (TSyntax `term)
   | `(kermlExpr| $e:kermlExpr [$u:kermlQualName]) => do
     let eElems ← elabKermlExpr e
     pure (eElems ++ #[← `((mkFeatureReferenceStub $(quote (qualNameStr u))).elt)])
+  | `(kermlExpr| $e:kermlExpr as $_ty:kermlQualName) => elabKermlExpr e
   | `(kermlExpr| -$e:kermlExpr) => do
     let eElems ← elabKermlExpr e
     pure (#[← `((mkOperatorStub "unary-minus" "-").elt)] ++ eElems)
@@ -989,6 +1008,15 @@ redefined target's name (`declaredName` stays `none`, matching the real anonymit
 see its own elaborator arm for why. -/
 syntax kermlDirFlag "feature " " :>> " kermlQualName kermlBody : kermlKDecl
 
+/-- `inv {...}` (KerML §8.3.4.7 `Invariant`, see its own standalone `kernelDecl`
+production's doc comment for the general shape) is *also* a `kermlKDecl` item, unlike
+`classifier`/`type` (`Core.lean`-owned, whose bodies can never reach it) --
+`predicate`/`function`/`behavior` already use this richer, `Kernel.lean`-owned body
+category, so `inv{}` genuinely nests here, no sibling-`#check` workaround needed.
+`Regions.kerml`'s own real `predicate PointInRegion { ... inv { point.frameOfReference
+== region.frameOfReference } }` is the first real use of this. -/
+syntax "inv " "{" kermlExpr "}" : kermlKDecl
+
 /-- Shared by the plain `feature ... = ...` production of `kermlKDecl` below (usable
 nested inside a `predicate`/`function`/`behavior` body) and the identically-shaped
 `kernelDecl` production declared further down (usable standalone/top-level, e.g.
@@ -1050,6 +1078,8 @@ def elabKermlKDecl : TSyntax `kermlKDecl → MacroM (Array (TSyntax `term))
     pure (#[← `(($aT).elt), ← `(($rel).elt)] ++ valElems ++ bodyElems)
   | `(kermlKDecl| feature $a:kermlIdent : $ty:kermlQualName $[$_mult:kermlMult]? = $val:kermlExpr $body:kermlBody) =>
     elabFeatureDefaultElems (kermlIdentStr a) ty val body
+  | `(kermlKDecl| inv { $e:kermlExpr }) => do
+    pure (#[← `((mkInvariantStub).elt)] ++ (← elabKermlExpr e))
   | _ => Macro.throwUnsupported
 
 /-- `predicate`/`function`/`behavior`'s own body category (see its
@@ -1460,6 +1490,176 @@ elab "kernel% " d:kernelDecl : term => do
 #check kernel% @Assert{n="GetChangeToFalse"; f="<<GetChangeToFalse : d~Occurrence, e~BooleanEvaluation, tau~Instant : "+
     "(not I[[d::e,now]] and forall t~Instant in tau ., now are I[[d::e,t]] )"+
     " implies b = false >>";}
+
+-- Regions.kerml's own real `library package Regions { ... }` wrapper: six real
+-- `private import ...;` statements, all Core.lean-layer content.
+#check kernel% library package Regions {
+  private import SpatialFrames::SpatialFrame ;
+  private import Occurrences::Occurrence ;
+  private import Assertion::Assert ;
+  private import Performances::BooleanEvaluation ;
+  private import Clocks::Clock ;
+  private import Clocks::universalClock ;
+}
+
+-- Regions.kerml's own real `type FrameOfReference {...}` -- the new `default` clause
+-- (parsed, not stored) on a nested `feature`.
+#check kerml% type FrameOfReference specializes Base::Anything {
+  doc "A frame of reference serves as the reference for the location of an occurrence."
+  feature clock : Clock default universalClock ;
+}
+
+-- Regions.kerml's own real `feature universalFrameOfReference : FrameOfReference {...}`
+-- -- the new undirected anonymous `feature :>> clock = universalClock;`.
+#check kerml% feature universalFrameOfReference : FrameOfReference {
+  doc "universalFrameOfReference is a fixed frame of reference used as a universal default."
+  feature :>> clock = universalClock ;
+}
+
+#check kerml% type Region specializes Base::Anything {
+  doc "A region is a contiguous, three-dimensional volume at a particular place in a particular frame-of-reference."
+  feature frameOfReference : FrameOfReference default universalFrameOfReference ;
+}
+
+#check kerml% type Point specializes Base::Anything {
+  doc "Point is a metaphysical 0-dimensional entity."
+  feature frameOfReference : FrameOfReference default universalFrameOfReference ;
+}
+
+#check kerml% type Surface specializes Base::Anything {
+  doc "Surface is the set of points at the boundary of a Region."
+  feature frameOfReference : FrameOfReference default universalFrameOfReference ;
+}
+
+-- Regions.kerml's own real `function Location {...}` -- `inv{...}` now genuinely
+-- nested (new, via kermlKDecl) and the new `as` cast expression
+-- (`(result as Region).frameOfReference`). Its own `@Assert` formula is a known,
+-- pre-existing gap (not attempted live): `SFS.lean`'s real `Location : Part → Region
+-- → Prop` takes a `Part`, but this formula's own header declares `o~Occurrence` --
+-- see [[project_assert_lean]]'s own "Location's own formula... excluded from the
+-- live smoke tests on purpose" finding, unchanged by this round.
+#check kernel% function Location {
+  doc "The location function relates spatial occurrences to their region."
+  in o : Occurrence ;
+  return result : Region ;
+  inv { o.isClosed and o.innerSpaceDimension == 3 and o.outerSpaceDimension == 3
+    and o.frameOfReference == (result as Region).frameOfReference }
+}
+
+#check kernel% predicate PointInRegion {
+  doc "Point is contained in Region; \"in\" is a set membership relation"
+  in point : Point ;
+  in region : Region ;
+  inv { point.frameOfReference == region.frameOfReference }
+}
+#check kernel% @Assert{n="PointInRegion"; f="<< PointInRegion : point~Point, region~Region : "+
+    " point in region >>";}
+
+#check kernel% predicate PointOnSurface {
+  doc "Point is on a Surface"
+  in point : Point ;
+  in surface : Surface ;
+  inv { point.frameOfReference == surface.frameOfReference }
+}
+#check kernel% @Assert{n="PointOnSurface"; f="<< PointOnSurface : point~Point, surface~Surface : "+
+    " point in surface >>";}
+
+#check kernel% predicate RegionOverlap {
+  doc "Two regions containing the same point overlap. This is the \"O\" relation (df-rov)."
+  in r1 : Region ;
+  in r2 : Region ;
+  inv { r1.frameOfReference == r2.frameOfReference }
+}
+#check kernel% @Assert{n="RegionOverlap"; f="<< RegionOverlap : r1~Region, r2~Region :"+
+    "exists p~Point that (PointInRegion(p,r1) and PointInRegion(p,r2)) >>"; t="RegionOverlap";}
+
+#check kernel% predicate RegionContainment {
+  doc "A region contains another, when it contains all of its points."
+  in r1 : Region ;
+  in r2 : Region ;
+  inv { r1.frameOfReference == r2.frameOfReference }
+}
+#check kernel% @Assert{n="RegionContainment"; f="<< RegionContainment : r1~Region, r2~Region :"+
+    "forall p~Point are (PointInRegion(p,r2) implies PointInRegion(p,r1)) >>"; t="RegionContainment";}
+
+#check kernel% predicate AtomicRegion {
+  doc "A region is atomic when it contains no other regions (in the location relation)."
+  in r : Region ;
+}
+#check kernel% @Assert{n="AtomicRegion"; f="<< AtomicRegion : r~Region : "+
+    "forall r1~Region are ( RegionContainment(r,r1) implies r = r1 ) >>"; t="AtomicRegion";}
+
+-- LFU/LIN/EXPNS/APAR's own real formulas each call `Location(x)` as a one-argument
+-- function returning a `Region` -- but `SFS.lean`'s real `Location : Part → Region →
+-- Prop` is a two-argument relation over `Part`, not `Occurrence` (this file's own
+-- `Location` predicate above, matching `Regions.kerml`'s functional modeling, was
+-- *already* excluded from live validation for the identical reason -- see
+-- [[project_assert_lean]]). Confirmed via a real build attempt (not assumed): both
+-- `Application type mismatch: Occurrence but expected Part` (the `x`/`y` argument)
+-- and `Type mismatch: Region but expected Region → Prop` (the partial application
+-- itself). `EXPNS` additionally calls `PartOf(x,y)` with `x,y~Occurrence` against
+-- `SFS.lean`'s real `PartOf : Part → Part → Prop`, the same mismatch one level over.
+-- `NOINTP` (no `Location`/`PartOf` calls) and `AtomicRegionDisjoint` (below) don't
+-- have this problem and elaborate live.
+#check kernel% @Assert{n="NOINTP"; f="<< NOINTP : : forall r1,r2~Region are "+
+    "RegionOverlap(r1,r2) implies (RegionContainment(r1,r2) or RegionContainment(r2,r1)) >>"; t="no_interpenetration";}
+
+#check kernel% predicate AtomicRegionDisjoint {
+  doc "Atomic regions are disjoint (df-rdi)"
+}
+#check kernel% @Assert{n="AtomicRegionDisjoint"; f="<< AtomicRegionDisjoint : :"+
+    "forall r1,r2~Region are "+
+    "   ( (AtomicRegion(r1) and AtomicRegion(r2)) implies "+
+    "     (not RegionOverlap(r1,r2) or r1=r2) ) >>"; t="rdi";}
+
+-- RegionSurface/RegionInterior/RegionFilm's own structural declarations (including
+-- `inv{...}`'s new `as` cast) elaborate fine; their `@Assert` formulas don't, for two
+-- already-documented, pre-existing reasons (both confirmed via a real build attempt):
+-- `RegionSurface(r)`/`RegionFilm(r)` called as *one-argument* functions returning a
+-- `Surface`, but `SFS.lean`'s real `RegionSurface`/`RegionFilm : Surface → Region →
+-- Prop` are *two-argument* relations (same "functional KerML vs. relational SFS.mm"
+-- mismatch [[project_assert_lean]] already found for these exact three); and `Adj`
+-- (the "set of adjacent points," `df-adjp`) is genuinely unformalized in `SFS.lean`
+-- -- `Regions.kerml`'s own comment already calls this future work.
+#check kernel% function RegionSurface {
+  doc "The surface of a region is all the points on its boundary"
+  in r : Region ;
+  return result : Surface ;
+  inv { r.frameOfReference == (result as Surface).frameOfReference }
+}
+
+#check kernel% function RegionInterior {
+  doc "The interior of a region includes all the points in a region not on its surface"
+  in r : Region ;
+  return result : Region ;
+  inv { r.frameOfReference == (result as Region).frameOfReference }
+}
+
+#check kernel% function RegionFilm {
+  doc "The film of a region is a surface of which it's the interior"
+  in r : Region ;
+  return result : Surface ;
+  inv { r.frameOfReference == (result as Surface).frameOfReference }
+}
+
+-- ExternallyConnected/FilmConnected's own structural declarations elaborate fine;
+-- their `@Assert` formulas hit the same `RegionFilm(r1)` one-arg-vs-two-arg mismatch
+-- as `RegionSurface`/`RegionInterior`/`RegionFilm` above (confirmed via a real build
+-- attempt), even though `SFS.lean` already has real, matching two-arg
+-- `ExternallyConnected`/`FilmConnected : Region → Region → Prop` defs of its own.
+#check kernel% predicate ExternallyConnected {
+  doc "This is the externally connected (EC) relation of Region Connection Calculus"
+  in r1 : Region ;
+  in r2 : Region ;
+  inv { r1.frameOfReference == r2.frameOfReference }
+}
+
+#check kernel% predicate FilmConnected {
+  doc "This is needed for Occurrences::JustOutsideOf."
+  in r1 : Region ;
+  in r2 : Region ;
+  inv { r1.frameOfReference == r2.frameOfReference }
+}
 
 #check kexpr% 1 + 2 * 3
 #check kexpr% true and not false
