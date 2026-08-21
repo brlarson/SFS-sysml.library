@@ -1533,11 +1533,14 @@ elab "kernel% " d:kernelDecl : term => do
 
 -- Regions.kerml's own real `function Location {...}` -- `inv{...}` now genuinely
 -- nested (new, via kermlKDecl) and the new `as` cast expression
--- (`(result as Region).frameOfReference`). Its own `@Assert` formula is a known,
--- pre-existing gap (not attempted live): `SFS.lean`'s real `Location : Part → Region
--- → Prop` takes a `Part`, but this formula's own header declares `o~Occurrence` --
--- see [[project_assert_lean]]'s own "Location's own formula... excluded from the
--- live smoke tests on purpose" finding, unchanged by this round.
+-- (`(result as Region).frameOfReference`). Its own `@Assert` formula is still a
+-- known gap (not attempted live), but a narrower one than when this was first
+-- written: `Mereology.kerml`/`SFS.lean`'s `Part` was retired 2026-08-21 in favor of
+-- `Occurrence` (see SFS.lean's own note near `PartOf`), so the argument-type half of
+-- the old mismatch is gone -- `Location : Occurrence → Region → Prop` now matches
+-- this formula's own `o~Occurrence` header exactly. What remains: `SFS.lean` has no
+-- `L` (the infix operator `o L result` names), unrelated to the type fix -- see
+-- [[project_assert_lean]]'s own updated note.
 #check kernel% function Location {
   doc "The location function relates spatial occurrences to their region."
   in o : Occurrence ;
@@ -1590,17 +1593,16 @@ elab "kernel% " d:kernelDecl : term => do
     "forall r1~Region are ( RegionContainment(r,r1) implies r = r1 ) >>"; t="AtomicRegion";}
 
 -- LFU/LIN/EXPNS/APAR's own real formulas each call `Location(x)` as a one-argument
--- function returning a `Region` -- but `SFS.lean`'s real `Location : Part → Region →
--- Prop` is a two-argument relation over `Part`, not `Occurrence` (this file's own
--- `Location` predicate above, matching `Regions.kerml`'s functional modeling, was
--- *already* excluded from live validation for the identical reason -- see
--- [[project_assert_lean]]). Confirmed via a real build attempt (not assumed): both
--- `Application type mismatch: Occurrence but expected Part` (the `x`/`y` argument)
--- and `Type mismatch: Region but expected Region → Prop` (the partial application
--- itself). `EXPNS` additionally calls `PartOf(x,y)` with `x,y~Occurrence` against
--- `SFS.lean`'s real `PartOf : Part → Part → Prop`, the same mismatch one level over.
--- `NOINTP` (no `Location`/`PartOf` calls) and `AtomicRegionDisjoint` (below) don't
--- have this problem and elaborate live.
+-- function returning a `Region` -- but `Location` is a genuine *two-argument*
+-- relation in `SFS.lean` (`Occurrence → Region → Prop`, `Part` retired 2026-08-21,
+-- see the note on `Location`'s own predicate above). Confirmed via a real build
+-- attempt after that retirement (not assumed stale from before it): still fails,
+-- now with `Type mismatch: Region but expected Region → Prop` (the one-arg-vs-
+-- two-arg partial-application mismatch alone, no longer an argument-type mismatch
+-- too) -- the same functional-KerML-vs-relational-`SFS.mm` gap already documented
+-- for `RegionSurface`/`RegionFilm`/`RegionInterior` below, independent of the
+-- `Part`/`Occurrence` question entirely. `NOINTP` (no `Location`/`PartOf` calls) and
+-- `AtomicRegionDisjoint` (below) don't have this problem and elaborate live.
 #check kernel% @Assert{n="NOINTP"; f="<< NOINTP : : forall r1,r2~Region are "+
     "RegionOverlap(r1,r2) implies (RegionContainment(r1,r2) or RegionContainment(r2,r1)) >>"; t="no_interpenetration";}
 

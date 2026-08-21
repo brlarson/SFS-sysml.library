@@ -740,55 +740,76 @@ primitive relations (`PartOf`, `Location`, `InRegion`, `OnSurface`, `birth`,
 Opaque carrier types stand in for SFS.mm's Metamath typecodes `part`/`region`/
 `point`/`surface`. -/
 
+/-- Carrier for what an occurrence's temporal extent is a set *of*; SFS.mm leaves
+this fully generic (its `A` is an unconstrained class). Moved up from its original
+position under "Time -- Allen's Intervals" below (still where SFS.mm itself
+introduces it, line-number-wise) -- `Mereology`'s own `PartOf` now needs `Occurrence`
+to already exist, per the 2026-08-21 `Part`-retirement (see that axiom's own doc
+comment); genuine forward-reference, not a reorganization for its own sake. -/
+axiom Item : Type
+
+/-- SFS.mm's implicit type for `A` in `exists`/`birth`/`death`/Allen's-relations: a
+temporal value whose extent, at each instant, is a set of `Item`s (empty = doesn't
+exist then). Reuses the real `TVal`/`interpValAt` machinery from the BLESS-logic
+section above rather than re-axiomatizing evaluation-at-an-instant. -/
+abbrev Occurrence := TVal (Set Item)
+
 /-! ### Mereology (SFS.mm lines 2726-2816) -/
 
-axiom Part : Type
-
-/-- SFS.mm `wpartof`: primitive. -/
-axiom PartOf : Part → Part → Prop
+/-- SFS.mm `wpartof`: primitive. **Typed over `Occurrence`, not a separate opaque
+`Part` carrier type** -- `Mereology.kerml` itself (the real KerML source, not a
+translation choice made independently here) declares `PartOf`'s own `x`/`y` as
+`Occurrence`, not a distinct `Part` classifier (2026-08-21 edit, matching this file's
+change the same day). The formerly-separate `axiom Part : Type` is retired
+entirely -- every definition/theorem below that used to be `Part`-typed (and
+`Location`/`lfu`/`lin`/`AtomicRegion`/`apar`/`expansivity` further down, which share
+the same variable with `PartOf`/`AtomPart` calls) is `Occurrence`-typed now too, not
+just this one axiom, since a stale `Part` anywhere in this cluster would no longer
+type-check against the others. -/
+axiom PartOf : Occurrence → Occurrence → Prop
 
 /-- SFS.mm `df-par`: antireflexivity, a genuine constraint on the primitive. -/
-axiom par (x : Part) : ¬ PartOf x x
+axiom par (x : Occurrence) : ¬ PartOf x x
 
 /-- SFS.mm `df-ptr`: transitivity, a genuine constraint on the primitive. -/
-axiom ptr {x y z : Part} : PartOf x y → PartOf y z → PartOf x z
+axiom ptr {x y z : Occurrence} : PartOf x y → PartOf y z → PartOf x z
 
 /-- SFS.mm `df-pov`. -/
-def Overlap (x y : Part) : Prop := ∃ z, PartOf z x ∧ PartOf z y
+def Overlap (x y : Occurrence) : Prop := ∃ z, PartOf z x ∧ PartOf z y
 
 /-- SFS.mm `df-pun`. -/
-def Underlap (x y : Part) : Prop := ∃ z, PartOf x z ∧ PartOf y z
+def Underlap (x y : Occurrence) : Prop := ∃ z, PartOf x z ∧ PartOf y z
 
 /-- SFS.mm `df-pim`. -/
-def ImproperPart (x y : Part) : Prop := PartOf x y ∨ x = y
+def ImproperPart (x y : Occurrence) : Prop := PartOf x y ∨ x = y
 
 /-- SFS.mm `df-pdj`. SFS.mm's own text reads `p_x Disjoint p_y <-> -. p_y Overlap
 p_y` (self-overlap of `y`, not overlap of `x` and `y`) -- almost certainly a
 transcription slip for `-. p_x Overlap p_y`, which is what is used here; flagged,
 not corrected in SFS.mm itself. -/
-def PartDisjoint (x y : Part) : Prop := ¬ Overlap x y
+def PartDisjoint (x y : Occurrence) : Prop := ¬ Overlap x y
 
 /-- SFS.mm `df-pch`: despite the `df-` name this doesn't define a new symbol -- it's
 purely a constraint (any two parts are comparable, equal, or disjoint, and not
 mutually part of each other) that is not derivable from `df-par`/`df-ptr` alone,
 so, like those two, it stays an `axiom` rather than becoming a `def`. -/
-axiom pch (x y : Part) :
+axiom pch (x y : Occurrence) :
     ((PartOf x y ∨ PartOf y x) ∨ (x = y ∨ PartDisjoint x y)) ∧ ¬ (PartOf x y ∧ PartOf y x)
 
 /-- SFS.mm `df-pat`. -/
-def AtomPart (x : Part) : Prop := ¬ ∃ z, PartOf z x
+def AtomPart (x : Occurrence) : Prop := ¬ ∃ z, PartOf z x
 
 /-- SFS.mm `df-pwh`. -/
-def WholePart (x : Part) : Prop := ∀ z, PartOf z x ∨ x = z
+def WholePart (x : Occurrence) : Prop := ∀ z, PartOf z x ∨ x = z
 
 -- SFS.mm's `povrfl`/`punrfl`/`pimrfl`/`pdjrfl` are unproven placeholders (`$= ?`)
 -- there too (see `reference_metamath_sfs_toolchain.md`'s baseline-placeholder list).
 -- Three are, in fact, real theorems here, needing no axiom:
-theorem povrfl (x y : Part) : Overlap x y ↔ Overlap y x :=
+theorem povrfl (x y : Occurrence) : Overlap x y ↔ Overlap y x :=
   exists_congr fun _ => and_comm
-theorem punrfl (x y : Part) : Underlap x y ↔ Underlap y x :=
+theorem punrfl (x y : Occurrence) : Underlap x y ↔ Underlap y x :=
   exists_congr fun _ => and_comm
-theorem pdjrfl (x y : Part) : PartDisjoint x y ↔ PartDisjoint y x := by
+theorem pdjrfl (x y : Occurrence) : PartDisjoint x y ↔ PartDisjoint y x := by
   unfold PartDisjoint; rw [povrfl]
 -- `pimrfl` (`ImproperPart x y ↔ ImproperPart y x`, i.e. `PartOf x y ∨ x=y ↔
 -- PartOf y x ∨ y=x`) is deliberately *not* translated: given only `df-par`
@@ -804,18 +825,24 @@ axiom Region : Type
 axiom Point : Type
 axiom Surface : Type
 
-/-- SFS.mm `wloc`: primitive (relates a *part*, not a point, to a region). -/
-axiom Location : Part → Region → Prop
+/-- SFS.mm `wloc`: primitive (relates an *occurrence*, not a point, to a region).
+Formerly `Part → Region → Prop` -- `Part`-typed no more, same 2026-08-21 change as
+`PartOf` above (this argument is shared with `PartOf`/`AtomPart` via `apar`/
+`expansivity` below, so it had to move too). This also resolves what was previously
+a documented, permanent type mismatch: `Regions.kerml`'s own real `Location` formula
+(`o~Occurrence := result~Region | o L result`) now matches this signature exactly --
+see `Assert.lean`'s own note on that, no longer accurate as written. -/
+axiom Location : Occurrence → Region → Prop
 /-- SFS.mm `win`: primitive. -/
 axiom InRegion : Point → Region → Prop
 /-- SFS.mm `won`: primitive. -/
 axiom OnSurface : Point → Surface → Prop
 
 /-- SFS.mm `df-lfu`: locational functionality, a genuine constraint on `Location`. -/
-axiom lfu {x : Part} {r1 r2 : Region} : Location x r1 → Location x r2 → r1 = r2
+axiom lfu {x : Occurrence} {r1 r2 : Region} : Location x r1 → Location x r2 → r1 = r2
 
 /-- SFS.mm `df-lin`: injectivity of location, a genuine constraint on `Location`. -/
-axiom lin {x y : Part} {r : Region} : Location x r → Location y r → x = y
+axiom lin {x y : Occurrence} {r : Region} : Location x r → Location y r → x = y
 
 /-- SFS.mm `df-rov`. -/
 def RegionOverlap (r1 r2 : Region) : Prop := ∃ p, InRegion p r1 ∧ InRegion p r2
@@ -825,17 +852,17 @@ def RegionContainment (r1 r2 : Region) : Prop := ∀ p, InRegion p r2 → InRegi
 
 /-- SFS.mm `df-rat`. -/
 def AtomicRegion (r0 : Region) : Prop :=
-  ∀ (x : Part) (r1 : Region), Location x r1 ∧ RegionContainment r0 r1 → r0 = r1
+  ∀ (x : Occurrence) (r1 : Region), Location x r1 ∧ RegionContainment r0 r1 → r0 = r1
 
 /-- SFS.mm `df-rdi`: a genuine constraint (atomic regions are disjoint or equal). -/
 axiom rdi {r1 r2 : Region} : AtomicRegion r1 → AtomicRegion r2 → ¬ RegionOverlap r1 r2 ∨ r1 = r2
 
 /-- SFS.mm `df-apar`: a genuine constraint (atomic parts have atomic regions). -/
-axiom apar {x : Part} {r0 : Region} : Location x r0 → AtomPart x → AtomicRegion r0
+axiom apar {x : Occurrence} {r0 : Region} : Location x r0 → AtomPart x → AtomicRegion r0
 
 /-- SFS.mm `df-pec`: expansivity, a genuine constraint tying `PartOf` to
 `RegionContainment` via `Location`. -/
-axiom expansivity {x y : Part} {r1 r2 : Region} :
+axiom expansivity {x y : Occurrence} {r1 r2 : Region} :
     Location x r1 → Location y r2 → PartOf x y → RegionContainment r1 r2
 
 /-- SFS.mm `df-rni`: no interpenetration, a genuine constraint. -/
@@ -868,16 +895,6 @@ def FilmConnected (r1 r2 : Region) : Prop :=
   ∃ (s1 s2 : Surface) (p : Point), (RegionFilm s1 r1 ∧ RegionFilm s2 r2) ∧ OnSurface p s1 ∧ OnSurface p s2
 
 /-! ### Time -- Allen's Intervals (SFS.mm lines 2962-3117) -/
-
-/-- Carrier for what an occurrence's temporal extent is a set *of*; SFS.mm leaves
-this fully generic (its `A` is an unconstrained class). -/
-axiom Item : Type
-
-/-- SFS.mm's implicit type for `A` in `exists`/`birth`/`death`/Allen's-relations: a
-temporal value whose extent, at each instant, is a set of `Item`s (empty = doesn't
-exist then). Reuses the real `TVal`/`interpValAt` machinery from the BLESS-logic
-section above rather than re-axiomatizing evaluation-at-an-instant. -/
-abbrev Occurrence := TVal (Set Item)
 
 /-- SFS.mm `df-exists`. A genuine `def`, not an axiom: already fully determined by
 `interpValAt`. -/
@@ -1154,10 +1171,16 @@ predicate name; this file's Mereology section, closer to `SFS.mm`'s own more com
 naming, dropped the `Part`/`Atomic` prefix for three of them. Aliased here (not
 renamed above) so `Assert.lean`'s elaborator can resolve formula bodies that cite the
 KerML name directly, without disturbing this file's own established names or their
-citations elsewhere. Not every such mismatch gets an alias -- `Location`'s own
-`@Assert` formula uses infix `L` on an `Occurrence` subject, but `SFS.lean`'s
-`Location : Part → Region → Prop` takes a different argument type entirely, so no
-alias would make it type-check; see `Assert.lean`'s own note on that one. -/
+citations elsewhere. `Location`'s own `@Assert` formula uses infix `L` on an
+`Occurrence` subject -- the *argument-type* half of the old mismatch (`Location` was
+`Part → Region → Prop`) is gone as of the 2026-08-21 `Part`-retirement above
+(`Location : Occurrence → Region → Prop`), confirmed via a real build, but the
+formula still fails for two independent, unrelated reasons: no `abbrev L :=
+Location` exists (the infix operator name `L` itself is unresolved), and `LFU`/
+`LIN`/`EXPNS`/`APAR` call `Location(x)` as a *one-argument* function, but `Location`
+is a genuine *two-argument* relation here (same one-arg-vs-two-arg mismatch already
+documented for `RegionSurface`/`RegionFilm`/`RegionInterior`) -- see `Assert.lean`'s
+own note. -/
 
 /-- SFS.mm/KerML's `PartOverlap`. -/
 abbrev PartOverlap := Overlap

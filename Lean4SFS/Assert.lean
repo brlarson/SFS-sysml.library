@@ -14,8 +14,9 @@ elaborator is deliberately *not* exhaustive: constructs with no clean, honest SF
 counterpart (`numberof`/`productof`/`sumof`, `shifted...by`'s missing step size -- see
 their cases below) raise a clear `Macro.throwError` rather than fabricate one, and a
 formula referencing an SFS.lean name that doesn't exist (e.g. `Location`'s own body
-uses infix `L`, but `SFS.lean` only has `Location : Part → Region → Prop`, a different
-argument type than this formula's `Occurrence` subject) is *expected* to fail with an
+uses infix `L`, but `SFS.lean` has no `L` -- unrelated to `Location`'s own argument
+type, which used to also mismatch (`Part` vs. this formula's `Occurrence` subject)
+until the 2026-08-21 `Part`-retirement fixed that half) is *expected* to fail with an
 honest "unknown identifier"/type-mismatch error, not silently coerced into something
 that type-checks but doesn't mean what the formula says.
 
@@ -348,7 +349,13 @@ instance : DSLMem Point Surface := ⟨OnSurface⟩
 /-- `dslType` → the `SFS.lean` type it names. Recognized DSL type names are mapped to
 their `SFS.lean` counterpart; anything else is passed through as a bare identifier
 (so it resolves if some matching Lean declaration happens to exist, and fails with an
-honest "unknown identifier" otherwise, rather than being silently mismapped). -/
+honest "unknown identifier" otherwise, rather than being silently mismapped).
+`"Class"` was removed 2026-08-21 -- `Mereology.kerml`'s own `x~Class` params (the
+only real use of that name anywhere in the repo) were changed to `x~Occurrence` in
+the KerML source itself, and `SFS.lean`'s own `Part` type they used to map to was
+retired the same day (`PartOf` etc. are `Occurrence`-typed now); leaving `"Class"`
+mapped to a nonexistent (or, worse, Mathlib's *own* unrelated `Part`) target would be
+a live footgun, not dead code worth keeping around. -/
 def elabDslType : TSyntax `dslType → MacroM (TSyntax `term)
   | `(dslType| $t:ident) => do
     match t.getId.toString with
@@ -357,7 +364,6 @@ def elabDslType : TSyntax `dslType → MacroM (TSyntax `term)
     | "Region" => `(Region)
     | "Point" => `(Point)
     | "Surface" => `(Surface)
-    | "Class" => `(Part)
     | "Anything" => `(KerML.Root.Element)
     | "BooleanEvaluation" => `(KerML.Root.Element)
     | _ => `($t)
@@ -723,29 +729,31 @@ elab "domain% " a:dslAssert : term => do
   let stx ← Elab.liftMacroM (elabDslAssert a)
   Elab.Term.elabTerm stx none
 
--- SFS.mm/Mereology.kerml `PAR`.
-#check domain% << PAR : : forall x~Class are not PartOf(x,x) >>
+-- SFS.mm/Mereology.kerml `PAR`. `x~Occurrence` (not `x~Class`) since 2026-08-21 --
+-- Mereology.kerml's own real params were changed from `Class` to `Occurrence` in
+-- the KerML source, and `SFS.lean`'s `PartOf` etc. followed the same day.
+#check domain% << PAR : : forall x~Occurrence are not PartOf(x,x) >>
 
 -- Mereology.kerml `PTR`.
-#check domain% << PTR : : forall x,y,z~Class are
+#check domain% << PTR : : forall x,y,z~Occurrence are
   ( (PartOf(x,y) and PartOf(y,z)) implies PartOf(x,z) ) >>
 
 -- Mereology.kerml `PartOverlap`.
-#check domain% << PartOverlap : x~Class, y~Class :
-  exists z~Class that ( PartOf(z,x) and PartOf(z,y) ) >>
+#check domain% << PartOverlap : x~Occurrence, y~Occurrence :
+  exists z~Occurrence that ( PartOf(z,x) and PartOf(z,y) ) >>
 
 -- Mereology.kerml `PartUnderlap`.
-#check domain% << PartUnderlap : x~Class, y~Class :
-  exists z~Class that ( PartOf(x,z) and PartOf(y,z) ) >>
+#check domain% << PartUnderlap : x~Occurrence, y~Occurrence :
+  exists z~Occurrence that ( PartOf(x,z) and PartOf(y,z) ) >>
 
 -- Mereology.kerml `ImproperPart`.
-#check domain% << ImproperPart : x~Class, y~Class : PartOf(x,y) or x=y >>
+#check domain% << ImproperPart : x~Occurrence, y~Occurrence : PartOf(x,y) or x=y >>
 
 -- Mereology.kerml `PartDisjoint`.
-#check domain% << PartDisjoint : x~Class, y~Class : not PartOverlap(x,y) >>
+#check domain% << PartDisjoint : x~Occurrence, y~Occurrence : not PartOverlap(x,y) >>
 
 -- Mereology.kerml `PCH`.
-#check domain% << PCH : : forall x,y~Class are
+#check domain% << PCH : : forall x,y~Occurrence are
   ( (x=y or PartOf(x,y) or PartOf(y,x) or PartDisjoint(x,y))
     and not (PartOf(x,y) and PartOf(y,x)) ) >>
 
@@ -790,16 +798,24 @@ example : domain% <<Get : d~Occurrence, f~Anything, tau~Instant := I[[d::f,tau]]
 
 /- Formulas deliberately *not* included as live `#check`s here, because they are
 expected to fail to elaborate, honestly, rather than being forced:
-- `Mereology.kerml`'s `PartOf`'s own body, `<< PartOf : x~Class, y~Class : xPy >>` --
+- `Mereology.kerml`'s `PartOf`'s own body, `<< PartOf : x~Occurrence, y~Occurrence :
+  xPy >>` --
   `xPy` is a standalone bare-`dslWff`-identifier (informal "x P y" shorthand, not a
   real scope-visible name), which `freeIdentsInWff`'s own bare-identifier case
   deliberately never auto-binds (see that section's header note) -- still fails with
   "unknown identifier xPy", honestly, exactly as before.
 - `<< Location : o~Occurrence := result~Region | o L result >>` -- `SFS.lean` has no
-  `L`; its own `Location : Part → Region → Prop` also has a different (and
-  incompatible) subject type (`Part`, not `Occurrence`) from this formula's `o`, so
-  even adding an `L := Location` alias would not make this one type-check. This is a
-  genuine mismatch between the DSL formula and `SFS.lean`'s Mereology/Region
-  axiomatization, not a `Assert.lean` bug -- surfaced here, not hidden. -/
+  `L` (would need an `L := Location` alias, not added since the type still wouldn't
+  line up cleanly for a `result~Type | wff`-shaped body either way, see next). Its
+  own `Location`'s argument type used to *also* mismatch (`Part`, not `Occurrence`)
+  but no longer does, since the 2026-08-21 `Part`-retirement (confirmed via a real
+  build, not assumed) -- the missing `L` is now the only remaining reason this one
+  fails, a narrower gap than before, still genuine and undecided (not something
+  `Assert.lean` should guess an alias for on its own).
+- `LFU`/`LIN`/`EXPNS`/`APAR` (`Regions.kerml`) each call `Location(x)` as a
+  *one-argument* function returning a `Region`, but `Location` (like
+  `RegionSurface`/`RegionFilm`/`RegionInterior` below) is a genuine *two-argument*
+  relation in `SFS.lean` -- the same functional-KerML-vs-relational-`SFS.mm`
+  modeling mismatch, independent of and unaffected by the `Part`-retirement above. -/
 
 end SFS.Assert
