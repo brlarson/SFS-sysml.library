@@ -522,6 +522,11 @@ def kFunctionStubTerm (s : String) : MacroM (TSyntax `term) := `(mkKFunctionStub
 def predicateStubTerm (s : String) : MacroM (TSyntax `term) := `(mkPredicateStub $(quote s))
 def interactionStubTerm (s : String) : MacroM (TSyntax `term) := `(mkInteractionStub $(quote s))
 def packageStubTerm (s : String) : MacroM (TSyntax `term) := `(mkPackageStub $(quote s))
+def mkLibraryPackageStub (name : String) (isStd : Bool) : LibraryPackage :=
+  { elementId := name, declaredName := some name, isStandard := isStd }
+def LibraryPackage.elt (t : LibraryPackage) : Element := t.toPackage.toNamespace.toElement
+def libraryPackageStubTerm (s : String) (isStd : Bool) : MacroM (TSyntax `term) :=
+  `(mkLibraryPackageStub $(quote s) $(quote isStd))
 def mkMultiplicityRangeStub (name : String) : MultiplicityRange := { elementId := name, declaredName := some name }
 def multiplicityRangeStubTerm (s : String) : MacroM (TSyntax `term) := `(mkMultiplicityRangeStub $(quote s))
 def MetadataFeature.elt (t : MetadataFeature) : Element := t.toFeature.toKType.toNamespace.toElement
@@ -611,7 +616,17 @@ syntax (kermlAbstractFlag)? "predicate " ident (" specializes " kermlQualName,+)
 syntax (kermlAbstractFlag)? "interaction " ident (" specializes " kermlQualName,+)? (" conjugates " kermlQualName)?
   (" disjoint" " from " kermlQualName,+)? (" unions " kermlQualName,+)? (" intersects " kermlQualName,+)?
   (" differences " kermlQualName,+)? kermlBody : kernelDecl
-syntax "package " ident " ;" : kernelDecl
+/-- KerML §8.2.5.13 `Package`/`LibraryPackage`: `package Name { ... }` (`Base.kerml`'s
+own package could have been written this way, though the real file's top level isn't
+itself parsed here -- see the `library`/`standard library` forms just below, which
+*are* matched against real files) or `[standard] library package Name { ... }`
+(`Allen.kerml`'s `library package Allen { ... }`, `Base.kerml`'s `standard library
+package Base { ... }`/`KerML.kerml`'s `standard library package KerML { ... }`). Real
+KerML also allows `PrefixMetadataMember`s before the keyword -- not covered, matching
+this grammar's usual scope discipline. -/
+syntax "package " ident kermlBody : kernelDecl
+syntax "library " "package " ident kermlBody : kernelDecl
+syntax "standard " "library " "package " ident kermlBody : kernelDecl
 /-- KerML §8.2.5.11 `MultiplicityRange`, standalone: `multiplicity Name [N..M] ;`
 (`Base.kerml`'s `exactlyOne`/`zeroOrOne`/`oneToMany`/`zeroToMany`). Bounds are parsed
 (`kermlMult`, `Core.lean`) but not stored, same reason as `feature`'s own inline
@@ -637,8 +652,14 @@ part of elaborating this `kermlDecl`. A malformed or type-incorrect `f="..."` st
 is now a genuine compile error here, the same way it already is when written directly
 as `domain% <<...>>` in `Assert.lean` itself. Other metaclasses (`@Invariant`, ...)
 and multi-valued `f=`/`t=` (KerML allows `f[1..*]`/`t[0..*]`) aren't covered --
-matching every real formula in this repo, which uses exactly one `f=` value. -/
-syntax "@" "Assert" "{" kermlMetaAttr* "}" : kernelDecl
+matching every real formula in this repo, which uses exactly one `f=` value.
+The metaclass name is captured as a generic `ident`, not the literal keyword
+`"Assert"` -- registering `"Assert"` itself as a reserved token would make that
+word unusable as an ordinary `ident` anywhere else in this file's grammar,
+which real files need (e.g. `import Assertion::Assert ;`, whose qualified name
+ends in the bare identifier `Assert`). Both elaborator sites below instead
+check the captured ident's string value at elaboration time. -/
+syntax "@" ident "{" kermlMetaAttr* "}" : kernelDecl
 
 /-! ### `kermlExpr` -- the expression language (KerML §8.2.5.8)
 
@@ -902,16 +923,22 @@ def elabKernelDecl : TSyntax `kernelDecl → MacroM (Array (TSyntax `term))
         $[disjoint from $disj,*]? $[unions $uni,*]? $[intersects $inter,*]? $[differences $diff,*]? $body:kermlBody) => do
     let declElems ← classifierLikeDeclElems interactionStubTerm a specs conj disj uni inter diff
     pure (declElems ++ (← elabKermlBody body))
-  | `(kernelDecl| package $a:ident ;) => do
+  | `(kernelDecl| package $a:ident $body:kermlBody) => do
     let pT ← packageStubTerm a.getId.toString
-    pure #[← `(($pT).elt)]
+    pure (#[← `(($pT).elt)] ++ (← elabKermlBody body))
+  | `(kernelDecl| library package $a:ident $body:kermlBody) => do
+    let pT ← libraryPackageStubTerm a.getId.toString Bool.false
+    pure (#[← `(($pT).elt)] ++ (← elabKermlBody body))
+  | `(kernelDecl| standard library package $a:ident $body:kermlBody) => do
+    let pT ← libraryPackageStubTerm a.getId.toString Bool.true
+    pure (#[← `(($pT).elt)] ++ (← elabKermlBody body))
   | `(kernelDecl| multiplicity $a:ident $_mult:kermlMult $body:kermlBody) => do
     let mT ← multiplicityRangeStubTerm a.getId.toString
     pure (#[← `(($mT).elt)] ++ (← elabKermlBody body))
-  | `(kernelDecl| @ Assert { $attrs:kermlMetaAttr* }) => do
+  | `(kernelDecl| @ $mc:ident { $attrs:kermlMetaAttr* }) => do
     let pairs := attrs.map kermlMetaAttrPair
     let nameVal := (pairs.find? (·.1 == "n")).map (·.2)
-    let elemId := nameVal.getD "assert"
+    let elemId := nameVal.getD mc.getId.toString
     pure #[← `((mkMetadataFeatureStub $(quote elemId)).elt)]
   | _ => Macro.throwUnsupported
 
@@ -926,8 +953,10 @@ type-check the embedded Domain Logic formula -- done here, in the *top-level*
 same as writing `domain% <<...>>` directly in `Assert.lean` would. -/
 elab "kernel% " d:kernelDecl : term => do
   match d with
-  | `(kernelDecl| @ Assert { $attrs:kermlMetaAttr* }) => do
-    let fVal := (attrs.map kermlMetaAttrPair).find? (·.1 == "f") |>.map (·.2)
+  | `(kernelDecl| @ $mc:ident { $attrs:kermlMetaAttr* }) => do
+    let fVal := if mc.getId.toString == "Assert" then
+        (attrs.map kermlMetaAttrPair).find? (·.1 == "f") |>.map (·.2)
+      else none
     if let some fStr := fVal then
       let env ← getEnv
       match Lean.Parser.runParserCategory env `dslAssert fStr with
@@ -980,10 +1009,28 @@ elab "kernel% " d:kernelDecl : term => do
   doc "zeroToMany is a multiplicity range allowing any cardinality of zero or more (that is, no restriction)."
 }
 
+-- Allen.kerml's own real `library package Allen { ... }` wrapper, containing its
+-- own real `import` statements (`private` isn't parsed, see `import`'s own note in
+-- Core.lean; dropped here, same as every other unparsed prefix flag throughout this
+-- grammar) and its own real `doc`. `predicate`/`@Assert` are *not* nested inside
+-- here, even though the real file nests them -- `kermlBody`'s `kermlDecl*` (used by
+-- `library package`'s own body, like every other body in this grammar) only ever
+-- holds `Core.lean`-layer content (`Core.lean` is compiled before `Kernel.lean`
+-- exists, so its `elabKermlBody` has no way to dispatch on Kernel-layer shapes like
+-- `predicate`/`@Assert` -- the same category-layering constraint `kermlPredBody`
+-- itself was built to route around, but only for `kermlExpr`, not for other
+-- `kernelDecl` keywords nested inside each other). Kept as separate, sibling
+-- `#check`s below instead, each demonstrating its own piece faithfully.
+#check kernel% library package Allen {
+  import Assertion::Assert ;
+  import Occurrences::Occurrence ;
+  import Domain::next ;
+  doc "SFS: Allen's Intervals -- death defined by df-bl.death; birth defined by df-bl.birth"
+}
+
 -- Allen.kerml's own real `precedes` predicate: `in`/`out` parameter declarations
 -- (no `feature` keyword) and a trailing bare-expression body giving the predicate
--- its own value -- both new (`kermlPredBody`) for this file. The surrounding
--- `library package`/`import` wrapper is out of scope for this pass.
+-- its own value -- both new (`kermlPredBody`) for this file.
 #check kernel% predicate precedes {
   in x : Occurrence ;
   in y : Occurrence ;
