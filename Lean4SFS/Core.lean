@@ -417,6 +417,54 @@ axiom df_typemultiplicityrange {A B : Element} {Ca Cb : Set Element} {m n : ℕ}
     Specializes B A → TypeMultiplicityRange B m n →
       Cb ⊆ Ca ∧ n ≤ cardElem Ca ∧ m ≤ cardElem Cb ∧ cardElem Cb ≤ n
 
+/-- `Chapter/CoreSemanticsChapter.tex` §2.3 `df-feature`: for every `e` declared with
+the bare `feature` keyword (tagged `Feature` in `ElementKind`, reused directly here --
+unlike `type`, `Feature` already has a slot in `ElementKind`'s 14 tags, so no new
+`DesignKind` case is needed), `e ∈ VF`. Exact parallel of `df_types`/`VT` above, one
+level down (`VF` for `Feature`s instead of `VT` for `Type`s). -/
+axiom VF : Set Element
+
+axiom df_feature : ∀ e : Element,
+    (∃ C : Set Element, (DesignKind.ofElementKind ElementKind.Feature, e, C) ∈ Design) → e ∈ VF
+
+/-- `Chapter/CoreSemanticsChapter.tex` §2.3 `df-featuredby`/`df-domainless`: both
+assert a feature's design-triple content equals a *set of ordered pairs* (a relation),
+not a plain `Set Element` -- `Design`'s own content slot (`Set Element`) can't hold
+that, so a dedicated primitive is needed here, independent of `Design`, rather than
+forcing this into the `(DesignKind, Element, Set Element)` triple shape used
+everywhere else. -/
+axiom FeatureContent : Element → Set (Element × Element) → Prop
+
+/-- `Chapter/CoreSemanticsChapter.tex` §2.3 `feature x typed by Y featured by Z;` --
+book-only, no `SFS.mm` formalization. A fresh `Element`-level primitive, same reasoning
+as `Specializes`: nothing currently represents this concrete-syntax clause. -/
+axiom FeaturedByDecl : Element → Element → Element → Prop
+
+/-- `Chapter/CoreSemanticsChapter.tex` §2.3 `df-featuredby`: a feature `x` declared
+`typed by Y featured by Z` has content exactly the relation pairing `Z`'s extension
+(domain) with `Y`'s extension (co-domain). A genuine constraint, not derivable, so
+this stays an `axiom` here too. -/
+axiom df_featuredby {x y z : Element} {Cy Cz : Set Element}
+    (hy : (DesignKind.type, y, Cy) ∈ Design) (hz : (DesignKind.type, z, Cz) ∈ Design) :
+    FeaturedByDecl x y z → FeatureContent x {p : Element × Element | p.1 ∈ Cz ∧ p.2 ∈ Cy}
+
+/-- `Chapter/CoreSemanticsChapter.tex` §2.3 `feature x typed by Y;` (no `featured by`
+clause) -- book-only, no `SFS.mm` formalization. A separate primitive from
+`FeaturedByDecl` above, mirroring the book's own two separate definitions for the two
+distinct concrete-syntax forms, rather than one primitive plus a "no featured-by
+clause" side condition. -/
+axiom DomainlessDecl : Element → Element → Prop
+
+/-- `Chapter/CoreSemanticsChapter.tex` §2.3 `df-domainless`: a feature `x` declared
+`typed by Y` (domain defaulting to the universe) has content the relation pairing
+*any* element (domain unconstrained) with `Y`'s extension (co-domain) -- the universal
+domain quantification collapses to no constraint on the pair's first component at all,
+same "vacuous existential/quantifier disappears" simplification used for
+`RegionSurface`/`RegionFilm` elsewhere in this file. -/
+axiom df_domainless {x y : Element} {Cy : Set Element}
+    (hy : (DesignKind.type, y, Cy) ∈ Design) :
+    DomainlessDecl x y → FeatureContent x {p : Element × Element | p.2 ∈ Cy}
+
 /-! ## Concrete syntax (KerML §8.2.4 "Core Concrete Syntax")
 
 A real, working parser and elaborator for a subset of KerML's textual notation, in
