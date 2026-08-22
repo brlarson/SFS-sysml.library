@@ -1036,6 +1036,29 @@ theorem next_uniq {t1 t2 t3 : Time} (h : next t1 t2) : t2 = t3 := absurd h (next
 -- being `wbr`-based) are subsumed by `next_dense`: since `next` is uniformly false
 -- here, nothing downstream ever needs their witnessing content.
 
+/-- SFS.mm `df-nearlymeets`'s own new primitives: `Interval`'s boundary-openness
+features (`Domain.kerml`'s `openLeft`/`openRight`), reused on `Occurrence` here since
+`Allen.kerml`'s own `nearlyMeets` calls them on `x`/`y : Occurrence`. Fresh primitives:
+nothing here represented interval boundary openness before `df-nearlymeets` was added
+to `SFS.mm`. -/
+axiom openLeft : Occurrence → Prop
+axiom openRight : Occurrence → Prop
+
+/-- SFS.mm `df-nearlymeets`. The `next (death A) (birth B)` disjunct is, per
+`next_dense` above, provably always `False` here (`next` is vacuous on dense `ℝ`), so
+this reduces semantically to just the open-boundary disjunct -- see `nearlyMeets_iff`
+below. Included literally anyway, matching `SFS.mm`'s own formula rather than silently
+dropping the now-vacuous part. -/
+def nearlyMeets (A B : Occurrence) : Prop :=
+  (birth B = death A ∧ (openRight A ∨ openLeft B)) ∨ next (death A) (birth B)
+
+/-- Free consequence of `next_dense`, not a fact `SFS.mm`/`Allen.kerml` state
+themselves: `nearlyMeets` collapses to its open-boundary disjunct alone. -/
+theorem nearlyMeets_iff (A B : Occurrence) :
+    nearlyMeets A B ↔ (birth B = death A ∧ (openRight A ∨ openLeft B)) := by
+  unfold nearlyMeets
+  simp [next_dense]
+
 /-! ### KerML Element Representation and Type Definition (SFS.mm lines 3246-3324) -/
 
 /-- SFS.mm `cci`/`cuid`: `CI`/`UI` (Class Identifiers / Unique Identifiers) are both
