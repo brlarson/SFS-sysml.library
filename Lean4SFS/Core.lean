@@ -317,6 +317,66 @@ theorem df_multspec {ts tg th : Element} {Cs Cg Ch : Set Element}
     (hsg : Specializes ts tg) (hsh : Specializes ts th) : Cs ⊆ Cg ∩ Ch :=
   fun _ hx => ⟨df_specializes hs hg hsg hx, df_specializes hs hh hsh hx⟩
 
+/-- `Chapter/CoreSemanticsChapter.tex` §2.2.1 `unions` (KerML's own textual keyword,
+elaborated structurally as a `Unioning` value) -- book-only, no `SFS.mm` formalization.
+Same reasoning as `Specializes` above: `Unioning` carries no semantic content of its
+own and, being a bare, unconstrained structure, isn't tied to what's actually asserted
+in the current model -- so a fresh `Element`-level primitive is needed here too. -/
+axiom Unions : Element → Element → Prop
+
+/-- `Chapter/CoreSemanticsChapter.tex` §2.2.1 `df-unions`: a type `ta` that specializes
+`tb` and unions `tc` has an extension equal to the union of `tb`'s and `tc`'s
+extensions. A genuine constraint, not derivable from `Specializes`/`Unions` being bare
+`Prop`-valued relations, so this stays an `axiom` here too, same reasoning as
+`df_specializes` above. -/
+axiom df_unions {ta tb tc : Element} {Ca Cb Cc : Set Element}
+    (ha : (DesignKind.type, ta, Ca) ∈ Design) (hb : (DesignKind.type, tb, Cb) ∈ Design)
+    (hc : (DesignKind.type, tc, Cc) ∈ Design) :
+    Specializes ta tb → Unions ta tc → Ca = Cb ∪ Cc
+
+/-- `Chapter/CoreSemanticsChapter.tex` §2.2.1 `intersects` (KerML's own textual
+keyword, elaborated structurally as an `Intersecting` value) -- book-only, no `SFS.mm`
+formalization. Same reasoning as `Unions` above. -/
+axiom Intersects : Element → Element → Prop
+
+/-- `Chapter/CoreSemanticsChapter.tex` §2.2.1 `df-intersects`: a type `ta` that
+specializes `tb` and intersects `tc` has an extension equal to the intersection of
+`tb`'s and `tc`'s extensions. Same reasoning as `df_unions` above. -/
+axiom df_intersects {ta tb tc : Element} {Ca Cb Cc : Set Element}
+    (ha : (DesignKind.type, ta, Ca) ∈ Design) (hb : (DesignKind.type, tb, Cb) ∈ Design)
+    (hc : (DesignKind.type, tc, Cc) ∈ Design) :
+    Specializes ta tb → Intersects ta tc → Ca = Cb ∩ Cc
+
+/-- `Chapter/CoreSemanticsChapter.tex` §2.2.1 `differences` (KerML's own textual
+keyword, elaborated structurally as a `Differencing` value) -- book-only, no `SFS.mm`
+formalization. Same reasoning as `Unions` above. -/
+axiom Differences : Element → Element → Prop
+
+/-- `Chapter/CoreSemanticsChapter.tex` §2.2.1 `df-differences`: a type `ta` that
+specializes `tb` and differences `tc` has an extension equal to `tb`'s extension minus
+`tc`'s. Same reasoning as `df_unions` above. -/
+axiom df_differences {ta tb tc : Element} {Ca Cb Cc : Set Element}
+    (ha : (DesignKind.type, ta, Ca) ∈ Design) (hb : (DesignKind.type, tb, Cb) ∈ Design)
+    (hc : (DesignKind.type, tc, Cc) ∈ Design) :
+    Specializes ta tb → Differences ta tc → Ca = Cb \ Cc
+
+/-- `Chapter/CoreSemanticsChapter.tex` §2.2.1 `disjoint from` (KerML's own textual
+keyword, elaborated structurally as a `Disjoining` value) -- book-only, no `SFS.mm`
+formalization. Same reasoning as `Unions` above. -/
+axiom Disjoint : Element → Element → Prop
+
+/-- `Chapter/CoreSemanticsChapter.tex` §2.2.1 `df-disjoint`: a type `ta` that
+specializes `tb` and is disjoint from `tc` has an extension that is a subset of `tb`'s
+and has empty intersection with `tc`'s. Same reasoning as `df_unions` above -- the
+first conjunct (`Ca ⊆ Cb`) is, notably, already exactly `df_specializes`'s own
+conclusion (given `Specializes ta tb`); it's restated here as part of the conjunction
+only because that's the literal shape `df-disjoint` itself asserts, not because it's
+independently new content. -/
+axiom df_disjoint {ta tb tc : Element} {Ca Cb Cc : Set Element}
+    (ha : (DesignKind.type, ta, Ca) ∈ Design) (hb : (DesignKind.type, tb, Cb) ∈ Design)
+    (hc : (DesignKind.type, tc, Cc) ∈ Design) :
+    Specializes ta tb → Disjoint ta tc → Ca ⊆ Cb ∧ Ca ∩ Cc = ∅
+
 /-! ## Concrete syntax (KerML §8.2.4 "Core Concrete Syntax")
 
 A real, working parser and elaborator for a subset of KerML's textual notation, in
