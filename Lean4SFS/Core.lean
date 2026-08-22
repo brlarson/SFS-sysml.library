@@ -679,6 +679,23 @@ axiom df_featurechaining {a b c : Element} {Rb Rc : Set (Element × Element)}
     (hb : FeatureContent b Rb) (hc : FeatureContent c Rc) :
     ChainsDecl a b c → FeatureContent a (relCompose Rc Rb)
 
+/-! ## Classifiers Semantics (`Chapter/ClassifierSemantics.tex` §2.5) -/
+
+/-- `Chapter/ClassifierSemantics.tex` §2.5 `df-classifier`: for every `e` declared
+with the bare `classifier` keyword (tagged `Classifier` in `ElementKind`, reused
+directly here -- same reasoning as `df_feature` above), `e ∈ VC`. Exact parallel of
+`df_types`/`VT` and `df_feature`/`VF` above, one more `ElementKind` tag down. -/
+axiom VC : Set Element
+
+axiom df_classifier : ∀ e : Element,
+    (∃ C : Set Element, (DesignKind.ofElementKind ElementKind.Classifier, e, C) ∈ Design) → e ∈ VC
+
+/-- `Chapter/ClassifierSemantics.tex` §2.5 `df-classifier2`: every `Classifier` is
+also a `Type`. Not derivable from `VC`'s/`VT`'s own definitions (each is independently
+primitive, same situation `df_types`/`df_feature` were already in), so this stays an
+`axiom` here too. -/
+axiom df_classifier2 : VC ⊆ VT
+
 /-! ## Concrete syntax (KerML §8.2.4 "Core Concrete Syntax")
 
 A real, working parser and elaborator for a subset of KerML's textual notation, in
