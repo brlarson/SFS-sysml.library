@@ -1286,6 +1286,39 @@ def GetChangeToFalse (d : Occurrence) (e : Element) (tau : Time) (b : Set Item) 
   (¬ GetP d e ⟨now, dl_nowt⟩ ∧ ∀ t ∈ Set.Ico tau (⟨now, dl_nowt⟩ : Time), GetP d e t)
     → b = falseItem
 
+/-- `Chapter/KernelSemanticsChapter.tex` §3.1.5 `df-bl.changed`: primitive (no
+construction of "the most recent instant before `t1` that `d`'s value differed" is
+given, only the characterizing property `changedIff` below), same treatment as
+`birth`/`death` above. -/
+axiom changed : Occurrence → Time → Time
+
+/-- `Chapter/KernelSemanticsChapter.tex` §3.1.5 `df-bl.changed`'s characterizing
+property: `changed d t1 = t2` iff `t2` precedes `t1`, `d`'s interpretation at `t1`
+differs from its interpretation at `t2` (or `t2 = 0`, meaning `d` has not changed
+before `t1`), and `d`'s interpretation is stable at that `t2` value throughout the
+open interval `(t2,t1)`. Same caveat as `birth`/`death`: this file's `changed` is a
+total function even though the book's own `df-bl.changed` only partially
+characterizes it (nothing forces a *unique* satisfying `t2` to exist when `d` never
+changes and `t2 = 0` doesn't itself satisfy the disjunction). -/
+axiom changedIff {d : Occurrence} {t1 t2 : Time} :
+    changed d t1 = t2 ↔
+      (t2.val ≺ t1.val ∧ (interpValAt d t1 ≠ interpValAt d t2 ∨ t2.val = 0) ∧
+        ∀ t : Time, t.val ∈ Set.Ioo t2.val t1.val → interpValAt d t = interpValAt d t2)
+
+/-- `Chapter/KernelSemanticsChapter.tex` §3.1.6 `df-bl.timeof`: primitive, same
+treatment as `changed`/`birth`/`death` above. The book's own prose notes
+`timeof(φ)` should read as the empty set when `φ` never holds for any `τ ∈ T` -- a
+genuine ZFC partial-function reading this file's total `Time`-valued `timeof`
+doesn't literally capture (same simplification already accepted for `birth`/
+`death`), so `timeofIff` below is a characterization, not a full definition. -/
+axiom timeof : TProp → Time
+
+/-- `Chapter/KernelSemanticsChapter.tex` §3.1.6 `df-bl.timeof`'s characterizing
+property: `timeof φ = t1` iff `φ` holds at `t1` and `φ` does not hold at any
+instant strictly before `t1`. -/
+axiom timeofIff {φ : TProp} {t1 : Time} :
+    timeof φ = t1 ↔ (interpAt φ t1 ∧ ∀ t : Time, t.val ∈ Set.Ico (0 : Instant) t1.val → ¬ interpAt φ t)
+
 /-! ## `Lean4SFS/Assert.lean` name-compatibility aliases
 
 Real `@Assert{n="..."}` names in `sysml.library/**/*.kerml` use the full KerML
