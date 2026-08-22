@@ -1263,6 +1263,29 @@ mirroring that same specialization at the Lean level, not just the KerML one. -/
 def GetBooleanChange (d : Occurrence) (e : Element) (tau : Time) (b : Set Item) : Prop :=
   GetChange d e tau b
 
+/-- Opaque canonical `Set Item` values standing for the Boolean literals `true`/
+`false`, needed once `GetChangeToTrue`/`GetChangeToFalse` compare `b` (inherited as
+`Set Item` from `GetBooleanChange`) against a literal -- `Item` is fully opaque, with
+no internal true/false structure to derive these from. -/
+axiom trueItem : Set Item
+axiom falseItem : Set Item
+
+/-- `Domain.kerml`'s own `GetChangeToTrue` behavior (`:> GetBooleanChange`). Uses
+`GetP` (the predicate reading), not `Get`, since its own `@Assert` formula uses
+`I[[d::e,tau]]` bare, not compared against anything -- matching `GetP`'s own doc note
+that `GetChangeToTrue`/`GetChangeToFalse` are exactly the declarations that need it.
+Does not wait if `d::e` is already true: unlike `GetBooleanChange`, there is no
+"was stable, has changed" antecedent, just "holds now and didn't hold throughout
+`[tau,now)`". -/
+def GetChangeToTrue (d : Occurrence) (e : Element) (tau : Time) (b : Set Item) : Prop :=
+  (GetP d e ⟨now, dl_nowt⟩ ∧ ∀ t ∈ Set.Ico tau (⟨now, dl_nowt⟩ : Time), ¬ GetP d e t)
+    → b = trueItem
+
+/-- `Domain.kerml`'s own `GetChangeToFalse` behavior, mirror of `GetChangeToTrue`. -/
+def GetChangeToFalse (d : Occurrence) (e : Element) (tau : Time) (b : Set Item) : Prop :=
+  (¬ GetP d e ⟨now, dl_nowt⟩ ∧ ∀ t ∈ Set.Ico tau (⟨now, dl_nowt⟩ : Time), GetP d e t)
+    → b = falseItem
+
 /-! ## `Lean4SFS/Assert.lean` name-compatibility aliases
 
 Real `@Assert{n="..."}` names in `sysml.library/**/*.kerml` use the full KerML

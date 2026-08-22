@@ -103,15 +103,17 @@ library package Domain {
 	behavior GetChangeToTrue :> GetBooleanChange{
 		doc /* GetChangeToTrue does not wait if d::e is already true */
 		@Assert{n="GetChangeToTrue"; f="<<GetChangeToTrue : d~Occurrence, e~BooleanEvaluation, tau~Instant : "+
-				"(I[[d::e,now]] and forall t~Instant in tau ., now are not I[[d::e,t]] )"+ 
-				" implies b = true >>";}
+				"(I[[d::e,now]] and forall t~Instant in tau ., now are not I[[d::e,t]] )"+
+				" implies b = true >>";
+				t="GetChangeToTrue";}
 	}
 
 	behavior GetChangeToFalse :> GetBooleanChange{
 		doc /* GetChangeToFalse does not wait if d::e is already false */
 		@Assert{n="GetChangeToFalse"; f="<<GetChangeToFalse : d~Occurrence, e~BooleanEvaluation, tau~Instant : "+
-				"(not I[[d::e,now]] and forall t~Instant in tau ., now are I[[d::e,t]] )"+ 
-				" implies b = false >>";}
+				"(not I[[d::e,now]] and forall t~Instant in tau ., now are I[[d::e,t]] )"+
+				" implies b = false >>";
+				t="GetChangeToFalse";}
 	}
 
 }

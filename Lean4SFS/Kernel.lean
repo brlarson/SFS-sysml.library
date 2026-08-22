@@ -1481,7 +1481,8 @@ elab "kernel% " d:kernelDecl : term => do
 }
 #check kernel% @Assert{n="GetChangeToTrue"; f="<<GetChangeToTrue : d~Occurrence, e~BooleanEvaluation, tau~Instant : "+
     "(I[[d::e,now]] and forall t~Instant in tau ., now are not I[[d::e,t]] )"+
-    " implies b = true >>";}
+    " implies b = true >>";
+    t="GetChangeToTrue";}
 
 -- Domain.kerml's own real `behavior GetChangeToFalse :> GetBooleanChange{...}`.
 #check kernel% behavior GetChangeToFalse :> GetBooleanChange {
@@ -1489,7 +1490,8 @@ elab "kernel% " d:kernelDecl : term => do
 }
 #check kernel% @Assert{n="GetChangeToFalse"; f="<<GetChangeToFalse : d~Occurrence, e~BooleanEvaluation, tau~Instant : "+
     "(not I[[d::e,now]] and forall t~Instant in tau ., now are I[[d::e,t]] )"+
-    " implies b = false >>";}
+    " implies b = false >>";
+    t="GetChangeToFalse";}
 
 -- Regions.kerml's own real `library package Regions { ... }` wrapper: six real
 -- `private import ...;` statements, all Core.lean-layer content.
