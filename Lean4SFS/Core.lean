@@ -31,6 +31,7 @@ only; boolean prefix flags and name resolution are out of scope).
 import Root
 import Lean
 import Mathlib.Data.Set.Defs
+import Mathlib.Data.Set.Card
 
 namespace KerML.Core
 
@@ -376,6 +377,45 @@ axiom df_disjoint {ta tb tc : Element} {Ca Cb Cc : Set Element}
     (ha : (DesignKind.type, ta, Ca) ∈ Design) (hb : (DesignKind.type, tb, Cb) ∈ Design)
     (hc : (DesignKind.type, tc, Cc) ∈ Design) :
     Specializes ta tb → Disjoint ta tc → Ca ⊆ Cb ∧ Ca ∩ Cc = ∅
+
+/-- `Chapter/CoreSemanticsChapter.tex` §2.2.3 `df-cardinality`: `#` is literal notation
+for `Set.ncard` (Mathlib's own finite-set cardinality -- "junk value zero if infinite",
+matching the book's own "nothing in a system is infinite" stance), not a new primitive:
+`SFS.mm`'s own `df-cardinality` is itself just an abbreviation reusing base `set.mm`'s
+already-developed cardinal number theory, so this is the direct Lean analogue, not a
+shortcut -- a genuine `def`, no `axiom` needed. -/
+noncomputable def cardElem (A : Set Element) : ℕ := A.ncard
+
+/-- `Chapter/CoreSemanticsChapter.tex` §2.2.3 `type B[n] specializes A` (KerML's exact
+multiplicity bracket, `[n]`) -- book-only, no `SFS.mm` formalization. A fresh
+`Element`-level primitive, same reasoning as `Specializes` above: nothing currently
+represents a type's *declared* multiplicity. -/
+axiom TypeMultiplicityExact : Element → ℕ → Prop
+
+/-- `Chapter/CoreSemanticsChapter.tex` §2.2.3 `df-typemultiplicity`: a type `B`
+declared `[n] specializes A` has an extension that's a subset of `A`'s, is bounded by
+`A`'s cardinality, and has cardinality exactly `n`. A genuine constraint, not
+derivable, so this stays an `axiom` here too -- the first conjunct (`Cb ⊆ Ca`) is,
+notably, already exactly `df_specializes`'s own conclusion, same caveat as
+`df_disjoint` above. -/
+axiom df_typemultiplicity {A B : Element} {Ca Cb : Set Element} {n : ℕ}
+    (hA : (DesignKind.type, A, Ca) ∈ Design) (hB : (DesignKind.type, B, Cb) ∈ Design) :
+    Specializes B A → TypeMultiplicityExact B n →
+      Cb ⊆ Ca ∧ n ≤ cardElem Ca ∧ cardElem Cb = n
+
+/-- `Chapter/CoreSemanticsChapter.tex` §2.2.3 `type B[m..n] specializes A` (KerML's
+multiplicity range bracket, `[m..n]`) -- book-only, no `SFS.mm` formalization. Same
+reasoning as `TypeMultiplicityExact` above. -/
+axiom TypeMultiplicityRange : Element → ℕ → ℕ → Prop
+
+/-- `Chapter/CoreSemanticsChapter.tex` §2.2.3 `df-typemultiplicityrange`: a type `B`
+declared `[m..n] specializes A` has an extension that's a subset of `A`'s, is bounded
+above by `A`'s cardinality, and has cardinality between `m` and `n`. Same reasoning as
+`df_typemultiplicity` above. -/
+axiom df_typemultiplicityrange {A B : Element} {Ca Cb : Set Element} {m n : ℕ}
+    (hA : (DesignKind.type, A, Ca) ∈ Design) (hB : (DesignKind.type, B, Cb) ∈ Design) :
+    Specializes B A → TypeMultiplicityRange B m n →
+      Cb ⊆ Ca ∧ n ≤ cardElem Ca ∧ m ≤ cardElem Cb ∧ cardElem Cb ≤ n
 
 /-! ## Concrete syntax (KerML §8.2.4 "Core Concrete Syntax")
 
