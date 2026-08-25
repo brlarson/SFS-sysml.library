@@ -1570,7 +1570,7 @@ theorem changed_zero_of_no_diff {d : Occurrence} {t1 : Time}
     (h : ∀ i : Fin (tickCount + 1), (ticks i).val ≺ t1.val → interpValAt d (ticks i) = interpValAt d t1) :
     changed d t1 = ⟨0, TIME_nonempty⟩ := by
   unfold changed
-  rw [dif_neg]
+  rw [dite_eq_right]
   simp only [Finset.not_nonempty_iff_eq_empty, Finset.filter_eq_empty_iff]
   exact fun i _ hcond => hcond.2 (h i hcond.1)
 
