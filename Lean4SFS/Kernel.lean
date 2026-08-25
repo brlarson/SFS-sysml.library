@@ -1344,11 +1344,11 @@ elab "kernel% " d:kernelDecl : term => do
 -- `$x:ident` case: an unspaced `x.openLeft` is one compound identifier by the time
 -- Lean's *lexer* sees it, so the fix splits it there rather than adding a doomed
 -- separate `dslTerm "." ident` grammar production, which could never actually fire
--- for real, unspaced formula text). Live, but not `example ... := rfl`-checked
--- against `SFS.lean`'s own `starts`/`finishes`/`coincident`: those definitions are
--- missing the `openLeft`/`openRight` conjunct Allen.kerml's real text has -- a
--- separate, pre-existing fidelity gap, unrelated to dot-access itself, not fixed
--- here (see `Assert.lean`'s matching `#check`s for the detailed note).
+-- for real, unspaced formula text) and `SFS.lean`'s own definitions (2026-08-26)
+-- gained the `openLeft`/`openRight` conjunct they had been missing. See
+-- `Assert.lean`'s own `example ... := rfl` checks (bare `domain%`, not the full
+-- `@Assert{...}` wrapper this file's own `kernel%` elaborates) for confirmation
+-- each elaborates to exactly `SFS.lean`'s real, current predicate.
 #check kernel% @Assert{n="starts"; f="<<starts : x~Occurrence, y~Occurrence :"+
   " birth(x) = birth(y) and death(y) < death(x)"+
   " and x.openLeft = y.openLeft >>"; t="starts";}

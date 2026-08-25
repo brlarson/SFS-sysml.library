@@ -1040,20 +1040,45 @@ noncomputable def precedes (A B : Occurrence) : Option Prop := (death A).map fun
 noncomputable def meets (A B : Occurrence) : Option Prop := (death A).map fun tA => tA = birth B
 /-- SFS.mm `df-overlaps`: needs only `A`'s death, same reasoning as `precedes`. -/
 noncomputable def overlaps (A B : Occurrence) : Option Prop := (death A).map fun tA => (birth B).val ≺ tA.val
+/-- `Interval`'s boundary-openness features (`Domain.kerml`'s `openLeft`/`openRight`),
+reused on `Occurrence` here since `Allen.kerml`'s own `starts`/`finishes`/`coincident`/
+`nearlyMeets` all call them on `x`/`y : Occurrence`. Fresh primitives: nothing here
+represented interval boundary openness before `df-nearlymeets` was added to `SFS.mm`.
+Declared here, ahead of `starts` below (rather than immediately before `nearlyMeets`,
+where they first appeared 2026-08-25), so `starts`/`finishes`/`coincident` can
+reference them too. -/
+axiom openLeft : Occurrence → Prop
+axiom openRight : Occurrence → Prop
+
 /-- SFS.mm `df-starts`: compares `A`'s and `B`'s deaths directly, so needs both --
-via `kand`/`klt`, which (unlike the old hand-rolled match) short-circuits to
-`some False` when `birth A = birth B` already fails, even if a death is unknown. -/
+via `kand`/`klt`, which (unlike the old hand-rolled match) short-circuits to a
+definite answer as soon as any known conjunct settles it, even if a death is
+unknown. `openLeft A = openLeft B` (2026-08-26) matches `Allen.kerml`'s real
+formula, which this definition had been missing -- both boundaries must agree
+open/closed the same way for `starts` to hold. Nested `kand`s deliberately mirror
+`Allen.kerml`'s own right-associative `and`-chain (`Assert.lean`'s `dslWff` grammar
+parses `A and B and C` as `A and (B and C)`) rather than grouping the two
+non-partial conjuncts together, so this is *literally*, not just logically, what
+the real `@Assert` formula elaborates to -- see `Assert.lean`/`Kernel.lean`'s own
+`example ... := rfl` checks. -/
 noncomputable def starts (A B : Occurrence) : Option Prop :=
-  kand (some (birth A = birth B)) (klt (death B) (death A))
+  kand (some (birth A = birth B)) (kand (klt (death B) (death A)) (some (openLeft A = openLeft B)))
 /-- SFS.mm `df-during`: needs both, same reasoning as `starts`. -/
 noncomputable def during (A B : Occurrence) : Option Prop :=
   kand (some ((birth B).val ≼ (birth A).val)) (kle (death A) (death B))
-/-- SFS.mm `df-finishes`: needs both, same reasoning as `starts`. -/
+/-- SFS.mm `df-finishes`: needs both, same reasoning as `starts` -- `openRight A =
+openRight B` (2026-08-26) matches `Allen.kerml`'s real formula, same fix and same
+right-associative nesting as `starts` above. -/
 noncomputable def finishes (A B : Occurrence) : Option Prop :=
-  kand (some ((birth B).val ≺ (birth A).val)) (keq (death A) (death B))
-/-- SFS.mm `df-coincident`: needs both, same reasoning as `starts`. -/
+  kand (some ((birth B).val ≺ (birth A).val)) (kand (keq (death A) (death B)) (some (openRight A = openRight B)))
+/-- SFS.mm `df-coincident`: needs both, same reasoning as `starts` -- both boundary
+conjuncts (2026-08-26), matching `Allen.kerml`'s real formula, same fix and nesting
+as `starts`/`finishes` above; the trailing pair (`openLeft`/`openRight`, both
+non-partial) combine via plain `∧`, matching how the DSL's own right-associative
+parse bottoms out. -/
 noncomputable def coincident (A B : Occurrence) : Option Prop :=
-  kand (some (birth A = birth B)) (keq (death A) (death B))
+  kand (some (birth B = birth A))
+    (kand (keq (death A) (death B)) (some (openLeft A = openLeft B ∧ openRight A = openRight B)))
 /-- SFS.mm `df-nonoverlaps`: `death(x) < birth(y) ∨ death(y) < birth(x)`, i.e.
 exactly `precedes A B ∨ precedes B A` -- `kor` gives the correct strong-Kleene
 disjunction for free (a known-true disjunct wins even if the other occurrence
@@ -1094,14 +1119,6 @@ theorem next_uniq {t1 t2 t3 : Time} (h : next t1 t2) : t2 = t3 := absurd h (next
 -- clause of `df-next`, needed in the Metamath development to route around `wtp` not
 -- being `wbr`-based) are subsumed by `next_dense`: since `next` is uniformly false
 -- here, nothing downstream ever needs their witnessing content.
-
-/-- SFS.mm `df-nearlymeets`'s own new primitives: `Interval`'s boundary-openness
-features (`Domain.kerml`'s `openLeft`/`openRight`), reused on `Occurrence` here since
-`Allen.kerml`'s own `nearlyMeets` calls them on `x`/`y : Occurrence`. Fresh primitives:
-nothing here represented interval boundary openness before `df-nearlymeets` was added
-to `SFS.mm`. -/
-axiom openLeft : Occurrence → Prop
-axiom openRight : Occurrence → Prop
 
 /-- SFS.mm `df-nearlymeets`. The `next (death A) (birth B)` disjunct is, per
 `next_dense` above, provably always `False` here (`next` is vacuous on dense `ℝ`), so

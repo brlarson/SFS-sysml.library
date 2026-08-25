@@ -962,25 +962,33 @@ example : domain% <<finishesEqCheck : x~Occurrence, y~Occurrence : death(x) = de
     = fun x y => SFS.keq (death x) (death y) := rfl
 
 -- `starts`/`finishes`/`coincident`, now that dot-access (`x.openLeft`/`y.openRight`)
--- has real grammar support: these elaborate live, but *not* as `example ... := rfl`
--- against `SFS.lean`'s own `starts`/`finishes`/`coincident` -- those definitions are
--- missing the `x.openLeft = y.openLeft`/`x.openRight = y.openRight` conjunct that
--- Allen.kerml's real formula text has (a separate, pre-existing fidelity gap,
--- unrelated to today's grammar work -- not fixed here). `#check` only, honestly
--- reporting what these formulas elaborate *to* (a real `Option Prop`-valued lambda,
--- strictly more conjuncts than `starts` itself), not claiming agreement with a
--- `SFS.lean` definition that doesn't yet have them.
+-- has real grammar support, and `SFS.lean`'s own definitions (2026-08-26) gained
+-- the `openLeft`/`openRight` conjunct they had been missing: `example ... := rfl`
+-- below confirms exact agreement, same as `precedes`/`meets`/`overlaps`/`during`/
+-- `nonoverlaps` above.
 #check domain% <<starts : x~Occurrence, y~Occurrence :
   birth(x) = birth(y) and death(y) < death(x)
   and x.openLeft = y.openLeft >>
+
+example : domain% <<starts : x~Occurrence, y~Occurrence :
+  birth(x) = birth(y) and death(y) < death(x)
+  and x.openLeft = y.openLeft >> = starts := rfl
 
 #check domain% <<finishes : x~Occurrence, y~Occurrence :
   birth(y) < birth(x) and death(x) = death(y)
   and x.openRight = y.openRight >>
 
+example : domain% <<finishes : x~Occurrence, y~Occurrence :
+  birth(y) < birth(x) and death(x) = death(y)
+  and x.openRight = y.openRight >> = finishes := rfl
+
 #check domain% <<coincident : x~Occurrence, y~Occurrence :
   birth(y) = birth(x) and death(x) = death(y) and x.openLeft = y.openLeft
   and x.openRight = y.openRight >>
+
+example : domain% <<coincident : x~Occurrence, y~Occurrence :
+  birth(y) = birth(x) and death(x) = death(y) and x.openLeft = y.openLeft
+  and x.openRight = y.openRight >> = coincident := rfl
 
 /- Formulas deliberately *not* included as live `#check`s here, because they are
 expected to fail to elaborate, honestly, rather than being forced:
