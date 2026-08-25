@@ -1007,30 +1007,55 @@ class Lifetimes where
   `birthIff`: the `Option` codomain already *is* the guard. -/
   deathIff : ∀ {A : Occurrence} {t0 : Time},
     death A = some t0 ↔ existsAt A t0 ∧ ∀ t1 : Time, t1.val ∈ Set.Ioc t0.val now → ¬ existsAt A t1
+  /-- SFS.mm `df-bl.timeof`: primitive, "the first instant `φ` holds" -- exactly
+  `birth`'s own shape (`existsAt A` replaced by `interpAt φ`), bundled into this
+  same class since it needs the same guard-and-prove treatment and the same new
+  axiom (`hasFirstInstant` below). -/
+  timeof : TProp → Time
+  /-- SFS.mm `df-bl.timeof`'s characterizing property, guarded on `φ` holding
+  somewhere -- same reasoning as `birthIff`: unconditional would force even a
+  nowhere-true `φ` to have *some* first-true instant. -/
+  timeofIff : ∀ {φ : TProp} {t1 : Time}, (∃ s, interpAt φ s) →
+    (timeof φ = t1 ↔ interpAt φ t1 ∧ ∀ t : Time, t.val ∈ Set.Ico (0 : Instant) t1.val → ¬ interpAt φ t)
 
-export Lifetimes (birth death birthIff deathIff)
+export Lifetimes (birth death birthIff deathIff timeof timeofIff)
 
-/-- The one new trusted ingredient this reformation needs: every `Occurrence` that
-exists anywhere has a *first* instant of existence, not merely an infimum of
-existence times. Formalizes `Occurrences.kerml`'s mandatory `startShot:
-Instant[1]` (unlike `endShot`, never weakened to `[0..1]`) -- without this,
-`birth_exists` below is not provable, `Time`'s dense order gives no well-ordering
-to fall back on the way `ℕ` does in `Repaired.lean`. -/
-axiom occurrenceHasFirstInstant (A : Occurrence) (_h : ∃ s, existsAt A s) :
-    ∃ τ, IsLeast {t : Time | existsAt A t} τ
+/-- The one new trusted ingredient this reformation needs: any `Time → Prop`
+predicate that holds anywhere has a *first* instant where it holds, not merely an
+infimum of the instants where it holds. Stated generically (not fixed to
+`existsAt A`) so it serves both `birth` (`P := existsAt A`, formalizing
+`Occurrences.kerml`'s mandatory `startShot: Instant[1]`) and `timeof` below
+(`P := interpAt φ`) without a near-duplicate axiom for each -- without this,
+neither `birth_exists` nor `timeof_exists` is provable, `Time`'s dense order gives
+no well-ordering to fall back on the way `ℕ` does in `Repaired.lean`. -/
+axiom hasFirstInstant (P : Time → Prop) (_h : ∃ s, P s) :
+    ∃ τ, IsLeast {t : Time | P t} τ
 
 /-- A total selector satisfying `birthIff`'s guarded spec exists for every
-occurrence: `occurrenceHasFirstInstant`'s witness when `A` exists somewhere,
-`Time`'s own `⟨now, dl_nowt⟩` (unconstrained junk, matching this file's own
-precedent for an arbitrary-but-valid `Time` witness) otherwise. -/
+occurrence: `hasFirstInstant`'s witness when `A` exists somewhere, `Time`'s own
+`⟨now, dl_nowt⟩` (unconstrained junk, matching this file's own precedent for an
+arbitrary-but-valid `Time` witness) otherwise. -/
 theorem birth_exists (A : Occurrence) :
     ∃ t0 : Time, (∃ s, existsAt A s) →
       (existsAt A t0 ∧ ∀ t1 : Time, t1.val ∈ Set.Ico (0 : Instant) t0.val → ¬ existsAt A t1) := by
   by_cases h : ∃ s, existsAt A s
-  · obtain ⟨τ, hτmem, hτlb⟩ := occurrenceHasFirstInstant A h
+  · obtain ⟨τ, hτmem, hτlb⟩ := hasFirstInstant (existsAt A) h
     refine ⟨τ, fun _ => ⟨hτmem, fun t1 ht1 hex1 => ?_⟩⟩
     exact absurd (hτlb hex1) (not_le.mpr ht1.2)
   · exact ⟨⟨now, dl_nowt⟩, fun hex => absurd hex h⟩
+
+/-- SFS.mm `df-bl.timeof`'s own guarded existence, exactly `birth_exists`'s
+argument with `existsAt A` replaced by `interpAt φ` -- the same structural shape
+(`timeofIff` is `birthIff` with `interpAt φ` in place of `existsAt A`), so the same
+proof, via the same generic `hasFirstInstant`, carries over unchanged. -/
+theorem timeof_exists (φ : TProp) :
+    ∃ t1 : Time, (∃ s, interpAt φ s) →
+      (interpAt φ t1 ∧ ∀ t : Time, t.val ∈ Set.Ico (0 : Instant) t1.val → ¬ interpAt φ t) := by
+  by_cases h : ∃ s, interpAt φ s
+  · obtain ⟨τ, hτmem, hτlb⟩ := hasFirstInstant (interpAt φ) h
+    refine ⟨τ, fun _ => ⟨hτmem, fun t ht hφt => ?_⟩⟩
+    exact absurd (hτlb hφt) (not_le.mpr ht.2)
+  · exact ⟨⟨now, dl_nowt⟩, fun hφ => absurd hφ h⟩
 
 /-- Existence set membership `t0 ∈ {t | existsAt A t}` together with "nothing
 exists strictly after `t0`" is exactly `IsGreatest {t | existsAt A t} t0` -- the
@@ -1089,11 +1114,23 @@ noncomputable instance model : Lifetimes where
   deathIff {A} {t0} := by
     have spec := Classical.choose_spec (death_exists A)
     exact spec t0
+  timeof φ := Classical.choose (timeof_exists φ)
+  timeofIff {φ} {t1} h := by
+    have spec := Classical.choose_spec (timeof_exists φ) h
+    constructor
+    · rintro rfl; exact spec
+    · rintro ⟨hφ, hno⟩
+      have h1 : ¬ t1.val < (Classical.choose (timeof_exists φ)).val := fun hlt =>
+        spec.2 t1 ⟨t1.2.1, hlt⟩ hφ
+      have h2 : ¬ (Classical.choose (timeof_exists φ)).val < t1.val := fun hlt =>
+        hno (Classical.choose (timeof_exists φ)) ⟨(Classical.choose (timeof_exists φ)).2.1, hlt⟩ spec.1
+      exact Subtype.ext (le_antisymm (not_lt.mp h1) (not_lt.mp h2))
 
 /- The audit (`Repaired.lean`'s own convention): `model` depends on Lean's standard
-classical axioms plus exactly one new ingredient, `occurrenceHasFirstInstant` --
-the well-ordering `Repaired.lean`'s toy `ℕ` case got for free, ported here as an
-explicit, named assumption instead, since dense `Time` has no such guarantee. -/
+classical axioms plus exactly one new ingredient, `hasFirstInstant` -- the
+well-ordering `Repaired.lean`'s toy `ℕ` case got for free, ported here as an
+explicit, named assumption instead (reused for both `birth` and `timeof`), since
+dense `Time` has no such guarantee. -/
 #print axioms model
 
 /-- Strong Kleene conjunction on `Option Prop`, the general form of the ad hoc
@@ -1469,36 +1506,33 @@ def GetChangeToFalse (d : Occurrence) (e : Element) (tau : Time) (b : Set Item) 
 
 /-- `Chapter/KernelSemanticsChapter.tex` §3.1.5 `df-bl.changed`: primitive (no
 construction of "the most recent instant before `t1` that `d`'s value differed" is
-given, only the characterizing property `changedIff` below), same treatment as
-`birth`/`death` above. -/
+given, only the characterizing property `changedIff` below). **Not** given the
+same guard-and-prove treatment as `birth`/`death`/`timeof` (2026-08-26 investigation):
+unlike those, `changedIff`'s presupposition isn't merely "sometimes fails at
+existence edge cases" -- for an ordinary step-function `Occurrence` (e.g. `d`
+constant `A` before `0.5`, constant `B` from `0.5` on) and any `t1` that isn't
+itself a fresh transition instant for `d` (e.g. `t1 = 0.8`), *no* `t2` satisfies
+`changedIff`'s three conditions jointly: the exact transition point fails the
+"differs" disjunct (its value already matches `d t1`), and every earlier `t2`
+fails the open-interval constancy clause (the interval `(t2,t1)` straddles the
+transition). This looks like a real gap in `df-bl.changed`'s own formalization
+(likely inherited from `SFS.mm`), not the `birth`/`death`-style "no least element
+in a dense order" presupposition gap -- left as a known, unresolved issue rather
+than guessed at. -/
 axiom changed : Occurrence → Time → Time
 
 /-- `Chapter/KernelSemanticsChapter.tex` §3.1.5 `df-bl.changed`'s characterizing
 property: `changed d t1 = t2` iff `t2` precedes `t1`, `d`'s interpretation at `t1`
 differs from its interpretation at `t2` (or `t2 = 0`, meaning `d` has not changed
 before `t1`), and `d`'s interpretation is stable at that `t2` value throughout the
-open interval `(t2,t1)`. Same caveat as `birth`/`death`: this file's `changed` is a
-total function even though the book's own `df-bl.changed` only partially
-characterizes it (nothing forces a *unique* satisfying `t2` to exist when `d` never
-changes and `t2 = 0` doesn't itself satisfy the disjunction). -/
+open interval `(t2,t1)`. See `changed`'s own doc comment above: this file's
+`changed` stays a total, unguarded function -- not merely "the book's own
+`df-bl.changed` only partially characterizes it" (the original framing), but
+because the guard-and-prove treatment doesn't obviously apply as-is. -/
 axiom changedIff {d : Occurrence} {t1 t2 : Time} :
     changed d t1 = t2 ↔
       (t2.val ≺ t1.val ∧ (interpValAt d t1 ≠ interpValAt d t2 ∨ t2.val = 0) ∧
         ∀ t : Time, t.val ∈ Set.Ioo t2.val t1.val → interpValAt d t = interpValAt d t2)
-
-/-- `Chapter/KernelSemanticsChapter.tex` §3.1.6 `df-bl.timeof`: primitive, same
-treatment as `changed`/`birth`/`death` above. The book's own prose notes
-`timeof(φ)` should read as the empty set when `φ` never holds for any `τ ∈ T` -- a
-genuine ZFC partial-function reading this file's total `Time`-valued `timeof`
-doesn't literally capture (same simplification already accepted for `birth`/
-`death`), so `timeofIff` below is a characterization, not a full definition. -/
-axiom timeof : TProp → Time
-
-/-- `Chapter/KernelSemanticsChapter.tex` §3.1.6 `df-bl.timeof`'s characterizing
-property: `timeof φ = t1` iff `φ` holds at `t1` and `φ` does not hold at any
-instant strictly before `t1`. -/
-axiom timeofIff {φ : TProp} {t1 : Time} :
-    timeof φ = t1 ↔ (interpAt φ t1 ∧ ∀ t : Time, t.val ∈ Set.Ico (0 : Instant) t1.val → ¬ interpAt φ t)
 
 /-! ## `Lean4SFS/Assert.lean` name-compatibility aliases
 
