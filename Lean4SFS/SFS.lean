@@ -968,8 +968,14 @@ def existsAt (A : Occurrence) (t0 : Time) : Prop := interpValAt A t0 ≠ ∅
 given, only the characterizing property `df-birth` below). Returns `Time`, not bare
 `Instant`: an occurrence's birth is itself one of the instants under discussion. -/
 axiom birth : Occurrence → Time
-/-- SFS.mm `death`: primitive. -/
-axiom death : Occurrence → Time
+/-- `Occurrences.kerml`'s own `endShot: Instant[0..1]` (`//SFS`-marked: "The
+Occurrence may not have ended at time now"), unlike `startShot: Instant[1]`, which
+stays mandatory. `Option`-valued, not a total `Occurrence → Time`: an ongoing
+occurrence genuinely has no death instant yet, not an arbitrary placeholder one --
+the old total version was inconsistent (`fun _ => ∅`, an occurrence that never
+exists, was still forced to have *some* death instant, and `deathIff` below then
+forced it to exist there). `birth` stays total (`startShot` stays mandatory). -/
+axiom death : Occurrence → Option Time
 
 /-- SFS.mm `df-birth`. SFS.mm's own text quantifies `A. t_1 e. (0[,)t_0) -.
 exists(A,t_0)` -- reusing the outer `t_0` inside the body instead of the bound
@@ -978,29 +984,82 @@ exists(A,t_0)` -- reusing the outer `t_0` inside the body instead of the bound
 axiom birthIff {A : Occurrence} {t0 : Time} :
     birth A = t0 ↔ existsAt A t0 ∧ ∀ t1 : Time, t1.val ∈ Set.Ico (0 : Instant) t0.val → ¬ existsAt A t1
 
-/-- SFS.mm `df-death`. -/
+/-- SFS.mm `df-death`, restated for `death`'s `Option` codomain: only characterizes
+`death A = some t0`, says nothing about when `death A = none` (ongoing) occurs --
+`none` isn't itself axiomatized as "occurs exactly when no such `t0` exists"; it's
+simply the case this axiom doesn't constrain, which is what breaks the old
+inconsistency (nothing forces `death A` to be `some` for an occurrence that never
+exists). -/
 axiom deathIff {A : Occurrence} {t0 : Time} :
-    death A = t0 ↔ existsAt A t0 ∧ ∀ t1 : Time, t1.val ∈ Set.Ioc t0.val now → ¬ existsAt A t1
+    death A = some t0 ↔ existsAt A t0 ∧ ∀ t1 : Time, t1.val ∈ Set.Ioc t0.val now → ¬ existsAt A t1
 
-/-- SFS.mm `df-lifetime`. -/
-def life (A : Occurrence) : Set Instant := Set.Icc (birth A).val (death A).val
+/-- Strong Kleene conjunction on `Option Prop`, the general form of the ad hoc
+"`some tA, some tB => some (...) | _, _ => none`" pattern this file used to repeat
+per-predicate: unlike that pattern, `kand` *short-circuits* to `some False` when the
+known operand is already false, even if the other is `none` -- matching real
+three-valued (Kleene) `∧`, not merely "both defined or nothing." Needs `Classical`
+(same as `nonoverlaps`'s pre-existing hand-rolled version below did) only to decide
+which branch a `some`-wrapped `Prop` operand is in. -/
+noncomputable def kand (p q : Option Prop) : Option Prop :=
+  open Classical in
+  match p, q with
+  | some P, some Q => some (P ∧ Q)
+  | some P, none => if P then none else some False
+  | none, some Q => if Q then none else some False
+  | none, none => none
 
-/-- SFS.mm `df-precedes`. -/
-def precedes (A B : Occurrence) : Prop := (death A).val ≺ (birth B).val
-/-- SFS.mm `df-meets`. -/
-def meets (A B : Occurrence) : Prop := death A = birth B
-/-- SFS.mm `df-overlaps`. -/
-def overlaps (A B : Occurrence) : Prop := (birth B).val ≺ (death A).val
-/-- SFS.mm `df-starts`. -/
-def starts (A B : Occurrence) : Prop := birth A = birth B ∧ (death B).val ≺ (death A).val
-/-- SFS.mm `df-during`. -/
-def during (A B : Occurrence) : Prop := (birth B).val ≼ (birth A).val ∧ (death A).val ≼ (death B).val
-/-- SFS.mm `df-finishes`. -/
-def finishes (A B : Occurrence) : Prop := (birth B).val ≺ (birth A).val ∧ death A = death B
-/-- SFS.mm `df-coincident`. -/
-def coincident (A B : Occurrence) : Prop := birth A = birth B ∧ death A = death B
-/-- SFS.mm `df-nonoverlaps`. -/
-def nonoverlaps (A B : Occurrence) : Prop := (death A).val ≺ (birth B).val ∨ (death B).val ≺ (birth A).val
+/-- Strong Kleene disjunction on `Option Prop`, dual to `kand`: short-circuits to
+`some True` when the known operand is already true. -/
+noncomputable def kor (p q : Option Prop) : Option Prop :=
+  open Classical in
+  match p, q with
+  | some P, some Q => some (P ∨ Q)
+  | some P, none => if P then some True else none
+  | none, some Q => if Q then some True else none
+  | none, none => none
+
+/-- Comparisons lifted through `Option Time`: `none` unless both operands are known
+(there is nothing to short-circuit on for a bare order/equality atom -- the
+short-circuiting happens one level up, in `kand`/`kor`). -/
+noncomputable def klt (a b : Option Time) : Option Prop :=
+  match a, b with | some a', some b' => some (a'.val ≺ b'.val) | _, _ => none
+noncomputable def kle (a b : Option Time) : Option Prop :=
+  match a, b with | some a', some b' => some (a'.val ≼ b'.val) | _, _ => none
+noncomputable def keq (a b : Option Time) : Option Prop :=
+  match a, b with | some a', some b' => some (a' = b') | _, _ => none
+
+/-- SFS.mm `df-lifetime`, `Option`-valued: undefined (`none`) exactly when `death A`
+is, i.e. for an ongoing occurrence -- matching `Occurrences::HappensDuring`-style KerML
+constructs already requiring a definite `endShot`. -/
+noncomputable def life (A : Occurrence) : Option (Set Instant) := (death A).map fun tA => Set.Icc (birth A).val tA.val
+
+/-- SFS.mm `df-precedes`, `Option`-valued: needs only `A`'s death (`B`'s `endShot`,
+if any, is irrelevant to whether `A` precedes `B`) -- `none` iff `death A = none`. -/
+noncomputable def precedes (A B : Occurrence) : Option Prop := (death A).map fun tA => tA.val ≺ (birth B).val
+/-- SFS.mm `df-meets`: needs only `A`'s death, same reasoning as `precedes`. -/
+noncomputable def meets (A B : Occurrence) : Option Prop := (death A).map fun tA => tA = birth B
+/-- SFS.mm `df-overlaps`: needs only `A`'s death, same reasoning as `precedes`. -/
+noncomputable def overlaps (A B : Occurrence) : Option Prop := (death A).map fun tA => (birth B).val ≺ tA.val
+/-- SFS.mm `df-starts`: compares `A`'s and `B`'s deaths directly, so needs both --
+via `kand`/`klt`, which (unlike the old hand-rolled match) short-circuits to
+`some False` when `birth A = birth B` already fails, even if a death is unknown. -/
+noncomputable def starts (A B : Occurrence) : Option Prop :=
+  kand (some (birth A = birth B)) (klt (death B) (death A))
+/-- SFS.mm `df-during`: needs both, same reasoning as `starts`. -/
+noncomputable def during (A B : Occurrence) : Option Prop :=
+  kand (some ((birth B).val ≼ (birth A).val)) (kle (death A) (death B))
+/-- SFS.mm `df-finishes`: needs both, same reasoning as `starts`. -/
+noncomputable def finishes (A B : Occurrence) : Option Prop :=
+  kand (some ((birth B).val ≺ (birth A).val)) (keq (death A) (death B))
+/-- SFS.mm `df-coincident`: needs both, same reasoning as `starts`. -/
+noncomputable def coincident (A B : Occurrence) : Option Prop :=
+  kand (some (birth A = birth B)) (keq (death A) (death B))
+/-- SFS.mm `df-nonoverlaps`: `death(x) < birth(y) ∨ death(y) < birth(x)`, i.e.
+exactly `precedes A B ∨ precedes B A` -- `kor` gives the correct strong-Kleene
+disjunction for free (a known-true disjunct wins even if the other occurrence
+hasn't ended), replacing what used to be a bespoke hand-rolled `if`/`match` block
+here. -/
+noncomputable def nonoverlaps (A B : Occurrence) : Option Prop := kor (precedes A B) (precedes B A)
 
 /-- SFS.mm `df-next`: `t_2` immediately follows `t_1`, no instant strictly between.
 A genuine `def` over the real `≺` (SFS.mm needed `bl.tpeq1`/`bl.tpeq2` as extra
@@ -1049,14 +1108,16 @@ axiom openRight : Occurrence → Prop
 this reduces semantically to just the open-boundary disjunct -- see `nearlyMeets_iff`
 below. Included literally anyway, matching `SFS.mm`'s own formula rather than silently
 dropping the now-vacuous part. -/
-def nearlyMeets (A B : Occurrence) : Prop :=
-  (birth B = death A ∧ (openRight A ∨ openLeft B)) ∨ next (death A) (birth B)
+noncomputable def nearlyMeets (A B : Occurrence) : Option Prop :=
+  (death A).map fun tA => (birth B = tA ∧ (openRight A ∨ openLeft B)) ∨ next tA (birth B)
 
 /-- Free consequence of `next_dense`, not a fact `SFS.mm`/`Allen.kerml` state
-themselves: `nearlyMeets` collapses to its open-boundary disjunct alone. -/
-theorem nearlyMeets_iff (A B : Occurrence) :
-    nearlyMeets A B ↔ (birth B = death A ∧ (openRight A ∨ openLeft B)) := by
+themselves: whenever `A` has ended, `nearlyMeets` collapses to its open-boundary
+disjunct alone. -/
+theorem nearlyMeets_iff {A B : Occurrence} {tA : Time} (hA : death A = some tA) :
+    nearlyMeets A B = some (birth B = tA ∧ (openRight A ∨ openLeft B)) := by
   unfold nearlyMeets
+  rw [hA]
   simp [next_dense]
 
 /-! ### KerML Element Representation and Type Definition (SFS.mm lines 3246-3324) -/

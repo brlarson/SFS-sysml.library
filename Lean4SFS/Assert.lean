@@ -324,14 +324,36 @@ once the surrounding term is fully built -- not guessed at macro-expansion time,
 the actual Lean type of an arbitrary sub-term isn't generally knowable. This is what
 lets `tau1 < tau2` (both elaborating to `SFS.Time`) produce `SFS.tprec`-based
 comparison while a real-valued `<` elsewhere in the same file produces plain `ℝ`
-comparison, from the exact same generated `DSLLt.lt` call. -/
-class DSLLt (α : Type _) where lt : α → α → Prop
-class DSLLe (α : Type _) where le : α → α → Prop
+comparison, from the exact same generated `DSLLt.lt` call.
 
-instance : DSLLt Time := ⟨fun t1 t2 => t1.val ≺ t2.val⟩
-instance : DSLLe Time := ⟨fun t1 t2 => t1.val ≼ t2.val⟩
-instance : DSLLt ℝ := ⟨(· < ·)⟩
-instance : DSLLe ℝ := ⟨(· ≤ ·)⟩
+Three type parameters (`α β : Type _`, `γ : outParam Type _`), not one -- mirrors
+Lean's own `HAdd`/`HMul` idiom -- so a *heterogeneous* comparison like
+`death(x) < birth(y)` (`Option Time` against plain `Time`, since `SFS.death` became
+`Option`-valued 2026-08-25) can still resolve: `α`/`β` need not agree, and the
+result type `γ` (`Prop` when both sides are total, `Option Prop` -- "compare only
+when defined," Strong Kleene, matching `SFS.kand`/`SFS.kor`'s established semantics
+-- when either side is `Option`-wrapped) is inferred as an output rather than fixed
+in advance. All instances below are on closed, concrete types (`Time`/`Option Time`/
+`ℝ`, never a bare type variable), so Lean's instance search resolves every query
+unambiguously -- no risk of overlap between, say, the `Time Time Prop` and
+`(Option Time) Time (Option Prop)` instances, since no single query can match both. -/
+class DSLLt (α β : Type _) (γ : outParam (Type _)) where lt : α → β → γ
+class DSLLe (α β : Type _) (γ : outParam (Type _)) where le : α → β → γ
+
+instance : DSLLt Time Time Prop := ⟨fun t1 t2 => t1.val ≺ t2.val⟩
+instance : DSLLe Time Time Prop := ⟨fun t1 t2 => t1.val ≼ t2.val⟩
+instance : DSLLt ℝ ℝ Prop := ⟨(· < ·)⟩
+instance : DSLLe ℝ ℝ Prop := ⟨(· ≤ ·)⟩
+
+/-- The `Option Time`-involving cases needed for `precedes`/`overlaps` (`death(x) <
+birth(y)`/`birth(y) < death(x)`, one side `Option`-wrapped, the other total) and
+`during` (`death(x) <= death(y)`, both wrapped, via `SFS.kle`). No `Option ℝ`
+instances exist -- nothing in the repo's real `@Assert` formulas compares a raw
+`Option`-wrapped real, only `Option Time`. -/
+instance : DSLLt (Option Time) Time (Option Prop) := ⟨fun a b => a.map fun a' => a'.val ≺ b.val⟩
+instance : DSLLt Time (Option Time) (Option Prop) := ⟨fun a b => b.map fun b' => a.val ≺ b'.val⟩
+noncomputable instance : DSLLt (Option Time) (Option Time) (Option Prop) := ⟨SFS.klt⟩
+noncomputable instance : DSLLe (Option Time) (Option Time) (Option Prop) := ⟨SFS.kle⟩
 
 /-- `in`'s dslWff sense (`x in y`, e.g. `PointInRegion`'s own body `point in region`) is
 overloaded the same way `<`/`<=` are: `SFS.lean` doesn't model spatial containment via
@@ -345,6 +367,47 @@ class DSLMem (α : Type _) (β : Type _) where mem : α → β → Prop
 
 instance : DSLMem Point Region := ⟨InRegion⟩
 instance : DSLMem Point Surface := ⟨OnSurface⟩
+
+/-- `=` is, unlike `<`/`<=`, used generically across an open-ended set of types today
+(`Occurrence`, `Bool`, `Set Item`, ...) via bare Lean `Eq` -- so unlike `DSLLt`/`DSLLe`
+it needs an actual generic fallback, not just a fixed list of concrete instances. That
+fallback must not win when both sides are `Option Time`: the whole point of
+`death(x) = death(y)`-style formulas becoming Kleene-aware is that `none = none`
+must NOT silently elaborate to `True` the way bare `Option` equality would. The
+concrete `(Option Time) (Option Time) (Option Prop)` instance below is therefore
+given no explicit priority (default = 1000) while the generic fallback is marked
+`priority := low`, so Lean's instance search tries (and succeeds on) the concrete one
+first for that exact query; the fallback is only ever reached when no concrete
+instance matches. -/
+class DSLEq (α β : Type _) (γ : outParam (Type _)) where eq : α → β → γ
+
+instance : DSLEq (Option Time) Time (Option Prop) := ⟨fun a b => a.map (· = b)⟩
+instance : DSLEq Time (Option Time) (Option Prop) := ⟨fun a b => b.map (a = ·)⟩
+noncomputable instance : DSLEq (Option Time) (Option Time) (Option Prop) := ⟨SFS.keq⟩
+instance (priority := low) {α : Type _} : DSLEq α α Prop := ⟨Eq⟩
+
+/-- `and`/`or` are, like `=`, used generically on plain `Prop` today (every existing
+`@Assert` formula) but must also accept an `Option Prop` operand (mixed with a plain
+`Prop`, or with another `Option Prop`) and route through `SFS.kand`/`SFS.kor` --
+Strong Kleene, not "undefined poisons the whole formula" and not "undefined treated
+as false." All four cells of each 2x2 (`Prop`/`Option Prop` on each side) are given
+explicit, non-overlapping concrete instances -- no generic fallback is needed since
+every operand shape a real formula can produce is already one of these four.
+Field names are `conj`/`disj`, not `and`/`or` -- the latter are this file's own
+`dslWff` syntax keywords (`syntax ... " and " ...` above), so `where and : ...`
+would parse `and` as that keyword, not a field name. -/
+class DSLAnd (α β : Type _) (γ : outParam (Type _)) where conj : α → β → γ
+class DSLOr (α β : Type _) (γ : outParam (Type _)) where disj : α → β → γ
+
+instance : DSLAnd Prop Prop Prop := ⟨And⟩
+noncomputable instance : DSLAnd Prop (Option Prop) (Option Prop) := ⟨fun p q => SFS.kand (some p) q⟩
+noncomputable instance : DSLAnd (Option Prop) Prop (Option Prop) := ⟨fun p q => SFS.kand p (some q)⟩
+noncomputable instance : DSLAnd (Option Prop) (Option Prop) (Option Prop) := ⟨SFS.kand⟩
+
+instance : DSLOr Prop Prop Prop := ⟨Or⟩
+noncomputable instance : DSLOr Prop (Option Prop) (Option Prop) := ⟨fun p q => SFS.kor (some p) q⟩
+noncomputable instance : DSLOr (Option Prop) Prop (Option Prop) := ⟨fun p q => SFS.kor p (some q)⟩
+noncomputable instance : DSLOr (Option Prop) (Option Prop) (Option Prop) := ⟨SFS.kor⟩
 
 /-- `dslType` → the `SFS.lean` type it names. Recognized DSL type names are mapped to
 their `SFS.lean` counterpart; anything else is passed through as a bare identifier
@@ -497,7 +560,7 @@ partial def elabDslWff : TSyntax `dslWff → MacroM (TSyntax `term)
   | `(dslWff| $a:dslTerm <= $b:dslTerm) => do `(DSLLe.le $(← elabDslTerm a) $(← elabDslTerm b))
   | `(dslWff| $a:dslTerm > $b:dslTerm) => do `(DSLLt.lt $(← elabDslTerm b) $(← elabDslTerm a))
   | `(dslWff| $a:dslTerm >= $b:dslTerm) => do `(DSLLe.le $(← elabDslTerm b) $(← elabDslTerm a))
-  | `(dslWff| $a:dslTerm = $b:dslTerm) => do `($(← elabDslTerm a) = $(← elabDslTerm b))
+  | `(dslWff| $a:dslTerm = $b:dslTerm) => do `(DSLEq.eq $(← elabDslTerm a) $(← elabDslTerm b))
   | `(dslWff| $a:dslTerm <> $b:dslTerm) => do `($(← elabDslTerm a) ≠ $(← elabDslTerm b))
   | `(dslWff| $a:dslTerm in $b:dslTerm) => do
     `(DSLMem.mem $(← elabDslTerm a) $(← elabDslTerm b))
@@ -511,8 +574,8 @@ partial def elabDslWff : TSyntax `dslWff → MacroM (TSyntax `term)
         predicate reading is defined yet -- every real formula using this position \
         gives an explicit time (I[[d::f,tau]])"
   | `(dslWff| not $φ:dslWff) => do `(¬ $(← elabDslWff φ))
-  | `(dslWff| $φ:dslWff and $ψ:dslWff) => do `($(← elabDslWff φ) ∧ $(← elabDslWff ψ))
-  | `(dslWff| $φ:dslWff or $ψ:dslWff) => do `($(← elabDslWff φ) ∨ $(← elabDslWff ψ))
+  | `(dslWff| $φ:dslWff and $ψ:dslWff) => do `(DSLAnd.conj $(← elabDslWff φ) $(← elabDslWff ψ))
+  | `(dslWff| $φ:dslWff or $ψ:dslWff) => do `(DSLOr.disj $(← elabDslWff φ) $(← elabDslWff ψ))
   | `(dslWff| $φ:dslWff implies $ψ:dslWff) => do `($(← elabDslWff φ) → $(← elabDslWff ψ))
   | `(dslWff| $φ:dslWff iff $ψ:dslWff) => do `($(← elabDslWff φ) ↔ $(← elabDslWff ψ))
   | `(dslWff| forall $ps,* $[in $r:dslRange]? are $body:dslWff) => do
@@ -556,7 +619,7 @@ operand, ...) that isn't a header parameter, a quantifier-bound name, or `result
 becomes an additional, *untyped* `fun` binder wrapping the elaborated body -- Lean's
 own elaborator then infers its type from how it's used (e.g. `during self
 thisPerformance` against `SFS.lean`'s real `during : Occurrence → Occurrence →
-Prop` pins both to `Occurrence`). This is exactly `Elab.Term.elabTerm`'s existing
+Option Prop` pins both to `Occurrence`). This is exactly `Elab.Term.elabTerm`'s existing
 job for `now`'s special case already did for one name; generalized here to any name.
 
 **Deliberately not extended to `dslWff`'s own bare-identifier case** (`xPy`-style,
@@ -819,8 +882,55 @@ example : domain% <<GetBooleanChange : d~Occurrence, e~BooleanEvaluation, tau~In
 -- header at all): both `self` and `thisPerformance` are scope-visible (KerML's
 -- implicit self-reference and a redefinable feature of `Performance`), auto-bound
 -- here with their types inferred from `SFS.lean`'s real `during : Occurrence →
--- Occurrence → Prop`.
+-- Occurrence → Option Prop` (2026-08-25: was `Prop`, before `death` became
+-- `Option`-valued -- this `#check` still elaborates fine, it just now reports
+-- `Option Prop` rather than `Prop`; `#check` doesn't itself constrain the result
+-- type the way `example ... := rfl` above does).
 #check domain% << during(self, thisPerformance) >>
+
+-- Allen.kerml's own real `@Assert` formulas, verbatim (2026-08-25, "extend Domain
+-- logic for compare only when defined"): `death(x)`/`death(y)` elaborate to
+-- `Option Time` (2026-08-25's earlier `Occurrence → Option Time` change), so `<`/`=`/
+-- `and`/`or` here go through the new `DSLLt`/`DSLLe`/`DSLEq`/`DSLAnd`/`DSLOr`
+-- outParam instances above instead of the plain-`Prop` operators used everywhere
+-- else in this file -- each `example ... := rfl` below confirms the elaborated form
+-- is *exactly* `SFS.lean`'s own `precedes`/`meets`/`overlaps`/`during`/`nonoverlaps`
+-- (all rewritten the same day onto the shared `kand`/`kor`/`klt`/`kle`/`keq`
+-- combinators), not merely something that happens to type-check.
+-- `starts`/`finishes`/`coincident` are not attempted: their real formulas use
+-- `x.openLeft`/`y.openRight` dot-access, which this grammar has never supported
+-- (predates today's partiality work; a separate gap). `nearlyMeets` is not
+-- attempted either: `next(death(x), birth(y))` passes an `Option Time` as a plain
+-- argument to `next : Time → Time → Prop`, which needs lifting *function
+-- application* through partiality, a different and larger problem than comparison.
+#check domain% <<precedes : x~Occurrence, y~Occurrence : death(x) < birth(y) >>
+
+example : domain% <<precedes : x~Occurrence, y~Occurrence : death(x) < birth(y) >> = precedes := rfl
+
+#check domain% <<meets : x~Occurrence, y~Occurrence : death(x) = birth(y) >>
+
+example : domain% <<meets : x~Occurrence, y~Occurrence : death(x) = birth(y) >> = meets := rfl
+
+#check domain% <<overlaps : x~Occurrence, y~Occurrence : birth(y) <  death(x)>>
+
+example : domain% <<overlaps : x~Occurrence, y~Occurrence : birth(y) <  death(x)>> = overlaps := rfl
+
+#check domain% <<during : x~Occurrence, y~Occurrence : birth(y) <= birth(x) and death(x) <= death(y)>>
+
+example : domain% <<during : x~Occurrence, y~Occurrence : birth(y) <= birth(x) and death(x) <= death(y)>> = during := rfl
+
+#check domain% <<nonoverlaps : x~Occurrence, y~Occurrence : birth(y) > death(x) or birth(x) > death(y)>>
+
+example : domain% <<nonoverlaps : x~Occurrence, y~Occurrence : birth(y) > death(x) or birth(x) > death(y)>> = nonoverlaps := rfl
+
+-- Pins the one genuinely risky ambiguity case at build time (not just by
+-- inspection): `death(x) = death(y)` is `Option Time` on both sides, and must
+-- resolve to the concrete `DSLEq (Option Time) (Option Time) (Option Prop)`
+-- instance (`keq`), never the generic `priority := low` fallback (`Eq`) -- the
+-- latter would make `none = none` silently `True`, exactly the bug this whole
+-- extension exists to prevent.
+example : domain% <<finishesEqCheck : x~Occurrence, y~Occurrence : death(x) = death(y)>>
+    = fun x y => SFS.keq (death x) (death y) := rfl
 
 /- Formulas deliberately *not* included as live `#check`s here, because they are
 expected to fail to elaborate, honestly, rather than being forced:

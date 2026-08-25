@@ -1314,13 +1314,38 @@ elab "kernel% " d:kernelDecl : term => do
   x.endShot < y.startShot
 }
 
--- Allen.kerml's own real `@Assert{...}` on `precedes` -- the formula string is
--- genuinely re-parsed and elaborated via Assert.lean's own dslAssert grammar/
--- elabDslAssert (see the kernel% trigger's own doc comment), so this only
--- type-checks because SFS.lean's real `death`/`birth : Occurrence → Time` exist and
--- Time's DSLLt instance applies -- an actually malformed or type-incorrect formula
--- string here would be a genuine compile error, not silently accepted.
-#check kernel% @Assert{n="precedes"; f="<<precedes : x~Occurrence, y~Occurrence : death(x) < birth(y) >>";}
+-- Allen.kerml's own real `@Assert{...}` formulas, verbatim, now live again
+-- (2026-08-25, "extend Domain logic for compare only when defined" -- see
+-- Assert.lean's own new `DSLLt`/`DSLLe`/`DSLEq`/`DSLAnd`/`DSLOr` outParam
+-- instances, and SFS.lean's `kand`/`kor`/`klt`/`kle`/`keq` Strong Kleene
+-- combinators). Briefly, after `death` became `Occurrence → Option Time`
+-- (2026-08-25, fixing the `birth`/`deathIff` inconsistency), `death(x) < birth(y)`
+-- stopped elaborating: comparing `Option Time` to `Time` had no instance. Rather
+-- than treating that as an unfixable gap, the DSL itself was taught genuine
+-- partiality -- comparisons/`and`/`or` over an `Option`-wrapped operand now
+-- propagate undefinedness (Strong Kleene, "compare only when defined"), short-
+-- circuiting to a definite answer where one is already forced (e.g. a known-false
+-- conjunct makes the whole `and` false even if the other side is unknown). The
+-- formula text below is *unchanged* from Allen.kerml -- only the semantics/types
+-- assigned to it changed; see Assert.lean's own `example ... := rfl` checks for
+-- confirmation each elaborates to exactly `SFS.lean`'s real predicate.
+#check kernel% @Assert{n="precedes"; f="<<precedes : x~Occurrence, y~Occurrence : death(x) < birth(y) >>"; t="precedes";}
+
+#check kernel% @Assert{n="meets"; f="<<meets : x~Occurrence, y~Occurrence : death(x) = birth(y) >>"; t="meets";}
+
+#check kernel% @Assert{n="overlaps"; f="<<overlaps : x~Occurrence, y~Occurrence : birth(y) <  death(x)>>"; t="overlaps";}
+
+#check kernel% @Assert{n="during"; f="<<during : x~Occurrence, y~Occurrence : birth(y) <= birth(x) and death(x) <= death(y)>>"; t="during";}
+
+#check kernel% @Assert{n="nonoverlaps"; f="<<nonoverlaps : x~Occurrence, y~Occurrence : birth(y) > death(x) or birth(x) > death(y)>>"; t="nonoverlaps";}
+
+-- `starts`/`finishes`/`coincident` remain unattempted: their real formulas use
+-- `x.openLeft`/`y.openRight` dot-access, a grammar feature that has never existed
+-- in this DSL (predates today's partiality work -- a separate, pre-existing gap,
+-- not fixed here). `nearlyMeets` remains unattempted too: `next(death(x), birth(y))`
+-- passes an `Option Time` as a plain argument into `next : Time → Time → Prop`,
+-- which would need lifting *function application* through partiality -- a
+-- different and larger problem than "compare only when defined."
 
 -- Domain.kerml's own real `library package Domain { ... }` wrapper: nine real
 -- `private import ...;` statements (the new `kermlVisibilityFlag`, Core.lean),
