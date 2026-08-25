@@ -457,12 +457,34 @@ partial def elabDslTerm : TSyntax `dslTerm → MacroM (TSyntax `term)
   | `(dslTerm| true) => `(Bool.true)
   | `(dslTerm| false) => `(Bool.false)
   | `(dslTerm| $x:ident) => do
-    -- `now` is special-cased: every real formula uses it in a `Time`-typed position
-    -- (`I[[d::f,now]]`'s `tau` argument, or a range's upper bound alongside another
-    -- `Time`-typed term like `tau`), never as bare `ℝ`, but `SFS.now : ℝ` is the raw
-    -- unrestricted constant. `dl_nowt : now ∈ TIME` closes the gap, matching how
-    -- `Time := ↥TIME` is threaded everywhere else `SFS.lean` needs an in-range instant.
-    if x.getId == `now then `((⟨now, dl_nowt⟩ : Time)) else `($x)
+    -- Dot-access sugar, `x.f` (`Allen.kerml`'s own `starts`/`finishes`/`coincident`,
+    -- `x.openLeft = y.openLeft`/`x.openRight = y.openRight`): Lean's *lexer* fuses an
+    -- unspaced `x.openLeft` into a single dotted `ident` token before any grammar-level
+    -- choice runs, so a separate `dslTerm "." ident` production can never actually fire
+    -- for real (unspaced) formula text -- the only way to reach this is to detect the
+    -- compound name here and split it. `openLeft`/`openRight` are ordinary `SFS.lean`
+    -- top-level functions (`Occurrence → Prop`), not structure fields, so this is not
+    -- KerML feature access (that's `I[[d::f,tau]]` below) and not real Lean generalized
+    -- field notation either (which would need them renamespaced under `Occurrence`, not
+    -- attempted -- per this project's own standing convention, fix the grammar rather
+    -- than rename around a real identifier). Only one dot level is handled (`recv.f`,
+    -- not `a.b.c`) -- no real formula needs more, and a deeper chain fails honestly
+    -- (unresolved identifier) rather than being guessed at.
+    match x.getId with
+    | .str pre s =>
+      if pre == .anonymous then
+        -- `now` is special-cased: every real formula uses it in a `Time`-typed
+        -- position (`I[[d::f,now]]`'s `tau` argument, or a range's upper bound
+        -- alongside another `Time`-typed term like `tau`), never as bare `ℝ`, but
+        -- `SFS.now : ℝ` is the raw unrestricted constant. `dl_nowt : now ∈ TIME`
+        -- closes the gap, matching how `Time := ↥TIME` is threaded everywhere else
+        -- `SFS.lean` needs an in-range instant.
+        if x.getId == `now then `((⟨now, dl_nowt⟩ : Time)) else `($x)
+      else
+        let recv := mkIdentFrom x pre
+        let f := mkIdentFrom x (Name.mkSimple s)
+        `($f $recv)
+    | _ => `($x)
   | `(dslTerm| $n:num) => `($n)
   | `(dslTerm| $f:ident($args,*)) => do
     let args ← args.getElems.mapM elabDslTerm
@@ -642,7 +664,17 @@ partial def freeIdentsInTerm (bound : List Name) : TSyntax `dslTerm → MacroM (
   | `(dslTerm| result) => pure []
   | `(dslTerm| true) => pure []
   | `(dslTerm| false) => pure []
-  | `(dslTerm| $x:ident) => pure (if x.getId == `now || bound.contains x.getId then [] else [x.getId])
+  | `(dslTerm| $x:ident) => pure (
+      -- `x.f` dot-access sugar (see `elabDslTerm`'s matching case): only the
+      -- receiver `pre` is a real free identifier -- `f` itself is a call head,
+      -- excluded the same way `f(args)`'s own `$_f` is above.
+      match x.getId with
+      | .str pre _ =>
+        if pre == .anonymous then
+          (if x.getId == `now || bound.contains x.getId then [] else [x.getId])
+        else
+          (if bound.contains pre then [] else [pre])
+      | _ => [])
   | `(dslTerm| $_n:num) => pure []
   | `(dslTerm| $_f:ident($args,*)) => do
     args.getElems.foldlM (fun acc a => return acc ++ (← freeIdentsInTerm bound a)) []
@@ -897,11 +929,8 @@ example : domain% <<GetBooleanChange : d~Occurrence, e~BooleanEvaluation, tau~In
 -- is *exactly* `SFS.lean`'s own `precedes`/`meets`/`overlaps`/`during`/`nonoverlaps`
 -- (all rewritten the same day onto the shared `kand`/`kor`/`klt`/`kle`/`keq`
 -- combinators), not merely something that happens to type-check.
--- `starts`/`finishes`/`coincident` are not attempted: their real formulas use
--- `x.openLeft`/`y.openRight` dot-access, which this grammar has never supported
--- (predates today's partiality work; a separate gap). `nearlyMeets` is not
--- attempted either: `next(death(x), birth(y))` passes an `Option Time` as a plain
--- argument to `next : Time → Time → Prop`, which needs lifting *function
+-- `nearlyMeets` is not attempted: `next(death(x), birth(y))` passes an `Option Time`
+-- as a plain argument to `next : Time → Time → Prop`, which needs lifting *function
 -- application* through partiality, a different and larger problem than comparison.
 #check domain% <<precedes : x~Occurrence, y~Occurrence : death(x) < birth(y) >>
 
@@ -931,6 +960,27 @@ example : domain% <<nonoverlaps : x~Occurrence, y~Occurrence : birth(y) > death(
 -- extension exists to prevent.
 example : domain% <<finishesEqCheck : x~Occurrence, y~Occurrence : death(x) = death(y)>>
     = fun x y => SFS.keq (death x) (death y) := rfl
+
+-- `starts`/`finishes`/`coincident`, now that dot-access (`x.openLeft`/`y.openRight`)
+-- has real grammar support: these elaborate live, but *not* as `example ... := rfl`
+-- against `SFS.lean`'s own `starts`/`finishes`/`coincident` -- those definitions are
+-- missing the `x.openLeft = y.openLeft`/`x.openRight = y.openRight` conjunct that
+-- Allen.kerml's real formula text has (a separate, pre-existing fidelity gap,
+-- unrelated to today's grammar work -- not fixed here). `#check` only, honestly
+-- reporting what these formulas elaborate *to* (a real `Option Prop`-valued lambda,
+-- strictly more conjuncts than `starts` itself), not claiming agreement with a
+-- `SFS.lean` definition that doesn't yet have them.
+#check domain% <<starts : x~Occurrence, y~Occurrence :
+  birth(x) = birth(y) and death(y) < death(x)
+  and x.openLeft = y.openLeft >>
+
+#check domain% <<finishes : x~Occurrence, y~Occurrence :
+  birth(y) < birth(x) and death(x) = death(y)
+  and x.openRight = y.openRight >>
+
+#check domain% <<coincident : x~Occurrence, y~Occurrence :
+  birth(y) = birth(x) and death(x) = death(y) and x.openLeft = y.openLeft
+  and x.openRight = y.openRight >>
 
 /- Formulas deliberately *not* included as live `#check`s here, because they are
 expected to fail to elaborate, honestly, rather than being forced:

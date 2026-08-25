@@ -1339,13 +1339,32 @@ elab "kernel% " d:kernelDecl : term => do
 
 #check kernel% @Assert{n="nonoverlaps"; f="<<nonoverlaps : x~Occurrence, y~Occurrence : birth(y) > death(x) or birth(x) > death(y)>>"; t="nonoverlaps";}
 
--- `starts`/`finishes`/`coincident` remain unattempted: their real formulas use
--- `x.openLeft`/`y.openRight` dot-access, a grammar feature that has never existed
--- in this DSL (predates today's partiality work -- a separate, pre-existing gap,
--- not fixed here). `nearlyMeets` remains unattempted too: `next(death(x), birth(y))`
--- passes an `Option Time` as a plain argument into `next : Time → Time → Prop`,
--- which would need lifting *function application* through partiality -- a
--- different and larger problem than "compare only when defined."
+-- `starts`/`finishes`/`coincident`, now that `x.openLeft`/`y.openRight` dot-access
+-- has real grammar support (`Assert.lean`'s `elabDslTerm`/`freeIdentsInTerm`, the
+-- `$x:ident` case: an unspaced `x.openLeft` is one compound identifier by the time
+-- Lean's *lexer* sees it, so the fix splits it there rather than adding a doomed
+-- separate `dslTerm "." ident` grammar production, which could never actually fire
+-- for real, unspaced formula text). Live, but not `example ... := rfl`-checked
+-- against `SFS.lean`'s own `starts`/`finishes`/`coincident`: those definitions are
+-- missing the `openLeft`/`openRight` conjunct Allen.kerml's real text has -- a
+-- separate, pre-existing fidelity gap, unrelated to dot-access itself, not fixed
+-- here (see `Assert.lean`'s matching `#check`s for the detailed note).
+#check kernel% @Assert{n="starts"; f="<<starts : x~Occurrence, y~Occurrence :"+
+  " birth(x) = birth(y) and death(y) < death(x)"+
+  " and x.openLeft = y.openLeft >>"; t="starts";}
+
+#check kernel% @Assert{n="finishes"; f="<<finishes : x~Occurrence, y~Occurrence :"+
+  " birth(y) < birth(x) and death(x) = death(y)"+
+  " and x.openRight = y.openRight >>"; t="finishes";}
+
+#check kernel% @Assert{n="coincident"; f="<<coincident : x~Occurrence, y~Occurrence :"+
+  " birth(y) = birth(x) and death(x) = death(y)"+
+  " and x.openLeft = y.openLeft and x.openRight = y.openRight >>"; t="coincident";}
+
+-- `nearlyMeets` remains unattempted: `next(death(x), birth(y))` passes an
+-- `Option Time` as a plain argument into `next : Time → Time → Prop`, which would
+-- need lifting *function application* through partiality -- a different and larger
+-- problem than "compare only when defined."
 
 -- Domain.kerml's own real `library package Domain { ... }` wrapper: nine real
 -- `private import ...;` statements (the new `kermlVisibilityFlag`, Core.lean),
