@@ -59,9 +59,10 @@ standard library package Occurrences {
 		}
 
 //		portion 
-		feature endShot: Instant[1] subsets snapshots  :>> upperBound {
+		feature endShot: Instant[0..1] subsets snapshots  :>> upperBound {
 			doc
-			/* The snapshot at the end of the occurrence in time. */
+			/* The snapshot at the end of the occurrence in time.
+			 * The Occurrence may not have ended at time now. */
 
 			/* suboccurrences at the end of an Occurrence must also end. */
 //SFS:  suboccurrences are constrained to end by Domain predicate			
