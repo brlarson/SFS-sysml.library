@@ -964,34 +964,137 @@ def FilmConnected (r1 r2 : Region) : Prop :=
 `interpValAt`. -/
 def existsAt (A : Occurrence) (t0 : Time) : Prop := interpValAt A t0 ≠ ∅
 
-/-- SFS.mm `birth`: primitive (no construction of "the first instant `A` exists" is
-given, only the characterizing property `df-birth` below). Returns `Time`, not bare
-`Instant`: an occurrence's birth is itself one of the instants under discussion. -/
-axiom birth : Occurrence → Time
-/-- `Occurrences.kerml`'s own `endShot: Instant[0..1]` (`//SFS`-marked: "The
-Occurrence may not have ended at time now"), unlike `startShot: Instant[1]`, which
-stays mandatory. `Option`-valued, not a total `Occurrence → Time`: an ongoing
-occurrence genuinely has no death instant yet, not an arbitrary placeholder one --
-the old total version was inconsistent (`fun _ => ∅`, an occurrence that never
-exists, was still forced to have *some* death instant, and `deathIff` below then
-forced it to exist there). `birth` stays total (`startShot` stays mandatory). -/
-axiom death : Occurrence → Option Time
+/-! `birth`/`death`, class-based (2026-08-26), porting `Repaired.lean`'s own recipe
+(guard the characterizing law with its presupposition, keep the function total --
+or here `Option`-valued -- with an unconstrained/undefined value when the
+presupposition fails, then *prove* a model exists) from toy `ℕ` to the real
+`Instant`/`Time`/`TIME`. The port is not mechanical: `ℕ` is well-ordered for free
+(`Nat.strongRecOn`), so *any* nonempty subset has a least element with no extra
+assumption. An arbitrary subset of the dense continuum `Time` need not (e.g.
+`{t | t.val < 0.5}` has an infimum but no attained minimum), so `birth`'s guard
+needs one further, explicitly-named structural axiom (`occurrenceHasFirstInstant`
+below, formalizing `Occurrences.kerml`'s mandatory `startShot: Instant[1]`) that the
+`ℕ` case got for free from well-ordering -- `#print axioms model` below will show
+it explicitly, alongside Lean's standard classical axioms. `death`, by contrast,
+needs no such extra axiom: its guard is "self-certifying" (`death_exists`'s proof
+gets a witness handed to it directly whenever the presupposition holds, and `none`
+is always available when it doesn't), the same reasoning that already justified
+`endShot`'s `Option` redesign in the first place. -/
 
-/-- SFS.mm `df-birth`. SFS.mm's own text quantifies `A. t_1 e. (0[,)t_0) -.
-exists(A,t_0)` -- reusing the outer `t_0` inside the body instead of the bound
-`t_1` -- almost certainly a transcription slip; read here with `t_1`, matching
-`df-death`'s own (correct) shape immediately below. -/
-axiom birthIff {A : Occurrence} {t0 : Time} :
-    birth A = t0 ↔ existsAt A t0 ∧ ∀ t1 : Time, t1.val ∈ Set.Ico (0 : Instant) t0.val → ¬ existsAt A t1
-
-/-- SFS.mm `df-death`, restated for `death`'s `Option` codomain: only characterizes
-`death A = some t0`, says nothing about when `death A = none` (ongoing) occurs --
-`none` isn't itself axiomatized as "occurs exactly when no such `t0` exists"; it's
-simply the case this axiom doesn't constrain, which is what breaks the old
-inconsistency (nothing forces `death A` to be `some` for an occurrence that never
-exists). -/
-axiom deathIff {A : Occurrence} {t0 : Time} :
+class Lifetimes where
+  /-- Primitive (no construction of "the first instant `A` exists" is given, only
+  the guarded characterizing property `birthIff` below). Returns `Time`, not bare
+  `Instant`: an occurrence's birth is itself one of the instants under discussion. -/
+  birth : Occurrence → Time
+  /-- `Occurrences.kerml`'s own `endShot: Instant[0..1]` (`//SFS`-marked: "The
+  Occurrence may not have ended at time now"), unlike `startShot: Instant[1]`,
+  which stays mandatory -- `birth` stays total, `death` doesn't. -/
+  death : Occurrence → Option Time
+  /-- SFS.mm `df-birth`, guarded on `A` existing somewhere (`Repaired.lean`'s own
+  pattern): unconditional would force even a never-existing `A` to have *some*
+  birth instant. SFS.mm's own text quantifies `A. t_1 e. (0[,)t_0) -. exists(A,t_0)`
+  -- reusing the outer `t_0` inside the body instead of the bound `t_1` -- almost
+  certainly a transcription slip; read here with `t_1`, matching `deathIff`'s own
+  (correct) shape below. -/
+  birthIff : ∀ {A : Occurrence} {t0 : Time}, (∃ s, existsAt A s) →
+    (birth A = t0 ↔ existsAt A t0 ∧ ∀ t1 : Time, t1.val ∈ Set.Ico (0 : Instant) t0.val → ¬ existsAt A t1)
+  /-- SFS.mm `df-death`, restated for `death`'s `Option` codomain: only
+  characterizes `death A = some t0`, says nothing about when `death A = none`
+  (ongoing) occurs -- `none` isn't itself characterized as "occurs exactly when no
+  such `t0` exists"; it's simply the case this law doesn't constrain, which is what
+  avoids the old total-`death`'s inconsistency (nothing forces `death A` to be
+  `some` for an occurrence that never exists). Needs no extra guard, unlike
+  `birthIff`: the `Option` codomain already *is* the guard. -/
+  deathIff : ∀ {A : Occurrence} {t0 : Time},
     death A = some t0 ↔ existsAt A t0 ∧ ∀ t1 : Time, t1.val ∈ Set.Ioc t0.val now → ¬ existsAt A t1
+
+export Lifetimes (birth death birthIff deathIff)
+
+/-- The one new trusted ingredient this reformation needs: every `Occurrence` that
+exists anywhere has a *first* instant of existence, not merely an infimum of
+existence times. Formalizes `Occurrences.kerml`'s mandatory `startShot:
+Instant[1]` (unlike `endShot`, never weakened to `[0..1]`) -- without this,
+`birth_exists` below is not provable, `Time`'s dense order gives no well-ordering
+to fall back on the way `ℕ` does in `Repaired.lean`. -/
+axiom occurrenceHasFirstInstant (A : Occurrence) (_h : ∃ s, existsAt A s) :
+    ∃ τ, IsLeast {t : Time | existsAt A t} τ
+
+/-- A total selector satisfying `birthIff`'s guarded spec exists for every
+occurrence: `occurrenceHasFirstInstant`'s witness when `A` exists somewhere,
+`Time`'s own `⟨now, dl_nowt⟩` (unconstrained junk, matching this file's own
+precedent for an arbitrary-but-valid `Time` witness) otherwise. -/
+theorem birth_exists (A : Occurrence) :
+    ∃ t0 : Time, (∃ s, existsAt A s) →
+      (existsAt A t0 ∧ ∀ t1 : Time, t1.val ∈ Set.Ico (0 : Instant) t0.val → ¬ existsAt A t1) := by
+  by_cases h : ∃ s, existsAt A s
+  · obtain ⟨τ, hτmem, hτlb⟩ := occurrenceHasFirstInstant A h
+    refine ⟨τ, fun _ => ⟨hτmem, fun t1 ht1 hex1 => ?_⟩⟩
+    exact absurd (hτlb hex1) (not_le.mpr ht1.2)
+  · exact ⟨⟨now, dl_nowt⟩, fun hex => absurd hex h⟩
+
+/-- Existence set membership `t0 ∈ {t | existsAt A t}` together with "nothing
+exists strictly after `t0`" is exactly `IsGreatest {t | existsAt A t} t0` -- the
+bridge `death_exists` below uses in both directions. -/
+theorem death_isGreatest_iff (A : Occurrence) (t0 : Time) :
+    (existsAt A t0 ∧ ∀ t1 : Time, t1.val ∈ Set.Ioc t0.val now → ¬ existsAt A t1) ↔
+      IsGreatest {t : Time | existsAt A t} t0 := by
+  constructor
+  · rintro ⟨hex, hno⟩
+    refine ⟨hex, fun t1 ht1mem => ?_⟩
+    by_contra hlt
+    exact hno t1 ⟨not_le.mp hlt, t1.2.2⟩ ht1mem
+  · rintro ⟨hex, hub⟩
+    refine ⟨hex, fun t1 ht1 hex1 => absurd (hub hex1) (not_le.mpr ht1.1)⟩
+
+/-- A total selector satisfying `deathIff`'s guarded spec exists for every
+occurrence, `none` when no greatest existence instant exists -- pure classical
+logic, *no* extra axiom needed (unlike `birth_exists`): `death_isGreatest_iff`
+already hands the `some`-branch a witness satisfying `IsGreatest` directly, so no
+well-ordering-style assumption about `Occurrence` is ever needed; uniqueness of
+`IsGreatest` (`IsGreatest.unique`) gives uniqueness of the selected value. -/
+theorem death_exists (A : Occurrence) :
+    ∃ d : Option Time, ∀ t0 : Time, d = some t0 ↔
+      (existsAt A t0 ∧ ∀ t1 : Time, t1.val ∈ Set.Ioc t0.val now → ¬ existsAt A t1) := by
+  by_cases h : ∃ τ, IsGreatest {t : Time | existsAt A t} τ
+  · obtain ⟨τ, hτ⟩ := h
+    refine ⟨some τ, fun t0 => ?_⟩
+    rw [death_isGreatest_iff A t0]
+    constructor
+    · intro heq; rw [Option.some.injEq] at heq; exact heq ▸ hτ
+    · intro hg; exact congrArg some (hτ.unique hg)
+  · refine ⟨none, fun t0 => ?_⟩
+    rw [death_isGreatest_iff A t0]
+    constructor
+    · intro heq; exact absurd heq (by simp)
+    · intro hg; exact absurd ⟨t0, hg⟩ h
+
+/-- The consistency certificate: a real model, named so it can be audited
+(`#print axioms model`) below -- exactly the construction that would be impossible
+without `birthIff`/`deathIff`'s guards. A plain (not locally-scoped) `instance`, so
+every downstream use of `birth`/`death`/`birthIff`/`deathIff` elsewhere in this
+project resolves to it automatically, unchanged. -/
+noncomputable instance model : Lifetimes where
+  birth A := Classical.choose (birth_exists A)
+  death A := Classical.choose (death_exists A)
+  birthIff {A} {t0} h := by
+    have spec := Classical.choose_spec (birth_exists A) h
+    constructor
+    · rintro rfl; exact spec
+    · rintro ⟨hex, hno⟩
+      have h1 : ¬ t0.val < (Classical.choose (birth_exists A)).val := fun hlt =>
+        spec.2 t0 ⟨t0.2.1, hlt⟩ hex
+      have h2 : ¬ (Classical.choose (birth_exists A)).val < t0.val := fun hlt =>
+        hno (Classical.choose (birth_exists A)) ⟨(Classical.choose (birth_exists A)).2.1, hlt⟩ spec.1
+      exact Subtype.ext (le_antisymm (not_lt.mp h1) (not_lt.mp h2))
+  deathIff {A} {t0} := by
+    have spec := Classical.choose_spec (death_exists A)
+    exact spec t0
+
+/- The audit (`Repaired.lean`'s own convention): `model` depends on Lean's standard
+classical axioms plus exactly one new ingredient, `occurrenceHasFirstInstant` --
+the well-ordering `Repaired.lean`'s toy `ℕ` case got for free, ported here as an
+explicit, named assumption instead, since dense `Time` has no such guarantee. -/
+#print axioms model
 
 /-- Strong Kleene conjunction on `Option Prop`, the general form of the ad hoc
 "`some tA, some tB => some (...) | _, _ => none`" pattern this file used to repeat
