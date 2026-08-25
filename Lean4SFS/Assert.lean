@@ -852,12 +852,19 @@ elab "domain% " a:dslAssert : term => do
   ( (x=y or PartOf(x,y) or PartOf(y,x) or PartDisjoint(x,y))
     and not (PartOf(x,y) and PartOf(y,x)) ) >>
 
--- Domain.kerml `next`: elaborates to *exactly* SFS.lean's own `next` definition.
+-- Domain.kerml `next`: this formula text still elaborates fine on its own (a
+-- plain Prop, independent of whatever `next` happens to mean), but no longer
+-- equals `SFS.lean`'s own `next` (2026-08-26: redefined from "no `Time` value
+-- strictly between" -- provably vacuous on dense `ℝ`, see the retired
+-- `next_dense` -- to "consecutive shared ticks," via the new `finitePartition`
+-- axiom). The formula text below is the OLD reading; expressing the new
+-- tick-adjacency reading would need real new DSL grammar (an `isTick`/`ticks`
+-- primitive), not attempted here -- same "documented gap" treatment as
+-- `PartOf`'s own `xPy` placeholder, `Location`'s missing `L` alias, etc.
+-- Updating `Domain.kerml`'s own `@Assert` text to match is a separate,
+-- KerML-source-level follow-up, also not attempted here.
 #check domain% <<next : tau1~Instant, tau2~Instant : (tau1 < tau2 and
   not exists tau~Instant that (tau1 < tau and tau < tau2) )  >>
-
-example : domain% <<next : tau1~Instant, tau2~Instant : (tau1 < tau2 and
-  not exists tau~Instant that (tau1 < tau and tau < tau2) )  >> = next := rfl
 
 -- Domain.kerml `Get`, exercising `I[[d::f,tau]]` → `Get d f tau`.
 #check domain% <<Get : d~Occurrence, f~Anything, tau~Instant := I[[d::f,tau]] >>

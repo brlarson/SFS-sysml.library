@@ -1226,56 +1226,92 @@ hasn't ended), replacing what used to be a bespoke hand-rolled `if`/`match` bloc
 here. -/
 noncomputable def nonoverlaps (A B : Occurrence) : Option Prop := kor (precedes A B) (precedes B A)
 
-/-- SFS.mm `df-next`: `t_2` immediately follows `t_1`, no instant strictly between.
-A genuine `def` over the real `≺` (SFS.mm needed `bl.tpeq1`/`bl.tpeq2` as extra
-axioms to make this usable in a real Metamath proof, since its `wtp` is a bare
-primitive there -- moot here, `tprec_congr1`/`tprec_congr2` above are free). -/
-def next (t1 t2 : Time) : Prop := t1.val ≺ t2.val ∧ ¬ ∃ x : Time, t1.val ≺ x.val ∧ x.val ≺ t2.val
+/-- Every `Occurrence`'s raw interpretation only ever changes at finitely many
+*shared* instants -- a single "event calendar," not a per-`Occurrence` one
+(2026-08-26, at direct request, superseding the vacuous `next`/`next_dense` below
+and motivating the redesign of `changed` further down). Stated without reference
+to "pieces" to sidestep any `Ico`/`Icc` boundary bookkeeping: if there is no shared
+tick strictly inside `(t1,t2]`, `d`'s value cannot have changed between `t1` and
+`t2`. This is a genuine new modeling commitment, not derivable from anything else
+in this file -- physically, it says the system has a shared discrete event
+structure, matching how `Occurrence`'s `Set Item`-valued (not continuously
+varying) values are already modeled. It is what actually fixes `next`'s permanent
+vacuity and `changed`'s own gap (see `changed`'s doc comment far below) -- *not*
+hyperreals, which cannot help here: two distinct `Time` values are both *standard*
+reals, so neither "nothing between" nor "infinitesimally close" can ever hold for
+them, transfer principle or not (a dead end reached and rejected before this
+axiom was proposed). -/
+axiom finitePartition :
+    ∃ (n : ℕ) (breaks : Fin (n + 1) → Time),
+      breaks 0 = ⟨0, TIME_nonempty⟩ ∧ breaks (Fin.last n) = ⟨now, dl_nowt⟩ ∧
+      (∀ i j : Fin (n + 1), i < j → (breaks i).val ≺ (breaks j).val) ∧
+      ∀ (d : Occurrence) (t1 t2 : Time), t1.val ≼ t2.val →
+        (¬ ∃ i : Fin (n + 1), (breaks i).val ∈ Set.Ioc t1.val t2.val) →
+        interpValAt d t1 = interpValAt d t2
 
-/-- SFS.mm `bl.nexttp`. Free, `rfl`-adjacent, not an axiom. -/
-theorem next_tprec {t1 t2 : Time} (h : next t1 t2) : t1.val ≺ t2.val := h.1
+/-- The chosen number of shared ticks, extracted from `finitePartition` once via
+`Classical.choose` -- every downstream definition (`next`, `changed`) is stated
+against this one fixed choice, not a fresh existential each time. -/
+noncomputable def tickCount : ℕ := finitePartition.choose
 
-/-- SFS.mm `bl.nextdense`, and simultaneously the direct resolution -- via ordinary
-real-number density -- of the exact `bl.nlt1`-`bl.nlt7`/`ASSIGN`-unification
-blocker documented in `reference_metamath_sfs_toolchain.md`: `next` is *vacuous* on
-`ℝ`, full stop. The midpoint of `t1.val` and `t2.val` is the witness; it's a genuine
-`Time` (not just an `Instant`) because `TIME` is convex -- `t1.val ≥ 0` and
-`t2.val ≤ now` bound it into `[0,now]` too. -/
-theorem next_dense (t1 t2 : Time) : ¬ next t1 t2 := by
-  rintro ⟨h12, hno⟩
-  replace h12 : t1.val < t2.val := h12
-  have hm1 : t1.val < (t1.val + t2.val) / 2 := by linarith
-  have hm2 : (t1.val + t2.val) / 2 < t2.val := by linarith
-  have hmT : (t1.val + t2.val) / 2 ∈ TIME := ⟨by linarith [t1.2.1], by linarith [t2.2.2]⟩
-  exact hno ⟨⟨(t1.val + t2.val) / 2, hmT⟩, hm1, hm2⟩
+/-- The chosen shared tick instants themselves. -/
+noncomputable def ticks : Fin (tickCount + 1) → Time := finitePartition.choose_spec.choose
 
-/-- SFS.mm `bl.nextuniq`. Vacuously true, via `next_dense`, in one line -- the
-uniqueness question dissolves once existence is known to fail on unrestricted
-dense time (matching the book's own remark that `next` "only does real work when
-applied to instant pairs known not to be dense with each other"). -/
-theorem next_uniq {t1 t2 t3 : Time} (h : next t1 t2) : t2 = t3 := absurd h (next_dense t1 t2)
+theorem ticks_zero : ticks 0 = ⟨0, TIME_nonempty⟩ := finitePartition.choose_spec.choose_spec.1
+theorem ticks_last : ticks (Fin.last tickCount) = ⟨now, dl_nowt⟩ :=
+  finitePartition.choose_spec.choose_spec.2.1
+theorem ticks_mono : ∀ i j : Fin (tickCount + 1), i < j → (ticks i).val ≺ (ticks j).val :=
+  finitePartition.choose_spec.choose_spec.2.2.1
 
--- SFS.mm `bl.nextev`/`bl.nextwit` (helper lemmas witnessing the "no instant between"
--- clause of `df-next`, needed in the Metamath development to route around `wtp` not
--- being `wbr`-based) are subsumed by `next_dense`: since `next` is uniformly false
--- here, nothing downstream ever needs their witnessing content.
+/-- The real content of `finitePartition`, restated against `ticks`: no change in
+`d`'s value between `t1` and `t2` unless a shared tick falls strictly inside
+`(t1,t2]`. -/
+theorem ticks_constant (d : Occurrence) {t1 t2 : Time} (h : t1.val ≼ t2.val)
+    (hno : ¬ ∃ i : Fin (tickCount + 1), (ticks i).val ∈ Set.Ioc t1.val t2.val) :
+    interpValAt d t1 = interpValAt d t2 :=
+  finitePartition.choose_spec.choose_spec.2.2.2 d t1 t2 h hno
 
-/-- SFS.mm `df-nearlymeets`. The `next (death A) (birth B)` disjunct is, per
-`next_dense` above, provably always `False` here (`next` is vacuous on dense `ℝ`), so
-this reduces semantically to just the open-boundary disjunct -- see `nearlyMeets_iff`
-below. Included literally anyway, matching `SFS.mm`'s own formula rather than silently
-dropping the now-vacuous part. -/
+/-- `t` is one of the finitely many shared ticks. -/
+def isTick (t : Time) : Prop := ∃ i : Fin (tickCount + 1), ticks i = t
+
+/-- SFS.mm `df-next`: `t_2` immediately follows `t_1`. Redefined 2026-08-26 (was
+"`t_1 ≺ t_2` and no `Time` value strictly between them," provably vacuous on
+dense `ℝ` regardless of `t_1`/`t_2` -- see the retired `next_dense`) as "`t_1`,
+`t_2` are both shared ticks, `t_1 ≺ t_2`, and no *other tick* lies strictly
+between them" -- genuine successor-in-a-finite-set, not "no real number between,"
+so no longer forced to be `False` for every input. -/
+noncomputable def next (t1 t2 : Time) : Prop :=
+  isTick t1 ∧ isTick t2 ∧ t1.val ≺ t2.val ∧
+    ¬ ∃ x : Time, isTick x ∧ t1.val ≺ x.val ∧ x.val ≺ t2.val
+
+/-- SFS.mm `bl.nexttp`. Free, `rfl`-adjacent, not an axiom -- unaffected by
+`next`'s redesign, still just the third conjunct. -/
+theorem next_tprec {t1 t2 : Time} (h : next t1 t2) : t1.val ≺ t2.val := h.2.2.1
+
+/-- SFS.mm `bl.nextuniq`, genuinely reinstated (was vacuously true via the old,
+now-retired `next_dense` before this redesign): if `t2` and `t3` are each the
+tick immediately following `t1`, they're the same tick -- via `ticks_mono` and
+linear-order trichotomy on their indices, whichever tick has the smaller index
+turns out to be strictly between `t1` and the other, contradicting that other's
+own "nothing between" clause. -/
+theorem next_uniq {t1 t2 t3 : Time} (h2 : next t1 t2) (h3 : next t1 t3) : t2 = t3 := by
+  obtain ⟨_, ⟨i2, hi2⟩, h12, hno2⟩ := h2
+  obtain ⟨_, ⟨i3, hi3⟩, h13, hno3⟩ := h3
+  rcases lt_trichotomy i2 i3 with hlt | heq | hgt
+  · exact absurd ⟨t2, ⟨i2, hi2⟩, h12, hi2 ▸ hi3 ▸ ticks_mono i2 i3 hlt⟩ hno3
+  · rw [← hi2, ← hi3, heq]
+  · exact absurd ⟨t3, ⟨i3, hi3⟩, h13, hi3 ▸ hi2 ▸ ticks_mono i3 i2 hgt⟩ hno2
+
+/-- SFS.mm `df-nearlymeets`. The `next (death A) (birth B)` disjunct is, before
+2026-08-26's redesign, provably always `False` (`next` was vacuous on dense `ℝ`);
+now genuinely possible whenever `death A`/`birth B` are consecutive shared ticks. -/
 noncomputable def nearlyMeets (A B : Occurrence) : Option Prop :=
   (death A).map fun tA => (birth B = tA ∧ (openRight A ∨ openLeft B)) ∨ next tA (birth B)
 
-/-- Free consequence of `next_dense`, not a fact `SFS.mm`/`Allen.kerml` state
-themselves: whenever `A` has ended, `nearlyMeets` collapses to its open-boundary
-disjunct alone. -/
-theorem nearlyMeets_iff {A B : Occurrence} {tA : Time} (hA : death A = some tA) :
-    nearlyMeets A B = some (birth B = tA ∧ (openRight A ∨ openLeft B)) := by
-  unfold nearlyMeets
-  rw [hA]
-  simp [next_dense]
+-- The old `nearlyMeets_iff` (an unconditional collapse to just the open-boundary
+-- disjunct, via `next_dense`'s vacuity) is retired along with `next_dense` itself:
+-- the `next` disjunct is no longer dead weight, so there is no longer a genuine
+-- simplification to state here -- unfolding the `def` above is the whole story.
 
 /-! ### KerML Element Representation and Type Definition (SFS.mm lines 3246-3324) -/
 
@@ -1504,35 +1540,39 @@ def GetChangeToFalse (d : Occurrence) (e : Element) (tau : Time) (b : Set Item) 
   (¬ GetP d e ⟨now, dl_nowt⟩ ∧ ∀ t ∈ Set.Ico tau (⟨now, dl_nowt⟩ : Time), GetP d e t)
     → b = falseItem
 
-/-- `Chapter/KernelSemanticsChapter.tex` §3.1.5 `df-bl.changed`: primitive (no
-construction of "the most recent instant before `t1` that `d`'s value differed" is
-given, only the characterizing property `changedIff` below). **Not** given the
-same guard-and-prove treatment as `birth`/`death`/`timeof` (2026-08-26 investigation):
-unlike those, `changedIff`'s presupposition isn't merely "sometimes fails at
-existence edge cases" -- for an ordinary step-function `Occurrence` (e.g. `d`
-constant `A` before `0.5`, constant `B` from `0.5` on) and any `t1` that isn't
-itself a fresh transition instant for `d` (e.g. `t1 = 0.8`), *no* `t2` satisfies
-`changedIff`'s three conditions jointly: the exact transition point fails the
-"differs" disjunct (its value already matches `d t1`), and every earlier `t2`
-fails the open-interval constancy clause (the interval `(t2,t1)` straddles the
-transition). This looks like a real gap in `df-bl.changed`'s own formalization
-(likely inherited from `SFS.mm`), not the `birth`/`death`-style "no least element
-in a dense order" presupposition gap -- left as a known, unresolved issue rather
-than guessed at. -/
-axiom changed : Occurrence → Time → Time
+/-- `Chapter/KernelSemanticsChapter.tex` §3.1.5 `df-bl.changed`: redefined
+2026-08-26 via `finitePartition`'s shared ticks, replacing the old unconditional
+`axiom changed` + `changedIff` pair (which -- see the retired doc comment history
+-- was close to vacuous for ordinary step-function `Occurrence`s: no `t2` ever
+satisfied its three conditions jointly except when `t1` itself was a fresh
+transition instant). `changed d t1` is now: among the ticks strictly before `t1`
+where `d`'s value differs from `d t1`, take the greatest one (`Finset.max'` over a
+finite, decidable set -- no infimum/supremum-of-a-continuum issue, unlike the old
+formula's open-interval search), then report the *next* tick after it (the start
+of `t1`'s own current, matching-`d t1` run); `0` if no such differing tick exists
+(matching `df-bl.changed`'s own `t2=0` "hasn't changed before `t1`" case,
+recovered here as a real consequence of the search coming up empty rather than a
+separate disjunct). Total, no guard needed -- finiteness does all the work. -/
+noncomputable def changed (d : Occurrence) (t1 : Time) : Time :=
+  open Classical in
+  let differing : Finset (Fin (tickCount + 1)) :=
+    Finset.univ.filter fun i => (ticks i).val ≺ t1.val ∧ interpValAt d (ticks i) ≠ interpValAt d t1
+  if h : differing.Nonempty then
+    let i := differing.max' h
+    if hlt : (i : ℕ) + 1 < tickCount + 1 then ticks ⟨i + 1, hlt⟩ else ⟨now, dl_nowt⟩
+  else ⟨0, TIME_nonempty⟩
 
-/-- `Chapter/KernelSemanticsChapter.tex` §3.1.5 `df-bl.changed`'s characterizing
-property: `changed d t1 = t2` iff `t2` precedes `t1`, `d`'s interpretation at `t1`
-differs from its interpretation at `t2` (or `t2 = 0`, meaning `d` has not changed
-before `t1`), and `d`'s interpretation is stable at that `t2` value throughout the
-open interval `(t2,t1)`. See `changed`'s own doc comment above: this file's
-`changed` stays a total, unguarded function -- not merely "the book's own
-`df-bl.changed` only partially characterizes it" (the original framing), but
-because the guard-and-prove treatment doesn't obviously apply as-is. -/
-axiom changedIff {d : Occurrence} {t1 t2 : Time} :
-    changed d t1 = t2 ↔
-      (t2.val ≺ t1.val ∧ (interpValAt d t1 ≠ interpValAt d t2 ∨ t2.val = 0) ∧
-        ∀ t : Time, t.val ∈ Set.Ioo t2.val t1.val → interpValAt d t = interpValAt d t2)
+/-- Sanity check, not a full re-derivation of the old `changedIff`: if `d` never
+differs from its own value at `t1` among any tick strictly before `t1`, `changed`
+reports `0` -- `df-bl.changed`'s own "hasn't changed before `t1`" case, now a real
+theorem rather than an axiomatized disjunct. -/
+theorem changed_zero_of_no_diff {d : Occurrence} {t1 : Time}
+    (h : ∀ i : Fin (tickCount + 1), (ticks i).val ≺ t1.val → interpValAt d (ticks i) = interpValAt d t1) :
+    changed d t1 = ⟨0, TIME_nonempty⟩ := by
+  unfold changed
+  rw [dif_neg]
+  simp only [Finset.not_nonempty_iff_eq_empty, Finset.filter_eq_empty_iff]
+  exact fun i _ hcond => hcond.2 (h i hcond.1)
 
 /-! ## `Lean4SFS/Assert.lean` name-compatibility aliases
 
