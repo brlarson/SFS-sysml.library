@@ -290,19 +290,146 @@ it). -/
 def relCompose (A B : Set (Element × Element)) : Set (Element × Element) :=
   {p : Element × Element | ∃ z, (p.1, z) ∈ B ∧ (z, p.2) ∈ A}
 
-/-! ## Kuratowski pairing (kept as a standalone axiom -- see `CoreDesignModel`'s own
-doc comment below for why this one isn't folded into the bundle) -/
+/-! ## Kuratowski pairing (2026-08-26: proved, not axiomatized -- see the doc comment
+on `encodePair` below for the construction, and `CoreDesignModel`'s own doc comment
+further down for why this one needed separate treatment from that class's `Design :=
+∅` trick) -/
+
+/-- Gödel-style injective encoding of `List ℕ` into `ℕ`, via `Nat.pair` (Mathlib's own
+`ℕ × ℕ ≃ ℕ`; `Nat.pair_eq_pair` gives the injectivity this is built on). `0` is
+reserved for `[]`; `x :: xs` maps to `Nat.pair (x + 1) (encode xs)`, which is always
+`≥ 1` (checked directly against `Nat.pair`'s own `if`-definition), keeping that case
+disjoint from `[]`'s `0`. -/
+private def encodeNatList : List ℕ → ℕ
+  | [] => 0
+  | x :: xs => Nat.pair (x + 1) (encodeNatList xs)
+
+private theorem encodeNatList_pos (x : ℕ) (xs : List ℕ) : 0 < encodeNatList (x :: xs) := by
+  show 0 < Nat.pair (x + 1) (encodeNatList xs)
+  unfold Nat.pair
+  split <;> omega
+
+private theorem encodeNatList_inj :
+    ∀ {l1 l2 : List ℕ}, encodeNatList l1 = encodeNatList l2 → l1 = l2
+  | [], [], _ => rfl
+  | [], y :: ys, h => absurd h.symm (encodeNatList_pos y ys).ne'
+  | x :: xs, [], h => absurd h (encodeNatList_pos x xs).ne'
+  | x :: xs, y :: ys, h => by
+      obtain ⟨hx1, hxs⟩ := Nat.pair_eq_pair.mp h
+      have hx : x = y := by omega
+      rw [hx, encodeNatList_inj hxs]
+
+/-- `List.map` of an injective function is injective on lists -- a self-contained
+induction rather than a search for the exact Mathlib combinator name, reused below for
+both `List Char` (via `charToNat`) and `List String` (via `stringToNat`). -/
+private theorem list_map_inj {α β : Type} {f : α → β} (hf : ∀ a b, f a = f b → a = b) :
+    ∀ {l1 l2 : List α}, l1.map f = l2.map f → l1 = l2
+  | [], [], _ => rfl
+  | [], _ :: _, h => by simp at h
+  | _ :: _, [], h => by simp at h
+  | a :: as, b :: bs, h => by
+      simp only [List.map_cons, List.cons.injEq] at h
+      rw [hf a b h.1, list_map_inj hf h.2]
+
+/-- A `Char`'s underlying `UInt32` codepoint, as a `ℕ` -- injective via `Char.ext`
+(`Char.val` injective) and `UInt32.toNat_inj` (both core-Lean facts, no Mathlib
+dependency). -/
+private def charToNat (c : Char) : ℕ := c.val.toNat
+
+private theorem charToNat_inj {c d : Char} (h : charToNat c = charToNat d) : c = d :=
+  Char.ext (UInt32.toNat_inj.mp h)
+
+/-- `List Char`, Gödel-encoded via `encodeNatList` over `charToNat`-mapped codepoints. -/
+private def listCharToNat (l : List Char) : ℕ := encodeNatList (l.map charToNat)
+
+private theorem listCharToNat_inj {l1 l2 : List Char} (h : listCharToNat l1 = listCharToNat l2) :
+    l1 = l2 :=
+  list_map_inj (fun _ _ => charToNat_inj) (encodeNatList_inj h)
+
+/-- `String`, via `String.toList` (core Lean's own `String.toList_inj` gives that this
+is injective) composed with `listCharToNat`. -/
+private def stringToNat (s : String) : ℕ := listCharToNat s.toList
+
+private theorem stringToNat_inj {s t : String} (h : stringToNat s = stringToNat t) : s = t :=
+  String.toList_inj.mp (listCharToNat_inj h)
+
+/-- `Option String`: `none ↦ 0`, `some s ↦ stringToNat s + 1` -- the `+1` keeps `some`
+disjoint from `none`'s `0` regardless of what `stringToNat s` is. -/
+private def optionStringToNat : Option String → ℕ
+  | none => 0
+  | some s => stringToNat s + 1
+
+private theorem optionStringToNat_inj {o1 o2 : Option String}
+    (h : optionStringToNat o1 = optionStringToNat o2) : o1 = o2 := by
+  match o1, o2, h with
+  | none, none, _ => rfl
+  | none, some s, h => simp [optionStringToNat] at h
+  | some s, none, h => simp [optionStringToNat] at h
+  | some s, some t, h =>
+      have heq : stringToNat s = stringToNat t := by simp only [optionStringToNat] at h; omega
+      rw [stringToNat_inj heq]
+
+/-- `List String`, Gödel-encoded via `encodeNatList` over `stringToNat`-mapped
+elements -- same construction as `listCharToNat` above, one level up. -/
+private def listStringToNat (l : List String) : ℕ := encodeNatList (l.map stringToNat)
+
+private theorem listStringToNat_inj {l1 l2 : List String}
+    (h : listStringToNat l1 = listStringToNat l2) : l1 = l2 :=
+  list_map_inj (fun _ _ => stringToNat_inj) (encodeNatList_inj h)
+
+/-- `Element`'s own 4 fields (`elementId : String`, `aliasIds : List String`,
+`declaredName`/`declaredShortName : Option String`), folded into one `ℕ` via nested
+`Nat.pair`. -/
+private def elementToNat (e : Element) : ℕ :=
+  Nat.pair (stringToNat e.elementId)
+    (Nat.pair (listStringToNat e.aliasIds)
+      (Nat.pair (optionStringToNat e.declaredName) (optionStringToNat e.declaredShortName)))
+
+private theorem elementToNat_inj {a b : Element} (h : elementToNat a = elementToNat b) :
+    a = b := by
+  unfold elementToNat at h
+  obtain ⟨h1, h2⟩ := Nat.pair_eq_pair.mp h
+  obtain ⟨h3, h4⟩ := Nat.pair_eq_pair.mp h2
+  obtain ⟨h5, h6⟩ := Nat.pair_eq_pair.mp h4
+  have e1 := stringToNat_inj h1
+  have e2 := listStringToNat_inj h3
+  have e3 := optionStringToNat_inj h5
+  have e4 := optionStringToNat_inj h6
+  obtain ⟨ida, ala, dna, dsa⟩ := a
+  obtain ⟨idb, alb, dnb, dsb⟩ := b
+  simp_all
 
 /-- Kuratowski-style pairing, encoding an ordered pair of `Element`s as a single
 `Element`. Needed because features can have features (`df-featureoffeature`), whose
 own domain is itself a relation of pairs, and so on to unbounded nesting depth --
 without a uniform way to fold a pair back into a plain `Element`, each nesting level
-would need its own primitive. Injective (distinct pairs give distinct encodings); no
-other structure is assumed. Moved ahead of `CoreDesignModel` for the same
-forward-reference reason as `cardElem`/`relCompose` above (`df_featureoffeature`'s
-field type cites it). -/
-axiom encodePair : Element → Element → Element
-axiom encodePair_inj {a b c d : Element} : encodePair a b = encodePair c d → a = c ∧ b = d
+would need its own primitive.
+
+**Proved, not axiomatized (2026-08-26)**: `Element`'s own fields are all built from
+`String`/`List`/`Option`, every one of which admits an injection into `ℕ` (`String`
+via `Char`'s `UInt32` codepoint and a Gödel `List ℕ → ℕ` encoding; `List`/`Option`
+generically over an already-injective element type) -- so `Element` itself injects
+into `ℕ` (`elementToNat` above), and `Nat.pair`/`Nat.pair_eq_pair` (Mathlib's own
+`ℕ × ℕ ≃ ℕ`) gives an injective pairing *of naturals*. The only remaining step is
+folding that single resulting `ℕ` back into an `Element` -- done via `aliasIds :=
+List.replicate n ""`, injective in `n` via `List.length` alone, avoiding any need to
+encode the result as a `String` in turn. This is the one axiom in the survey's
+category-4 list (`no_interpenetration`, `hasFirstInstant`, `finitePartition` in
+`SFS.lean`, and `df_types`'s whole `Design`/`VT` cluster here) that turned out to
+need neither a vacuity trick nor a new modeling commitment, just a real but
+self-contained cardinality argument. -/
+def encodePair (a b : Element) : Element :=
+  { elementId := "", aliasIds := List.replicate (Nat.pair (elementToNat a) (elementToNat b)) "",
+    declaredName := none, declaredShortName := none }
+
+theorem encodePair_inj {a b c d : Element} (h : encodePair a b = encodePair c d) :
+    a = c ∧ b = d := by
+  have haliases := congrArg Element.aliasIds h
+  simp only [encodePair] at haliases
+  have hlen := congrArg List.length haliases
+  simp only [List.length_replicate] at hlen
+  obtain ⟨h1, h2⟩ := Nat.pair_eq_pair.mp hlen
+  exact ⟨elementToNat_inj h1, elementToNat_inj h2⟩
 
 /-- **Class-based (2026-08-26, at direct request, following a full audit of this
 section's ~45-axiom cluster): `Design`/`VT`/`Specializes`/`Unions`/`Intersects`/
