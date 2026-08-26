@@ -1606,6 +1606,78 @@ elab "kernel% " d:kernelDecl : term => do
     " implies b = false >>";
     t="GetChangeToFalse";}
 
+-- Mereology.kerml's own real `library package Mereology { ... }` wrapper: three
+-- real `private import ...;` statements, same sibling-`#check` treatment as
+-- Allen.kerml/Domain.kerml's own wrappers above.
+#check kernel% library package Mereology {
+  doc "SFS: Merology is the metaphysics of parthood. Predicates are Performances::BooleanEvaluation in KerML, but metaphysical predicates aren't meant to be executed. Need something to define values rather than operations."
+  private import Performances::BooleanEvaluation ;
+  private import Occurrences::Occurrence ;
+  private import Assertion::Assert ;
+}
+
+-- Mereology.kerml's own real `abstract predicate PartOf specializes
+-- BooleanEvaluation {...}` -- `abstract`/`specializes` on `predicate`, both
+-- already-existing grammar (`kermlAbstractFlag`, `predicate`'s own
+-- `specializes`-clause production), exercised together here for the first time.
+-- `@Assert`/`doc` kept as separate sibling `#check`s below, same constraint as
+-- every other nested-body case in this file.
+#check kernel% abstract predicate PartOf specializes BooleanEvaluation {
+  in x : Occurrence ;
+  in y : Occurrence ;
+}
+
+-- `PartOf`'s own `@Assert` body, `xPy`, is the informal "x P y" shorthand
+-- (`Assert.lean`'s own documented, deliberate exclusion -- see its "Formulas
+-- deliberately *not* included" list): `xPy` is a bare `dslWff` identifier that
+-- `freeIdentsInWff` never auto-binds, so this fails honestly with "unknown
+-- identifier xPy," not attempted as a live `#check` here either, same reasoning.
+
+-- `PAR`/`PTR`: bare top-level `@Assert{...}` declarations, not nested inside any
+-- predicate -- stating a fact about `PartOf` rather than defining a new one, same
+-- shape as `Allen.kerml`'s own top-level formulas.
+#check kernel% @Assert{n="PAR"; f="<< PAR : : forall x~Occurrence are not PartOf(x,x) >>"; t="par";}
+#check kernel% @Assert{n="PTR"; f="<< PTR : : forall x,y,z~Occurrence are "+
+  "( (PartOf(x,y) and PartOf(y,z)) implies PartOf(x,z) ) >>"; t="ptr";}
+
+#check kernel% abstract predicate PartOverlap specializes BooleanEvaluation {
+  in x : Occurrence ;
+  in y : Occurrence ;
+}
+#check kernel% @Assert{n="PartOverlap"; f="<< PartOverlap : x~Occurrence, y~Occurrence : "+
+  "exists z~Occurrence that ( PartOf(z,x) and PartOf(z,y) ) >>"; t="PartOverlap";}
+
+#check kernel% abstract predicate PartUnderlap specializes BooleanEvaluation {
+  in x : Occurrence ;
+  in y : Occurrence ;
+}
+#check kernel% @Assert{n="PartUnderlap"; f="<< PartUnderlap : x~Occurrence, y~Occurrence : "+
+  "exists z~Occurrence that ( PartOf(x,z) and PartOf(y,z) ) >>"; t="PartUnderlap";}
+
+#check kernel% abstract predicate ImproperPart specializes BooleanEvaluation {
+  in x : Occurrence ;
+  in y : Occurrence ;
+}
+#check kernel% @Assert{n="ImproperPart"; f="<< ImproperPart : x~Occurrence, y~Occurrence : PartOf(x,y) or x=y >>"; t="ImproperPart";}
+
+#check kernel% abstract predicate PartDisjoint specializes BooleanEvaluation {
+  in x : Occurrence ;
+  in y : Occurrence ;
+}
+#check kernel% @Assert{n="PartDisjoint"; f="<< PartDisjoint : x~Occurrence, y~Occurrence : not PartOverlap(x,y) >>";
+    t="PartDisjoint";}
+
+-- `PCH`: another bare top-level `@Assert{...}`, same shape as `PAR`/`PTR` above.
+#check kernel% @Assert{n="PCH"; f="<< PCH : : forall x,y~Occurrence are "+
+  "( (x=y or PartOf(x,y) or PartOf(y,x) or PartDisjoint(x,y))"+
+  "and not (PartOf(x,y) and PartOf(y,x)) ) >>"; t="pch";}
+
+#check kernel% abstract predicate AtomicPart specializes BooleanEvaluation {
+  in x : Occurrence ;
+}
+#check kernel% @Assert{n="AtomicPart";f="<< AtomicPart : x~Occurrence : not exists z~Occurrence that PartOf(z,x) >>";
+    t="AtomicPart";}
+
 -- Regions.kerml's own real `library package Regions { ... }` wrapper: six real
 -- `private import ...;` statements, all Core.lean-layer content.
 #check kernel% library package Regions {
