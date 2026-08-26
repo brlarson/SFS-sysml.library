@@ -763,8 +763,29 @@ this fully generic (its `A` is an unconstrained class). Moved up from its origin
 position under "Time -- Allen's Intervals" below (still where SFS.mm itself
 introduces it, line-number-wise) -- `Mereology`'s own `PartOf` now needs `Occurrence`
 to already exist, per the 2026-08-21 `Part`-retirement (see that axiom's own doc
-comment); genuine forward-reference, not a reorganization for its own sake. -/
-axiom Item : Type
+comment); genuine forward-reference, not a reorganization for its own sake.
+
+**Class-based (2026-08-26, at direct request, extending the `Now` recipe to every
+axiom with no characterizing law at all)**: unlike `birth`/`death`/`timeof`/`now`,
+`Item` (and every other axiom converted alongside it below -- `Region`/`Point`/
+`Surface`/`PartOf`/`Location`/`InRegion`/`OnSurface`/`Adjacent`/`featureAccess`/
+`featureAccessProp`/`wonce`/`trueItem`/`falseItem`) never asserted a satisfiability
+condition to begin with (no biconditional, no guard) -- `axiom Item : Type` just
+posited a free constant of that type, with nothing to prove consistent. Converting
+these still shrinks `#print axioms`' trust footprint for the same reason `now` did:
+each becomes a `Classical.choose` witness of a *trivial* `∃ x : T, True` rather than
+an independent axiom, so it's derived from Lean's standard classical axioms (already
+present) instead of adding new ones. `Classical.choose` (not a concrete pick like
+`ℕ`) is used throughout this batch for the same reason it was for `now`: it keeps
+the witness opaque, so nothing downstream can accidentally exploit structure (e.g.
+`ℕ`'s successor/order) that an opaque primitive was never meant to have. -/
+class ItemT where
+  Item : Type
+
+export ItemT (Item)
+
+noncomputable instance itemModel : ItemT :=
+  ⟨Classical.choose (⟨ℕ, trivial⟩ : ∃ _ : Type, True)⟩
 
 /-- SFS.mm's implicit type for `A` in `exists`/`birth`/`death`/Allen's-relations: a
 temporal value whose extent, at each instant, is a set of `Item`s (empty = doesn't
@@ -783,8 +804,15 @@ entirely -- every definition/theorem below that used to be `Part`-typed (and
 `Location`/`lfu`/`lin`/`AtomicRegion`/`apar`/`expansivity` further down, which share
 the same variable with `PartOf`/`AtomPart` calls) is `Occurrence`-typed now too, not
 just this one axiom, since a stale `Part` anywhere in this cluster would no longer
-type-check against the others. -/
-axiom PartOf : Occurrence → Occurrence → Prop
+type-check against the others. Class-based, same batch/treatment as `Item` above
+(no characterizing law of its own -- `par`/`ptr`/`pch` below are the genuine
+constraints, and stay separate axioms; they'd need a real constructed model to
+eliminate, not just a trivial existence witness -- see the axiom survey). -/
+class PartOfRel where
+  PartOf : Occurrence → Occurrence → Prop
+export PartOfRel (PartOf)
+noncomputable instance partOfModel : PartOfRel :=
+  ⟨Classical.choose (⟨fun _ _ => False, trivial⟩ : ∃ _ : Occurrence → Occurrence → Prop, True)⟩
 
 /-- SFS.mm `df-par`: antireflexivity, a genuine constraint on the primitive. -/
 axiom par (x : Occurrence) : ¬ PartOf x x
@@ -839,9 +867,30 @@ theorem pdjrfl (x y : Occurrence) : PartDisjoint x y ↔ PartDisjoint y x := by
 
 /-! ### Region and Location (SFS.mm lines 2816-2962) -/
 
-axiom Region : Type
-axiom Point : Type
-axiom Surface : Type
+/-- Class-based, same batch/treatment as `Item` above -- witnessed via `∃ T,
+Nonempty T` rather than the bare `∃ T, True` the others use, since `Location`
+below needs an actual `Region` value to construct its own witness function
+(`Occurrence → Region` can't be built without one), not just the type's
+existence. -/
+class RegionT where
+  Region : Type
+export RegionT (Region)
+noncomputable instance regionModel : RegionT :=
+  ⟨Classical.choose (⟨ℕ, ⟨0⟩⟩ : ∃ T : Type, Nonempty T)⟩
+instance regionNonempty : Nonempty Region :=
+  Classical.choose_spec (⟨ℕ, ⟨0⟩⟩ : ∃ T : Type, Nonempty T)
+
+/-- Class-based, same batch/treatment as `Item` above. -/
+class PointT where
+  Point : Type
+export PointT (Point)
+noncomputable instance pointModel : PointT := ⟨Classical.choose (⟨ℕ, trivial⟩ : ∃ _ : Type, True)⟩
+
+/-- Class-based, same batch/treatment as `Item` above. -/
+class SurfaceT where
+  Surface : Type
+export SurfaceT (Surface)
+noncomputable instance surfaceModel : SurfaceT := ⟨Classical.choose (⟨ℕ, trivial⟩ : ∃ _ : Type, True)⟩
 
 /-- SFS.mm `wloc`: primitive (relates an *occurrence*, not a point, to a region).
 **Function-valued (`Occurrence → Region`), not a relation** -- 2026-08-21 change, at
@@ -854,12 +903,28 @@ a straightforward, but not the only possible, `SFS.mm`-style rendering of `wloc`
 Deliberately does **not** attempt to wire up the infix `L` notation those same real
 formulas' own *definitions* use (`o L result`) -- disregarded at request, `SFS.lean`
 still has no `L`, and `Location`'s own `@Assert` formula is expected to keep failing
-for that specific reason; see `Assert.lean`'s own note. -/
-axiom Location : Occurrence → Region
-/-- SFS.mm `win`: primitive. -/
-axiom InRegion : Point → Region → Prop
-/-- SFS.mm `won`: primitive. -/
-axiom OnSurface : Point → Surface → Prop
+for that specific reason; see `Assert.lean`'s own note. Class-based, same batch/
+treatment as `Item` above (no characterizing law -- `lin` below is the only
+constraint, and stays a separate axiom). -/
+class LocationFn where
+  Location : Occurrence → Region
+export LocationFn (Location)
+noncomputable instance locationModel : LocationFn :=
+  ⟨Classical.choose (⟨fun _ => Classical.arbitrary (α := Region), trivial⟩ : ∃ _ : Occurrence → Region, True)⟩
+
+/-- SFS.mm `win`: primitive. Class-based, same batch/treatment as `Item` above. -/
+class InRegionRel where
+  InRegion : Point → Region → Prop
+export InRegionRel (InRegion)
+noncomputable instance inRegionModel : InRegionRel :=
+  ⟨Classical.choose (⟨fun _ _ => True, trivial⟩ : ∃ _ : Point → Region → Prop, True)⟩
+
+/-- SFS.mm `won`: primitive. Class-based, same batch/treatment as `Item` above. -/
+class OnSurfaceRel where
+  OnSurface : Point → Surface → Prop
+export OnSurfaceRel (OnSurface)
+noncomputable instance onSurfaceModel : OnSurfaceRel :=
+  ⟨Classical.choose (⟨fun _ _ => True, trivial⟩ : ∃ _ : Point → Surface → Prop, True)⟩
 
 /-- `Regions.kerml`'s own real `Adj(p)` ("the set of adjacent points to `p`"),
 `df-adjp`, was previously genuinely unformalized -- `Regions.kerml`'s own comment
@@ -873,8 +938,13 @@ elsewhere. `Regions.kerml`'s own `RegionSurface`/`RegionFilm` formulas, which us
 call the now-real `Adjacent` via the set-membership idiom `p2 in Adj(p)`, are updated
 to call it directly as `Adjacent(p, p2)` instead -- a proper predicate application,
 not the informal `xPy`-style bare-identifier form `Adjacent`'s *own* `@Assert`
-formula uses (see `Regions.kerml`), so those two formulas now elaborate live. -/
-axiom Adjacent : Point → Point → Prop
+formula uses (see `Regions.kerml`), so those two formulas now elaborate live.
+Class-based, same batch/treatment as `Item` above. -/
+class AdjacentRel where
+  Adjacent : Point → Point → Prop
+export AdjacentRel (Adjacent)
+noncomputable instance adjacentModel : AdjacentRel :=
+  ⟨Classical.choose (⟨fun _ _ => True, trivial⟩ : ∃ _ : Point → Point → Prop, True)⟩
 
 /-- SFS.mm `df-lfu`: locational functionality. Was a genuine axiom (a constraint on
 a *relation*, not derivable); now a real theorem, since a Lean function is
@@ -1345,9 +1415,14 @@ abbrev UI := String
 Both are left as opaque `String`-valued primitives here, exactly mirroring SFS.mm's own
 `df-wonce`: neither SFS.mm's axiomatization nor the book's prose actually enforce
 "freshness" (a new, distinct wonce each time) as part of the definition itself -- that's
-an informal side condition on how `mkUid` gets *used*, not a fact `mkUid` itself proves. -/
+an informal side condition on how `mkUid` gets *used*, not a fact `mkUid` itself proves.
+Class-based, same batch/treatment as `Item` above. -/
 def tb : String := "\\#"
-axiom wonce : String
+class Wonce where
+  wonce : String
+export Wonce (wonce)
+noncomputable instance wonceModel : Wonce :=
+  ⟨Classical.choose (⟨"", trivial⟩ : ∃ _ : String, True)⟩
 
 /-- SFS.mm `df-wonce`: creation of a Unique Identifier from a Class Identifier by
 appending the tag-boundary and a wonce. -/
@@ -1462,8 +1537,13 @@ primitives added specifically so `Assert.lean`'s elaborator has something to tra
 way `Model` above isn't. -/
 
 /-- `d::f`: the feature `f` of occurrence `d`, itself an occurrence (KerML features
-are themselves typed elements, so themselves `Occurrence`-shaped here). -/
-axiom featureAccess : Occurrence → Element → Occurrence
+are themselves typed elements, so themselves `Occurrence`-shaped here). Class-based,
+same batch/treatment as `Item` above. -/
+class FeatureAccessFn where
+  featureAccess : Occurrence → Element → Occurrence
+export FeatureAccessFn (featureAccess)
+noncomputable instance featureAccessModel : FeatureAccessFn :=
+  ⟨Classical.choose (⟨fun _ _ => fun _ => ∅, trivial⟩ : ∃ _ : Occurrence → Element → Occurrence, True)⟩
 
 /-- `I[[d::f,tau]]`: the value of feature `f` of `d` at `tau`. -/
 def Get (d : Occurrence) (f : Element) (tau : Time) : Set Item := interpValAt (featureAccess d f) tau
@@ -1483,8 +1563,13 @@ codomain is `TProp` (a time-varying `Prop`) instead of `Occurrence` (a time-vary
 (`A`, evaluated via `I[[·,·]]`/`Get`) and Boolean expressions/predicates (`φ`,
 evaluated via this and `GetP` below) -- the same "class vs. wff" split `Assert.lean`'s
 own `dslTerm`/`dslWff` categories already make, now given a real target on this side
-too. -/
-axiom featureAccessProp : Occurrence → Element → TProp
+too. Class-based, same batch/treatment as `Item` above. -/
+class FeatureAccessPropFn where
+  featureAccessProp : Occurrence → Element → TProp
+export FeatureAccessPropFn (featureAccessProp)
+noncomputable instance featureAccessPropModel : FeatureAccessPropFn :=
+  ⟨Classical.choose
+    (⟨fun _ _ => fun _ => False, trivial⟩ : ∃ _ : Occurrence → Element → TProp, True)⟩
 
 /-- `I[[d::e,tau]]`, predicate reading: whether Boolean feature `e` of `d` holds at
 `tau` -- `interpAt` (already used for `\S`3.13.1's `φ @ τ`) applied to
@@ -1538,9 +1623,18 @@ def GetBooleanChange (d : Occurrence) (e : Element) (tau : Time) (b : Set Item) 
 /-- Opaque canonical `Set Item` values standing for the Boolean literals `true`/
 `false`, needed once `GetChangeToTrue`/`GetChangeToFalse` compare `b` (inherited as
 `Set Item` from `GetBooleanChange`) against a literal -- `Item` is fully opaque, with
-no internal true/false structure to derive these from. -/
-axiom trueItem : Set Item
-axiom falseItem : Set Item
+no internal true/false structure to derive these from. Class-based, same batch/
+treatment as `Item` above -- bundled together (like `Now`'s `now`/`now_nonneg`)
+since they're declared and used as a pair, though each is chosen independently
+(there was never a `trueItem ≠ falseItem` axiom to preserve; the two `axiom`s
+never ruled out coincidence either). -/
+class BoolItems where
+  trueItem : Set Item
+  falseItem : Set Item
+export BoolItems (trueItem falseItem)
+noncomputable instance boolItemsModel : BoolItems :=
+  ⟨Classical.choose (⟨∅, trivial⟩ : ∃ _ : Set Item, True),
+    Classical.choose (⟨∅, trivial⟩ : ∃ _ : Set Item, True)⟩
 
 /-- `Domain.kerml`'s own `GetChangeToTrue` behavior (`:> GetBooleanChange`). Uses
 `GetP` (the predicate reading), not `Get`, since its own `@Assert` formula uses
