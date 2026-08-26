@@ -1759,6 +1759,12 @@ own grammar. -/
 def isTypeDeclOf (A : ID) (e : Element) : Prop :=
   e.declaredName = some A ∧ ∃ C : Set Element, (DesignKind.type, e, C) ∈ Design
 
+/-- The connection `isTypeDeclOf` was introduced for but never actually drawn: concrete
+KerML text `"type A"` (`isTypeDeclOf A e`) really does put `e` in `VT`, via `df_types`
+applied directly to `isTypeDeclOf`'s own second conjunct. -/
+theorem isTypeDeclOf_mem_VT {A : ID} {e : Element} (h : isTypeDeclOf A e) : e ∈ VT :=
+  df_types e h.2
+
 /- SFS.mm `df-types`: for every `Element` `e`, if `e` is declared with the bare `type`
 keyword (i.e. tagged `.type` in `Design`, the same reading `df-type` gives that text),
 then `e ∈ VT`. Now a real theorem, not an axiom -- see `Core.lean`'s own
