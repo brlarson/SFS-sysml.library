@@ -1272,14 +1272,19 @@ presupposition fails, then *prove* a model exists) from toy `ℕ` to the real
 (`Nat.strongRecOn`), so *any* nonempty subset has a least element with no extra
 assumption. An arbitrary subset of the dense continuum `Time` need not (e.g.
 `{t | t.val < 0.5}` has an infimum but no attained minimum), so `birth`'s guard
-needs one further, explicitly-named structural axiom (`occurrenceHasFirstInstant`
-below, formalizing `Occurrences.kerml`'s mandatory `startShot: Instant[1]`) that the
-`ℕ` case got for free from well-ordering -- `#print axioms model` below will show
-it explicitly, alongside Lean's standard classical axioms. `death`, by contrast,
-needs no such extra axiom: its guard is "self-certifying" (`death_exists`'s proof
-gets a witness handed to it directly whenever the presupposition holds, and `none`
-is always available when it doesn't), the same reasoning that already justified
-`endShot`'s `Option` redesign in the first place. -/
+originally needed a further, separately-axiomatized structural fact
+(`hasFirstInstant`, asserting -- falsely, in general, for a dense order -- that
+*every* satisfiable `Time → Prop` predicate has an attained least witness) that the
+`ℕ` case got for free from well-ordering. That axiom is retired (2026-08-26, same
+day, once `finitePartition` below was broadened to cover every `TVal α`): `birth`'s
+guard now goes through the real theorem `hasFirstTick`, which needs only
+`finitePartition`'s *finite shared-tick* structure, not `Time`'s own order --
+`#print axioms model` below shows `finitePartition` explicitly, alongside Lean's
+standard classical axioms. `death`, by contrast, needs no such extra fact at all:
+its guard is "self-certifying" (`death_exists`'s proof gets a witness handed to it
+directly whenever the presupposition holds, and `none` is always available when it
+doesn't), the same reasoning that already justified `endShot`'s `Option` redesign
+in the first place. -/
 
 class Lifetimes where
   /-- Primitive (no construction of "the first instant `A` exists" is given, only
@@ -1309,8 +1314,8 @@ class Lifetimes where
     death A = some t0 ↔ existsAt A t0 ∧ ∀ t1 : Time, t1.val ∈ Set.Ioc t0.val now → ¬ existsAt A t1
   /-- SFS.mm `df-bl.timeof`: primitive, "the first instant `φ` holds" -- exactly
   `birth`'s own shape (`existsAt A` replaced by `interpAt φ`), bundled into this
-  same class since it needs the same guard-and-prove treatment and the same new
-  axiom (`hasFirstInstant` below). -/
+  same class since it needs the same guard-and-prove treatment and the same
+  `hasFirstTick` theorem (below, built on `finitePartition`). -/
   timeof : TProp → Time
   /-- SFS.mm `df-bl.timeof`'s characterizing property, guarded on `φ` holding
   somewhere -- same reasoning as `birthIff`: unconditional would force even a
@@ -1320,26 +1325,128 @@ class Lifetimes where
 
 export Lifetimes (birth death birthIff deathIff timeof timeofIff)
 
-/-- The one new trusted ingredient this reformation needs: any `Time → Prop`
-predicate that holds anywhere has a *first* instant where it holds, not merely an
-infimum of the instants where it holds. Stated generically (not fixed to
-`existsAt A`) so it serves both `birth` (`P := existsAt A`, formalizing
-`Occurrences.kerml`'s mandatory `startShot: Instant[1]`) and `timeof` below
-(`P := interpAt φ`) without a near-duplicate axiom for each -- without this,
-neither `birth_exists` nor `timeof_exists` is provable, `Time`'s dense order gives
-no well-ordering to fall back on the way `ℕ` does in `Repaired.lean`. -/
-axiom hasFirstInstant (P : Time → Prop) (_h : ∃ s, P s) :
-    ∃ τ, IsLeast {t : Time | P t} τ
+/-- Every `TVal α`'s raw value only ever changes at finitely many *shared*
+instants -- a single "event calendar," not a per-value one (2026-08-26, at direct
+request; broadened the same day from an earlier `Occurrence`-only form once
+`birth_exists`/`timeof_exists` below were rebuilt on top of it, retiring the
+separate `hasFirstInstant` axiom they used to need). Stated without reference to
+"pieces" to sidestep any `Ico`/`Icc` boundary bookkeeping: if there is no shared
+tick strictly inside `(t1,t2]`, `d`'s value cannot have changed between `t1` and
+`t2`. This is a genuine new modeling commitment, not derivable from anything else
+in this file -- physically, it says the system has a shared discrete event
+structure, matching how `Occurrence`'s `Set Item`-valued (not continuously
+varying) values are already modeled; broadening it to arbitrary `TVal α` (rather
+than leaving it `Occurrence`-specific) says the same thing about *every*
+time-varying quantity, `TProp`-valued ones (`interpAt`/`timeof`) included, not
+just `Set Item`-valued ones. It is what fixes `next`'s permanent vacuity and
+`changed`'s own gap (see `changed`'s doc comment far below), and (since 2026-08-26)
+what `birth`/`timeof` are built on too -- *not* hyperreals, which cannot help
+here: two distinct `Time` values are both *standard* reals, so neither "nothing
+between" nor "infinitesimally close" can ever hold for them, transfer principle or
+not (a dead end reached and rejected before this axiom was proposed); and a
+general `Time → Prop` predicate still has no well-ordering to exploit on its own
+(`{t | 0 < t.val}` has an infimum but no attained minimum) -- it's specifically
+the *finiteness* of the shared tick structure, not `Time`'s own order, that makes
+`hasFirstTick` below a real theorem. -/
+axiom finitePartition :
+    ∃ (n : ℕ) (breaks : Fin (n + 1) → Time),
+      breaks 0 = ⟨0, TIME_nonempty⟩ ∧ breaks (Fin.last n) = ⟨now, dl_nowt⟩ ∧
+      (∀ i j : Fin (n + 1), i < j → (breaks i).val ≺ (breaks j).val) ∧
+      ∀ {α : Type} (d : TVal α) (t1 t2 : Time), t1.val ≼ t2.val →
+        (¬ ∃ i : Fin (n + 1), (breaks i).val ∈ Set.Ioc t1.val t2.val) →
+        interpValAt d t1 = interpValAt d t2
+
+/-- The chosen number of shared ticks, extracted from `finitePartition` once via
+`Classical.choose` -- every downstream definition (`next`, `changed`) is stated
+against this one fixed choice, not a fresh existential each time. -/
+noncomputable def tickCount : ℕ := finitePartition.choose
+
+/-- The chosen shared tick instants themselves. -/
+noncomputable def ticks : Fin (tickCount + 1) → Time := finitePartition.choose_spec.choose
+
+theorem ticks_zero : ticks 0 = ⟨0, TIME_nonempty⟩ := finitePartition.choose_spec.choose_spec.1
+theorem ticks_last : ticks (Fin.last tickCount) = ⟨now, dl_nowt⟩ :=
+  finitePartition.choose_spec.choose_spec.2.1
+theorem ticks_mono : ∀ i j : Fin (tickCount + 1), i < j → (ticks i).val ≺ (ticks j).val :=
+  finitePartition.choose_spec.choose_spec.2.2.1
+
+theorem ticks_mono_le {i j : Fin (tickCount + 1)} (h : i ≤ j) : (ticks i).val ≼ (ticks j).val := by
+  rcases h.lt_or_eq with hlt | heq
+  · exact (ticks_mono i j hlt).le
+  · exact heq ▸ le_refl _
+
+/-- The real content of `finitePartition`, restated against `ticks`: no change in
+`d`'s value between `t1` and `t2` unless a shared tick falls strictly inside
+`(t1,t2]`. -/
+theorem ticks_constant {α : Type} (d : TVal α) {t1 t2 : Time} (h : t1.val ≼ t2.val)
+    (hno : ¬ ∃ i : Fin (tickCount + 1), (ticks i).val ∈ Set.Ioc t1.val t2.val) :
+    interpValAt d t1 = interpValAt d t2 :=
+  finitePartition.choose_spec.choose_spec.2.2.2 d t1 t2 h hno
+
+/-- `t` is one of the finitely many shared ticks. -/
+def isTick (t : Time) : Prop := ∃ i : Fin (tickCount + 1), ticks i = t
+
+/-- Every instant `t`'s `d`-value matches the `d`-value at the *largest* shared
+tick `≤ t` (`t`'s "bucket anchor") -- `ticks 0 = 0` guarantees the candidate set is
+always nonempty, so `Finset.max'` gives a real witness, and `ticks_constant`
+(no tick strictly between the anchor and `t`, since the anchor is the *largest*
+one `≤ t`) gives the constancy. -/
+theorem ticks_bucket {α : Type} (d : TVal α) (t : Time) :
+    ∃ j : Fin (tickCount + 1), (ticks j).val ≼ t.val ∧ d t = d (ticks j) := by
+  classical
+  set S : Finset (Fin (tickCount + 1)) := Finset.univ.filter (fun i => (ticks i).val ≼ t.val)
+    with hSdef
+  have hSne : S.Nonempty :=
+    ⟨0, by simp only [hSdef, Finset.mem_filter, Finset.mem_univ, true_and, ticks_zero]
+           exact t.2.1⟩
+  refine ⟨S.max' hSne, (Finset.mem_filter.mp (S.max'_mem hSne)).2, ?_⟩
+  symm
+  apply ticks_constant d (Finset.mem_filter.mp (S.max'_mem hSne)).2
+  rintro ⟨i, hi1, hi2⟩
+  have hiS : i ∈ S := by simp only [hSdef, Finset.mem_filter, Finset.mem_univ, true_and]; exact hi2
+  exact absurd (ticks_mono_le (S.le_max' i hiS)) (not_le.mpr hi1)
+
+/-- Any `TVal α`-anchored predicate that's satisfiable somewhere has a *first*
+instant where it holds, and that instant is always one of the finitely many
+shared ticks -- unlike the retired `hasFirstInstant`, this is a real theorem, not
+an axiom: `Time`'s dense order gives no well-ordering on its own, but
+`finitePartition` means `P (d ·)` can only ever change value at a tick
+(`ticks_bucket`), so a finite search over `Fin (tickCount + 1)` (`Finset.min'`)
+suffices. Stated generically (not fixed to `existsAt A`) so it serves both `birth`
+(`d := A`, `P := (· ≠ ∅)`) and `timeof` below (`d := φ`, `P := id`) without a
+near-duplicate theorem for each. -/
+theorem hasFirstTick {α : Type} (d : TVal α) (P : α → Prop) (h : ∃ s : Time, P (d s)) :
+    ∃ τ, IsLeast {t : Time | P (d t)} τ := by
+  classical
+  have htick : ∃ i : Fin (tickCount + 1), P (d (ticks i)) := by
+    obtain ⟨s, hs⟩ := h
+    obtain ⟨j, _, hj⟩ := ticks_bucket d s
+    exact ⟨j, hj ▸ hs⟩
+  set T : Finset (Fin (tickCount + 1)) := Finset.univ.filter (fun i => P (d (ticks i)))
+    with hTdef
+  have hTne : T.Nonempty := by
+    obtain ⟨i, hi⟩ := htick
+    exact ⟨i, by simp only [hTdef, Finset.mem_filter, Finset.mem_univ, true_and]; exact hi⟩
+  set i0 := T.min' hTne with hi0def
+  have hi0P : P (d (ticks i0)) := (Finset.mem_filter.mp (T.min'_mem hTne)).2
+  refine ⟨ticks i0, hi0P, ?_⟩
+  rintro t (ht : P (d t))
+  by_contra hlt
+  have hlt' : t.val ≺ (ticks i0).val := not_le.mp hlt
+  obtain ⟨j, hjle, hjeq⟩ := ticks_bucket d t
+  have hjP : P (d (ticks j)) := hjeq ▸ ht
+  have hjT : j ∈ T := by simp only [hTdef, Finset.mem_filter, Finset.mem_univ, true_and]; exact hjP
+  exact absurd (ticks_mono_le (T.min'_le j hjT) |>.trans hjle) (not_le.mpr hlt')
 
 /-- A total selector satisfying `birthIff`'s guarded spec exists for every
-occurrence: `hasFirstInstant`'s witness when `A` exists somewhere, `Time`'s own
+occurrence: `hasFirstTick`'s witness when `A` exists somewhere, `Time`'s own
 `⟨now, dl_nowt⟩` (unconstrained junk, matching this file's own precedent for an
 arbitrary-but-valid `Time` witness) otherwise. -/
 theorem birth_exists (A : Occurrence) :
     ∃ t0 : Time, (∃ s, existsAt A s) →
       (existsAt A t0 ∧ ∀ t1 : Time, t1.val ∈ Set.Ico (0 : Instant) t0.val → ¬ existsAt A t1) := by
   by_cases h : ∃ s, existsAt A s
-  · obtain ⟨τ, hτmem, hτlb⟩ := hasFirstInstant (existsAt A) h
+  · obtain ⟨τ, hτmem, hτlb⟩ := hasFirstTick A (· ≠ ∅) h
     refine ⟨τ, fun _ => ⟨hτmem, fun t1 ht1 hex1 => ?_⟩⟩
     exact absurd (hτlb hex1) (not_le.mpr ht1.2)
   · exact ⟨⟨now, dl_nowt⟩, fun hex => absurd hex h⟩
@@ -1347,12 +1454,12 @@ theorem birth_exists (A : Occurrence) :
 /-- SFS.mm `df-bl.timeof`'s own guarded existence, exactly `birth_exists`'s
 argument with `existsAt A` replaced by `interpAt φ` -- the same structural shape
 (`timeofIff` is `birthIff` with `interpAt φ` in place of `existsAt A`), so the same
-proof, via the same generic `hasFirstInstant`, carries over unchanged. -/
+proof, via the same generic `hasFirstTick`, carries over unchanged. -/
 theorem timeof_exists (φ : TProp) :
     ∃ t1 : Time, (∃ s, interpAt φ s) →
       (interpAt φ t1 ∧ ∀ t : Time, t.val ∈ Set.Ico (0 : Instant) t1.val → ¬ interpAt φ t) := by
   by_cases h : ∃ s, interpAt φ s
-  · obtain ⟨τ, hτmem, hτlb⟩ := hasFirstInstant (interpAt φ) h
+  · obtain ⟨τ, hτmem, hτlb⟩ := hasFirstTick φ id h
     refine ⟨τ, fun _ => ⟨hτmem, fun t ht hφt => ?_⟩⟩
     exact absurd (hτlb hφt) (not_le.mpr ht.2)
   · exact ⟨⟨now, dl_nowt⟩, fun hφ => absurd hφ h⟩
@@ -1427,10 +1534,12 @@ noncomputable instance model : Lifetimes where
       exact Subtype.ext (le_antisymm (not_lt.mp h1) (not_lt.mp h2))
 
 /- The audit (`Repaired.lean`'s own convention): `model` depends on Lean's standard
-classical axioms plus exactly one new ingredient, `hasFirstInstant` -- the
-well-ordering `Repaired.lean`'s toy `ℕ` case got for free, ported here as an
-explicit, named assumption instead (reused for both `birth` and `timeof`), since
-dense `Time` has no such guarantee. -/
+classical axioms plus exactly one new ingredient, `finitePartition` -- not for the
+well-ordering `Repaired.lean`'s toy `ℕ` case got for free (dense `Time` still has
+none), but because `hasFirstTick` (reused for both `birth` and `timeof`) needs
+*some* structural fact ruling out an unattained infimum, and `finitePartition`'s
+finite shared-tick structure is what supplies it (2026-08-26, retiring the earlier,
+separately-axiomatized `hasFirstInstant`). -/
 #print axioms model
 
 /-- Strong Kleene conjunction on `Option Prop`, the general form of the ad hoc
@@ -1535,53 +1644,13 @@ hasn't ended), replacing what used to be a bespoke hand-rolled `if`/`match` bloc
 here. -/
 noncomputable def nonoverlaps (A B : Occurrence) : Option Prop := kor (precedes A B) (precedes B A)
 
-/-- Every `Occurrence`'s raw interpretation only ever changes at finitely many
-*shared* instants -- a single "event calendar," not a per-`Occurrence` one
-(2026-08-26, at direct request, superseding the vacuous `next`/`next_dense` below
-and motivating the redesign of `changed` further down). Stated without reference
-to "pieces" to sidestep any `Ico`/`Icc` boundary bookkeeping: if there is no shared
-tick strictly inside `(t1,t2]`, `d`'s value cannot have changed between `t1` and
-`t2`. This is a genuine new modeling commitment, not derivable from anything else
-in this file -- physically, it says the system has a shared discrete event
-structure, matching how `Occurrence`'s `Set Item`-valued (not continuously
-varying) values are already modeled. It is what actually fixes `next`'s permanent
-vacuity and `changed`'s own gap (see `changed`'s doc comment far below) -- *not*
-hyperreals, which cannot help here: two distinct `Time` values are both *standard*
-reals, so neither "nothing between" nor "infinitesimally close" can ever hold for
-them, transfer principle or not (a dead end reached and rejected before this
-axiom was proposed). -/
-axiom finitePartition :
-    ∃ (n : ℕ) (breaks : Fin (n + 1) → Time),
-      breaks 0 = ⟨0, TIME_nonempty⟩ ∧ breaks (Fin.last n) = ⟨now, dl_nowt⟩ ∧
-      (∀ i j : Fin (n + 1), i < j → (breaks i).val ≺ (breaks j).val) ∧
-      ∀ (d : Occurrence) (t1 t2 : Time), t1.val ≼ t2.val →
-        (¬ ∃ i : Fin (n + 1), (breaks i).val ∈ Set.Ioc t1.val t2.val) →
-        interpValAt d t1 = interpValAt d t2
-
-/-- The chosen number of shared ticks, extracted from `finitePartition` once via
-`Classical.choose` -- every downstream definition (`next`, `changed`) is stated
-against this one fixed choice, not a fresh existential each time. -/
-noncomputable def tickCount : ℕ := finitePartition.choose
-
-/-- The chosen shared tick instants themselves. -/
-noncomputable def ticks : Fin (tickCount + 1) → Time := finitePartition.choose_spec.choose
-
-theorem ticks_zero : ticks 0 = ⟨0, TIME_nonempty⟩ := finitePartition.choose_spec.choose_spec.1
-theorem ticks_last : ticks (Fin.last tickCount) = ⟨now, dl_nowt⟩ :=
-  finitePartition.choose_spec.choose_spec.2.1
-theorem ticks_mono : ∀ i j : Fin (tickCount + 1), i < j → (ticks i).val ≺ (ticks j).val :=
-  finitePartition.choose_spec.choose_spec.2.2.1
-
-/-- The real content of `finitePartition`, restated against `ticks`: no change in
-`d`'s value between `t1` and `t2` unless a shared tick falls strictly inside
-`(t1,t2]`. -/
-theorem ticks_constant (d : Occurrence) {t1 t2 : Time} (h : t1.val ≼ t2.val)
-    (hno : ¬ ∃ i : Fin (tickCount + 1), (ticks i).val ∈ Set.Ioc t1.val t2.val) :
-    interpValAt d t1 = interpValAt d t2 :=
-  finitePartition.choose_spec.choose_spec.2.2.2 d t1 t2 h hno
-
-/-- `t` is one of the finitely many shared ticks. -/
-def isTick (t : Time) : Prop := ∃ i : Fin (tickCount + 1), ticks i = t
+/- `finitePartition`/`tickCount`/`ticks`/`ticks_zero`/`ticks_last`/`ticks_mono`/
+`ticks_constant`/`isTick` moved earlier (2026-08-26, at direct request), right
+after `Lifetimes`'s own `export`, and `finitePartition` itself broadened from
+`Occurrence`-only to every `TVal α` -- `birth_exists`/`timeof_exists` now build
+directly on the tick structure (via `hasFirstTick`) instead of the separate
+`hasFirstInstant` axiom, which is retired entirely. See that section for the
+full doc comment. -/
 
 /-- SFS.mm `df-next`: `t_2` immediately follows `t_1`. Redefined 2026-08-26 (was
 "`t_1 ≺ t_2` and no `Time` value strictly between them," provably vacuous on
