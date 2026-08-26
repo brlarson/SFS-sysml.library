@@ -1623,8 +1623,13 @@ rather than across the import boundary -- the reverse direction is impossible
 (`Core.lean` cannot import `SFS.lean`: `Kernel.lean` imports `Assert.lean` which
 imports `SFS.lean`, so `SFS → Core` and `Core → SFS` together would close a cycle).
 `isTypeDeclOf`/`df_types` below still need `Design`/`DesignKind`/`VT`, so they're
-brought back in here; `ElementKind` is needed too, for `ElementRep` further down. -/
-open KerML.Core (ElementKind DesignKind Design VT)
+brought back in here; `ElementKind` is needed too, for `ElementRep` further down.
+`df_types` itself also moved to `Core.lean` (2026-08-26, folded into its own
+`CoreDesignModel` class alongside `Design`/`VT` -- see that class's doc comment),
+since it needs the exact same treatment as `Core.lean`'s own `df_feature`/
+`df_classifier` and `Design`/`VT` are shared, load-bearing primitives for a much
+larger cluster there, not private to `df_types`; brought in here too. -/
+open KerML.Core (ElementKind DesignKind Design VT df_types)
 
 /-- SFS.mm `cID`: the class of identifiers (strings naming KerML elements -- previously
 declared but unused in `SFS.mm` until `df-type` reused it). Kept as a plain `String`
@@ -1641,11 +1646,10 @@ own grammar. -/
 def isTypeDeclOf (A : ID) (e : Element) : Prop :=
   e.declaredName = some A ∧ ∃ C : Set Element, (DesignKind.type, e, C) ∈ Design
 
-/-- SFS.mm `df-types`: for every `Element` `e`, if `e` is declared with the bare `type`
+/- SFS.mm `df-types`: for every `Element` `e`, if `e` is declared with the bare `type`
 keyword (i.e. tagged `.type` in `Design`, the same reading `df-type` gives that text),
-then `e ∈ VT`. This genuinely needs to stay an axiom here too -- `VT` is independently
-primitive on both sides, so there's no automatic Lean-typing shortcut this time. -/
-axiom df_types : ∀ e : Element, (∃ C : Set Element, (DesignKind.type, e, C) ∈ Design) → e ∈ VT
+then `e ∈ VT`. Now a real theorem, not an axiom -- see `Core.lean`'s own
+`CoreDesignModel`/`df_types`, opened in above alongside `Design`/`VT`. -/
 
 /-- `Chapter/CoreSemanticsChapter.tex` §2.1.3 `df-rep` ("Representation of Elements as
 Triples") -- book-only, like `Model` below: `df-rep` has no SFS.mm formalization, only

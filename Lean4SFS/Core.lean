@@ -276,425 +276,363 @@ inductive DesignKind
   | ofElementKind (k : ElementKind)
   | type
 
-axiom Design : Set (DesignKind × Element × Set Element)
-
-/-- SFS.mm `cVT`: `V_T`, the set of all Types in the design (KerML Core Semantics
-§2.1.1's vocabulary triple `⟨V_T,V_C,V_F⟩`) -- a primitive `df-types` *constrains*
-rather than fully defines, matching `SFS.mm`'s own implication (not equation) form, so
-this stays an `axiom` rather than a derived `def`. Holds real `Element`s (matching
-`Design`'s own full-replacement redesign above), not bare `ID`s. -/
-axiom VT : Set Element
-
-/-- `Chapter/CoreSemanticsChapter.tex` §2.2.1 `specializes` (KerML's own textual
-keyword, elaborated structurally above as a `Specialization`/`Subclassification`
-value, e.g. via `mkSpecializationTerm`) -- book-only, no `SFS.mm` formalization. That
-structural elaboration carries no semantic content of its own (its doc comment's
-"every instance of `specific` is also an instance of `general`" is prose, not an
-encoded constraint), and -- being a bare, unconstrained `structure` -- isn't tied to
-"what's actually asserted in the current model" the way `Design` is: any `Element`
-pair could trivially satisfy `∃ s : Specialization, s.specific.elt = a ∧ s.general.elt
-= b`, making that an unfaithful (vacuous) reading of `specializes`. So, like `VT`, a
-fresh `Element`-level primitive is needed here instead. -/
-axiom Specializes : Element → Element → Prop
-
-/-- `Chapter/CoreSemanticsChapter.tex` §2.2.1 `df-specializes`: a type's specialization
-implies its extension (the content set `Design` associates with its `.type` triple, the
-same set-of-instances reading `df-type` gives that triple's third component) is a subset
-of its generalization's extension. A genuine constraint, not derivable from `Specializes`
-being a bare `Prop`-valued relation, so this stays an `axiom` here too, same reasoning as
-`VT`/`df_types` above. -/
-axiom df_specializes {ts tg : Element} {Cs Cg : Set Element}
-    (hs : (DesignKind.type, ts, Cs) ∈ Design) (hg : (DesignKind.type, tg, Cg) ∈ Design) :
-    Specializes ts tg → Cs ⊆ Cg
-
-/-- `Chapter/CoreSemanticsChapter.tex` §2.2.1 `df-multspec`: multiple specialization
-bounds the specific type's extension within the *intersection* of every one of its
-generalizations' extensions -- proved directly from `df_specializes` applied to each
-generalization independently, exactly as the book's own prose describes it (`§2.2.1`,
-just below `df-specializes`), so this one genuinely is a `theorem`. -/
-theorem df_multspec {ts tg th : Element} {Cs Cg Ch : Set Element}
-    (hs : (DesignKind.type, ts, Cs) ∈ Design) (hg : (DesignKind.type, tg, Cg) ∈ Design)
-    (hh : (DesignKind.type, th, Ch) ∈ Design)
-    (hsg : Specializes ts tg) (hsh : Specializes ts th) : Cs ⊆ Cg ∩ Ch :=
-  fun _ hx => ⟨df_specializes hs hg hsg hx, df_specializes hs hh hsh hx⟩
-
-/-- `Chapter/CoreSemanticsChapter.tex` §2.2.1 `unions` (KerML's own textual keyword,
-elaborated structurally as a `Unioning` value) -- book-only, no `SFS.mm` formalization.
-Same reasoning as `Specializes` above: `Unioning` carries no semantic content of its
-own and, being a bare, unconstrained structure, isn't tied to what's actually asserted
-in the current model -- so a fresh `Element`-level primitive is needed here too. -/
-axiom Unions : Element → Element → Prop
-
-/-- `Chapter/CoreSemanticsChapter.tex` §2.2.1 `df-unions`: a type `ta` that specializes
-`tb` and unions `tc` has an extension equal to the union of `tb`'s and `tc`'s
-extensions. A genuine constraint, not derivable from `Specializes`/`Unions` being bare
-`Prop`-valued relations, so this stays an `axiom` here too, same reasoning as
-`df_specializes` above. -/
-axiom df_unions {ta tb tc : Element} {Ca Cb Cc : Set Element}
-    (ha : (DesignKind.type, ta, Ca) ∈ Design) (hb : (DesignKind.type, tb, Cb) ∈ Design)
-    (hc : (DesignKind.type, tc, Cc) ∈ Design) :
-    Specializes ta tb → Unions ta tc → Ca = Cb ∪ Cc
-
-/-- `Chapter/CoreSemanticsChapter.tex` §2.2.1 `intersects` (KerML's own textual
-keyword, elaborated structurally as an `Intersecting` value) -- book-only, no `SFS.mm`
-formalization. Same reasoning as `Unions` above. -/
-axiom Intersects : Element → Element → Prop
-
-/-- `Chapter/CoreSemanticsChapter.tex` §2.2.1 `df-intersects`: a type `ta` that
-specializes `tb` and intersects `tc` has an extension equal to the intersection of
-`tb`'s and `tc`'s extensions. Same reasoning as `df_unions` above. -/
-axiom df_intersects {ta tb tc : Element} {Ca Cb Cc : Set Element}
-    (ha : (DesignKind.type, ta, Ca) ∈ Design) (hb : (DesignKind.type, tb, Cb) ∈ Design)
-    (hc : (DesignKind.type, tc, Cc) ∈ Design) :
-    Specializes ta tb → Intersects ta tc → Ca = Cb ∩ Cc
-
-/-- `Chapter/CoreSemanticsChapter.tex` §2.2.1 `differences` (KerML's own textual
-keyword, elaborated structurally as a `Differencing` value) -- book-only, no `SFS.mm`
-formalization. Same reasoning as `Unions` above. -/
-axiom Differences : Element → Element → Prop
-
-/-- `Chapter/CoreSemanticsChapter.tex` §2.2.1 `df-differences`: a type `ta` that
-specializes `tb` and differences `tc` has an extension equal to `tb`'s extension minus
-`tc`'s. Same reasoning as `df_unions` above. -/
-axiom df_differences {ta tb tc : Element} {Ca Cb Cc : Set Element}
-    (ha : (DesignKind.type, ta, Ca) ∈ Design) (hb : (DesignKind.type, tb, Cb) ∈ Design)
-    (hc : (DesignKind.type, tc, Cc) ∈ Design) :
-    Specializes ta tb → Differences ta tc → Ca = Cb \ Cc
-
-/-- `Chapter/CoreSemanticsChapter.tex` §2.2.1 `disjoint from` (KerML's own textual
-keyword, elaborated structurally as a `Disjoining` value) -- book-only, no `SFS.mm`
-formalization. Same reasoning as `Unions` above. -/
-axiom Disjoint : Element → Element → Prop
-
-/-- `Chapter/CoreSemanticsChapter.tex` §2.2.1 `df-disjoint`: a type `ta` that
-specializes `tb` and is disjoint from `tc` has an extension that is a subset of `tb`'s
-and has empty intersection with `tc`'s. Same reasoning as `df_unions` above -- the
-first conjunct (`Ca ⊆ Cb`) is, notably, already exactly `df_specializes`'s own
-conclusion (given `Specializes ta tb`); it's restated here as part of the conjunction
-only because that's the literal shape `df-disjoint` itself asserts, not because it's
-independently new content. -/
-axiom df_disjoint {ta tb tc : Element} {Ca Cb Cc : Set Element}
-    (ha : (DesignKind.type, ta, Ca) ∈ Design) (hb : (DesignKind.type, tb, Cb) ∈ Design)
-    (hc : (DesignKind.type, tc, Cc) ∈ Design) :
-    Specializes ta tb → Disjoint ta tc → Ca ⊆ Cb ∧ Ca ∩ Cc = ∅
-
 /-- `Chapter/CoreSemanticsChapter.tex` §2.2.3 `df-cardinality`: `#` is literal notation
-for `Set.ncard` (Mathlib's own finite-set cardinality -- "junk value zero if infinite",
-matching the book's own "nothing in a system is infinite" stance), not a new primitive:
-`SFS.mm`'s own `df-cardinality` is itself just an abbreviation reusing base `set.mm`'s
-already-developed cardinal number theory, so this is the direct Lean analogue, not a
-shortcut -- a genuine `def`, no `axiom` needed. -/
+for `Set.ncard` (Mathlib's own finite-set cardinality) -- a genuine `def`, no axiom
+needed. Moved ahead of `CoreDesignModel` below (from its original position, which was
+after some of the axioms that now cite it as part of a class field's type) -- a
+straightforward forward-reference fix, no content change. -/
 noncomputable def cardElem (A : Set Element) : ℕ := A.ncard
 
-/-- `Chapter/CoreSemanticsChapter.tex` §2.2.3 `type B[n] specializes A` (KerML's exact
-multiplicity bracket, `[n]`) -- book-only, no `SFS.mm` formalization. A fresh
-`Element`-level primitive, same reasoning as `Specializes` above: nothing currently
-represents a type's *declared* multiplicity. -/
-axiom TypeMultiplicityExact : Element → ℕ → Prop
+/-- `Chapter/CoreSemanticsChapter.tex` §2.4 `df-co`: composition of two relations. A
+genuine `def`, no axiom needed. Moved ahead of `CoreDesignModel` for the same
+forward-reference reason as `cardElem` above (`df_featurechaining`'s field type cites
+it). -/
+def relCompose (A B : Set (Element × Element)) : Set (Element × Element) :=
+  {p : Element × Element | ∃ z, (p.1, z) ∈ B ∧ (z, p.2) ∈ A}
 
-/-- `Chapter/CoreSemanticsChapter.tex` §2.2.3 `df-typemultiplicity`: a type `B`
-declared `[n] specializes A` has an extension that's a subset of `A`'s, is bounded by
-`A`'s cardinality, and has cardinality exactly `n`. A genuine constraint, not
-derivable, so this stays an `axiom` here too -- the first conjunct (`Cb ⊆ Ca`) is,
-notably, already exactly `df_specializes`'s own conclusion, same caveat as
-`df_disjoint` above. -/
-axiom df_typemultiplicity {A B : Element} {Ca Cb : Set Element} {n : ℕ}
-    (hA : (DesignKind.type, A, Ca) ∈ Design) (hB : (DesignKind.type, B, Cb) ∈ Design) :
-    Specializes B A → TypeMultiplicityExact B n →
-      Cb ⊆ Ca ∧ n ≤ cardElem Ca ∧ cardElem Cb = n
-
-/-- `Chapter/CoreSemanticsChapter.tex` §2.2.3 `type B[m..n] specializes A` (KerML's
-multiplicity range bracket, `[m..n]`) -- book-only, no `SFS.mm` formalization. Same
-reasoning as `TypeMultiplicityExact` above. -/
-axiom TypeMultiplicityRange : Element → ℕ → ℕ → Prop
-
-/-- `Chapter/CoreSemanticsChapter.tex` §2.2.3 `df-typemultiplicityrange`: a type `B`
-declared `[m..n] specializes A` has an extension that's a subset of `A`'s, is bounded
-above by `A`'s cardinality, and has cardinality between `m` and `n`. Same reasoning as
-`df_typemultiplicity` above. -/
-axiom df_typemultiplicityrange {A B : Element} {Ca Cb : Set Element} {m n : ℕ}
-    (hA : (DesignKind.type, A, Ca) ∈ Design) (hB : (DesignKind.type, B, Cb) ∈ Design) :
-    Specializes B A → TypeMultiplicityRange B m n →
-      Cb ⊆ Ca ∧ n ≤ cardElem Ca ∧ m ≤ cardElem Cb ∧ cardElem Cb ≤ n
-
-/-- `Chapter/CoreSemanticsChapter.tex` §2.3 `df-feature`: for every `e` declared with
-the bare `feature` keyword (tagged `Feature` in `ElementKind`, reused directly here --
-unlike `type`, `Feature` already has a slot in `ElementKind`'s 14 tags, so no new
-`DesignKind` case is needed), `e ∈ VF`. Exact parallel of `df_types`/`VT` above, one
-level down (`VF` for `Feature`s instead of `VT` for `Type`s). -/
-axiom VF : Set Element
-
-axiom df_feature : ∀ e : Element,
-    (∃ C : Set Element, (DesignKind.ofElementKind ElementKind.Feature, e, C) ∈ Design) → e ∈ VF
-
-/-- `Chapter/CoreSemanticsChapter.tex` §2.3 `df-featuredby`/`df-domainless`: both
-assert a feature's design-triple content equals a *set of ordered pairs* (a relation),
-not a plain `Set Element` -- `Design`'s own content slot (`Set Element`) can't hold
-that, so a dedicated primitive is needed here, independent of `Design`, rather than
-forcing this into the `(DesignKind, Element, Set Element)` triple shape used
-everywhere else. -/
-axiom FeatureContent : Element → Set (Element × Element) → Prop
-
-/-- `Chapter/CoreSemanticsChapter.tex` §2.3 `feature x typed by Y featured by Z;` --
-book-only, no `SFS.mm` formalization. A fresh `Element`-level primitive, same reasoning
-as `Specializes`: nothing currently represents this concrete-syntax clause. -/
-axiom FeaturedByDecl : Element → Element → Element → Prop
-
-/-- `Chapter/CoreSemanticsChapter.tex` §2.3 `df-featuredby`: a feature `x` declared
-`typed by Y featured by Z` has content exactly the relation pairing `Z`'s extension
-(domain) with `Y`'s extension (co-domain). A genuine constraint, not derivable, so
-this stays an `axiom` here too. -/
-axiom df_featuredby {x y z : Element} {Cy Cz : Set Element}
-    (hy : (DesignKind.type, y, Cy) ∈ Design) (hz : (DesignKind.type, z, Cz) ∈ Design) :
-    FeaturedByDecl x y z → FeatureContent x {p : Element × Element | p.1 ∈ Cz ∧ p.2 ∈ Cy}
-
-/-- `Chapter/CoreSemanticsChapter.tex` §2.3 `feature x typed by Y;` (no `featured by`
-clause) -- book-only, no `SFS.mm` formalization. A separate primitive from
-`FeaturedByDecl` above, mirroring the book's own two separate definitions for the two
-distinct concrete-syntax forms, rather than one primitive plus a "no featured-by
-clause" side condition. -/
-axiom DomainlessDecl : Element → Element → Prop
-
-/-- `Chapter/CoreSemanticsChapter.tex` §2.3 `df-domainless`: a feature `x` declared
-`typed by Y` (domain defaulting to the universe) has content the relation pairing
-*any* element (domain unconstrained) with `Y`'s extension (co-domain) -- the universal
-domain quantification collapses to no constraint on the pair's first component at all,
-same "vacuous existential/quantifier disappears" simplification used for
-`RegionSurface`/`RegionFilm` elsewhere in this file. -/
-axiom df_domainless {x y : Element} {Cy : Set Element}
-    (hy : (DesignKind.type, y, Cy) ∈ Design) :
-    DomainlessDecl x y → FeatureContent x {p : Element × Element | p.2 ∈ Cy}
-
-/-! ## Types with Features (`Chapter/CoreSemanticsChapter.tex` §2.4) -/
+/-! ## Kuratowski pairing (kept as a standalone axiom -- see `CoreDesignModel`'s own
+doc comment below for why this one isn't folded into the bundle) -/
 
 /-- Kuratowski-style pairing, encoding an ordered pair of `Element`s as a single
 `Element`. Needed because features can have features (`df-featureoffeature`), whose
 own domain is itself a relation of pairs, and so on to unbounded nesting depth --
 without a uniform way to fold a pair back into a plain `Element`, each nesting level
 would need its own primitive. Injective (distinct pairs give distinct encodings); no
-other structure is assumed, matching this file's general practice of adding only the
-constraint actually needed. -/
+other structure is assumed. Moved ahead of `CoreDesignModel` for the same
+forward-reference reason as `cardElem`/`relCompose` above (`df_featureoffeature`'s
+field type cites it). -/
 axiom encodePair : Element → Element → Element
 axiom encodePair_inj {a b c d : Element} : encodePair a b = encodePair c d → a = c ∧ b = d
 
-/-- `Chapter/CoreSemanticsChapter.tex` §2.4 "Feature Member": a type or feature `Z`
-has, in its own body, a feature member identified by `x` whose relation content is `R`
-(the set of `⟨domain,codomain⟩` pairs `x` denotes, matching `FeatureContent`'s own
-pair-relation shape). The shared primitive `df-featuremember`/`df-featureoffeature`/
-`df-typebody` all build on: `df-typebody`'s variable-arity `C_1,...,C_j` is just
-`FeatureMemberOf Z x_i R_i` holding for each `i`, not one new primitive per arity. -/
-axiom FeatureMemberOf : Element → Element → Set (Element × Element) → Prop
+/-- **Class-based (2026-08-26, at direct request, following a full audit of this
+section's ~45-axiom cluster): `Design`/`VT`/`Specializes`/`Unions`/`Intersects`/
+`Differences`/`Disjoint`/`TypeMultiplicityExact`/`TypeMultiplicityRange`/`VF`/
+`FeatureContent`/`FeaturedByDecl`/`DomainlessDecl`/`FeatureMemberOf`/
+`OwnedFeatureTypedBy`(+`Exact`/`Star`/`Range`/`RangeStar`)/`MemberOf`/
+`OwnedFeatures`/`OrderedOn`/`OrderedDecl`/`ChainsDecl`/`VC` bundled together with
+every `df_*` constraint that ties them to `Design` (`df_specializes` through
+`df_typebody`, `df_classifier`, `df_classifier2`) -- one class, not one axiom
+per primitive/constraint, because almost every constraint here shares the same
+hypothesis shape: `(DesignKind._, _, _) ∈ Design` (or `FeatureContent _ _`, for
+`df_featurechaining`). That means a single global witness discharges essentially
+the whole cluster at once: `Design := ∅` and `FeatureContent := fun _ _ => False`
+make every one of those hypotheses unconstructible, so every constraint holds
+*vacuously* -- checked individually for each of the ~19 constraints below, not
+assumed from the shape alone. `df_types` itself (`SFS.mm`'s `df-types`, previously
+a separate `SFS.lean` axiom referencing `Design`/`VT` from here) is folded in as
+this class's own field, since it needs exactly the same treatment as `df_feature`/
+`df_classifier` and there is no way to eliminate it in isolation -- `Design`/`VT`
+are shared, load-bearing primitives for the whole cluster, not private to
+`df_types`.
 
-/-- `Chapter/CoreSemanticsChapter.tex` §2.4 `type Z { feature x typed by Y; }` (an
-owned feature member, no explicit `featured by`) -- book-only, no `SFS.mm`
-formalization. A fresh `Element`-level primitive, same reasoning as `Specializes`. -/
-axiom OwnedFeatureTypedBy : Element → Element → Element → Prop
+**Not eliminated by this same trick, left as separate axioms above (`encodePair`/
+`encodePair_inj`)**: whether `Element` admits an injective self-pairing is an
+independent question about `Element`'s own cardinality, unrelated to `Design`.
 
-/-- `Chapter/CoreSemanticsChapter.tex` §2.4 `df-featuremember`: a type `Z` specializing
-`T` with an owned feature `x` typed by `Y` has a feature member whose relation pairs
-`T`'s extension (domain, matching the book's own `C={c|c∈T}` clause) with `Y`'s
-extension (co-domain). A genuine constraint, not derivable, so this stays an `axiom`
-here too. -/
-axiom df_featuremember {Z T x Y' : Element} {Ct Cy : Set Element}
-    (ht : (DesignKind.type, T, Ct) ∈ Design) (hy : (DesignKind.type, Y', Cy) ∈ Design) :
-    Specializes Z T → OwnedFeatureTypedBy Z x Y' →
+**`Nonempty`/`Classical.choice` instead of `∃`/`Classical.choose`**: at this scale
+(~45 fields) a raw `∃`-tuple would need an unreadable `.2.2.2...`-chain to destructure;
+`Nonempty CoreDesignModel` (constructed directly via one concrete `{ field := value,
+... }` term) plus `Classical.choice` gives the identical opacity guarantee -- neither
+adds a new axiom (`Classical.choice` is already one of Lean's standard axioms, already
+present in every `#print axioms` list in this project) -- with ordinary named-field
+syntax instead. -/
+class CoreDesignModel where
+  Design : Set (DesignKind × Element × Set Element)
+  /-- SFS.mm `cVT`: `V_T`, the set of all Types in the design (KerML Core Semantics
+  §2.1.1's vocabulary triple `⟨V_T,V_C,V_F⟩`). -/
+  VT : Set Element
+  /-- `Chapter/CoreSemanticsChapter.tex` §2.2.1 `specializes`. -/
+  Specializes : Element → Element → Prop
+  /-- `Chapter/CoreSemanticsChapter.tex` §2.2.1 `unions`. -/
+  Unions : Element → Element → Prop
+  /-- `Chapter/CoreSemanticsChapter.tex` §2.2.1 `intersects`. -/
+  Intersects : Element → Element → Prop
+  /-- `Chapter/CoreSemanticsChapter.tex` §2.2.1 `differences`. -/
+  Differences : Element → Element → Prop
+  /-- `Chapter/CoreSemanticsChapter.tex` §2.2.1 `disjoint from`. -/
+  Disjoint : Element → Element → Prop
+  /-- `Chapter/CoreSemanticsChapter.tex` §2.2.3 `type B[n] specializes A`. -/
+  TypeMultiplicityExact : Element → ℕ → Prop
+  /-- `Chapter/CoreSemanticsChapter.tex` §2.2.3 `type B[m..n] specializes A`. -/
+  TypeMultiplicityRange : Element → ℕ → ℕ → Prop
+  /-- SFS.mm `cVF`/`df-feature`'s own `V_F`. -/
+  VF : Set Element
+  /-- `Chapter/CoreSemanticsChapter.tex` §2.3 `df-featuredby`/`df-domainless`'s shared
+  content primitive: a feature's denoted relation (a set of ordered pairs, not a plain
+  `Set Element`, so independent of `Design`'s own triple shape). -/
+  FeatureContent : Element → Set (Element × Element) → Prop
+  /-- `Chapter/CoreSemanticsChapter.tex` §2.3 `feature x typed by Y featured by Z;`. -/
+  FeaturedByDecl : Element → Element → Element → Prop
+  /-- `Chapter/CoreSemanticsChapter.tex` §2.3 `feature x typed by Y;` (no `featured by`
+  clause). -/
+  DomainlessDecl : Element → Element → Prop
+  /-- `Chapter/CoreSemanticsChapter.tex` §2.4 "Feature Member": the shared primitive
+  `df-featuremember`/`df-featureoffeature`/`df-typebody` all build on. -/
+  FeatureMemberOf : Element → Element → Set (Element × Element) → Prop
+  /-- `Chapter/CoreSemanticsChapter.tex` §2.4 `type Z { feature x typed by Y; }`. -/
+  OwnedFeatureTypedBy : Element → Element → Element → Prop
+  /-- `Chapter/CoreSemanticsChapter.tex` §2.4 `type Z { feature x[k] typed by Y; }`. -/
+  OwnedFeatureTypedByExact : Element → Element → Element → ℕ → Prop
+  /-- `Chapter/CoreSemanticsChapter.tex` §2.4 `type Z { feature x[*] typed by Y; }`. -/
+  OwnedFeatureTypedByStar : Element → Element → Element → Prop
+  /-- `Chapter/CoreSemanticsChapter.tex` §2.4 `type Z { feature x[l..u] typed by Y; }`. -/
+  OwnedFeatureTypedByRange : Element → Element → Element → ℕ → ℕ → Prop
+  /-- `Chapter/CoreSemanticsChapter.tex` §2.4 `type Z { feature x[l..*] typed by Y; }`. -/
+  OwnedFeatureTypedByRangeStar : Element → Element → Element → ℕ → Prop
+  /-- `Chapter/CoreSemanticsChapter.tex` §2.4 `type B { member feature g typed by C
+  featured by A; }` -- ordinary (non-feature) membership, distinct from
+  `FeatureMemberOf`/`OwnedFeatureTypedBy`. No `df_*` axiom of its own even before this
+  conversion (`df_membershipfeature` below is already a real theorem not needing one). -/
+  MemberOf : Element → Element → Prop
+  /-- `Chapter/CoreSemanticsChapter.tex` §2.4 `type Z { feature x1 typed by Y1; ...;
+  feature xj typed by Yj; }`, arity sidestepped via a `List`. -/
+  OwnedFeatures : Element → List (Element × Element) → Prop
+  /-- `Chapter/CoreSemanticsChapter.tex` §2.4 "ordered": `OrderedOn Y a b` means `a < b`
+  under `Y`'s own (type-relative) ordering. No `df_*` axiom of its own (only used as a
+  hypothesis inside the already-`theorem` `df_ordered` below). -/
+  OrderedOn : Element → Element → Element → Prop
+  /-- `Chapter/CoreSemanticsChapter.tex` §2.4 `type Z { feature x[*] ordered typed by
+  Y; }`. No `df_*` axiom of its own, same reasoning as `OrderedOn`. -/
+  OrderedDecl : Element → Element → Element → Prop
+  /-- `Chapter/CoreSemanticsChapter.tex` §2.4 `feature a chains b.c;`. -/
+  ChainsDecl : Element → Element → Element → Prop
+  /-- SFS.mm `cVC`/`df-classifier`'s own `V_C`. -/
+  VC : Set Element
+  /-- `Chapter/CoreSemanticsChapter.tex` §2.2.1 `df-specializes`: a type's
+  specialization implies its extension is a subset of its generalization's. -/
+  df_specializes : ∀ {ts tg : Element} {Cs Cg : Set Element},
+      (DesignKind.type, ts, Cs) ∈ Design → (DesignKind.type, tg, Cg) ∈ Design →
+      Specializes ts tg → Cs ⊆ Cg
+  /-- `Chapter/CoreSemanticsChapter.tex` §2.2.1 `df-unions`. -/
+  df_unions : ∀ {ta tb tc : Element} {Ca Cb Cc : Set Element},
+      (DesignKind.type, ta, Ca) ∈ Design → (DesignKind.type, tb, Cb) ∈ Design →
+      (DesignKind.type, tc, Cc) ∈ Design → Specializes ta tb → Unions ta tc →
+      Ca = Cb ∪ Cc
+  /-- `Chapter/CoreSemanticsChapter.tex` §2.2.1 `df-intersects`. -/
+  df_intersects : ∀ {ta tb tc : Element} {Ca Cb Cc : Set Element},
+      (DesignKind.type, ta, Ca) ∈ Design → (DesignKind.type, tb, Cb) ∈ Design →
+      (DesignKind.type, tc, Cc) ∈ Design → Specializes ta tb → Intersects ta tc →
+      Ca = Cb ∩ Cc
+  /-- `Chapter/CoreSemanticsChapter.tex` §2.2.1 `df-differences`. -/
+  df_differences : ∀ {ta tb tc : Element} {Ca Cb Cc : Set Element},
+      (DesignKind.type, ta, Ca) ∈ Design → (DesignKind.type, tb, Cb) ∈ Design →
+      (DesignKind.type, tc, Cc) ∈ Design → Specializes ta tb → Differences ta tc →
+      Ca = Cb \ Cc
+  /-- `Chapter/CoreSemanticsChapter.tex` §2.2.1 `df-disjoint`. -/
+  df_disjoint : ∀ {ta tb tc : Element} {Ca Cb Cc : Set Element},
+      (DesignKind.type, ta, Ca) ∈ Design → (DesignKind.type, tb, Cb) ∈ Design →
+      (DesignKind.type, tc, Cc) ∈ Design → Specializes ta tb → Disjoint ta tc →
+      Ca ⊆ Cb ∧ Ca ∩ Cc = ∅
+  /-- `Chapter/CoreSemanticsChapter.tex` §2.2.3 `df-typemultiplicity`. -/
+  df_typemultiplicity : ∀ {A B : Element} {Ca Cb : Set Element} {n : ℕ},
+      (DesignKind.type, A, Ca) ∈ Design → (DesignKind.type, B, Cb) ∈ Design →
+      Specializes B A → TypeMultiplicityExact B n →
+      Cb ⊆ Ca ∧ n ≤ cardElem Ca ∧ cardElem Cb = n
+  /-- `Chapter/CoreSemanticsChapter.tex` §2.2.3 `df-typemultiplicityrange`. -/
+  df_typemultiplicityrange : ∀ {A B : Element} {Ca Cb : Set Element} {m n : ℕ},
+      (DesignKind.type, A, Ca) ∈ Design → (DesignKind.type, B, Cb) ∈ Design →
+      Specializes B A → TypeMultiplicityRange B m n →
+      Cb ⊆ Ca ∧ n ≤ cardElem Ca ∧ m ≤ cardElem Cb ∧ cardElem Cb ≤ n
+  /-- SFS.mm `df-types`: for every `e` declared with the bare `type` keyword, `e ∈ VT`.
+  Moved here from `SFS.lean` (2026-08-26) -- see this class's own doc comment above. -/
+  df_types : ∀ e : Element,
+      (∃ C : Set Element, (DesignKind.type, e, C) ∈ Design) → e ∈ VT
+  /-- `Chapter/CoreSemanticsChapter.tex` §2.3 `df-feature`: exact parallel of
+  `df_types`, one `ElementKind` tag down. -/
+  df_feature : ∀ e : Element,
+      (∃ C : Set Element, (DesignKind.ofElementKind ElementKind.Feature, e, C) ∈ Design) →
+      e ∈ VF
+  /-- `Chapter/CoreSemanticsChapter.tex` §2.3 `df-featuredby`. -/
+  df_featuredby : ∀ {x y z : Element} {Cy Cz : Set Element},
+      (DesignKind.type, y, Cy) ∈ Design → (DesignKind.type, z, Cz) ∈ Design →
+      FeaturedByDecl x y z → FeatureContent x {p : Element × Element | p.1 ∈ Cz ∧ p.2 ∈ Cy}
+  /-- `Chapter/CoreSemanticsChapter.tex` §2.3 `df-domainless`. -/
+  df_domainless : ∀ {x y : Element} {Cy : Set Element},
+      (DesignKind.type, y, Cy) ∈ Design →
+      DomainlessDecl x y → FeatureContent x {p : Element × Element | p.2 ∈ Cy}
+  /-- `Chapter/CoreSemanticsChapter.tex` §2.4 `df-featuremember`. -/
+  df_featuremember : ∀ {Z T x Y' : Element} {Ct Cy : Set Element},
+      (DesignKind.type, T, Ct) ∈ Design → (DesignKind.type, Y', Cy) ∈ Design →
+      Specializes Z T → OwnedFeatureTypedBy Z x Y' →
       FeatureMemberOf Z x {p : Element × Element | p.1 ∈ Ct ∧ p.2 ∈ Cy}
-
-/-- `Chapter/CoreSemanticsChapter.tex` §2.4 `df-featureoffeature`: a domain-less
-feature `x` typed by `Y`, with its own owned feature `w` typed by `Z`, has content
-pairing the universe with `Y`'s extension (via `df_domainless`), and `w`'s relation
-pairs `x`'s own encoded pairs (domain `v`, codomain from `Y`) with `Z`'s extension. The
-nested pair domain is exactly why `encodePair` above is needed: `w`'s domain isn't a
-plain `Element`, it's one of `x`'s own pairs. -/
-axiom df_featureoffeature {x w Y' Z' : Element} {Cy Cz : Set Element}
-    (hy : (DesignKind.type, Y', Cy) ∈ Design) (hz : (DesignKind.type, Z', Cz) ∈ Design) :
-    DomainlessDecl x Y' → OwnedFeatureTypedBy x w Z' →
+  /-- `Chapter/CoreSemanticsChapter.tex` §2.4 `df-featureoffeature`. References the
+  still-standalone `encodePair` axiom above (`w`'s domain is one of `x`'s own encoded
+  pairs, not a plain `Element`). -/
+  df_featureoffeature : ∀ {x w Y' Z' : Element} {Cy Cz : Set Element},
+      (DesignKind.type, Y', Cy) ∈ Design → (DesignKind.type, Z', Cz) ∈ Design →
+      DomainlessDecl x Y' → OwnedFeatureTypedBy x w Z' →
       FeatureContent x {p : Element × Element | p.2 ∈ Cy} ∧
       FeatureMemberOf x w {q : Element × Element |
         (∃ v y, q.1 = encodePair v y ∧ y ∈ Cy) ∧ q.2 ∈ Cz}
-
-/-- `Chapter/CoreSemanticsChapter.tex` §2.4 `type Z { feature x[k] typed by Y; }`
-(exact feature multiplicity) -- book-only, no `SFS.mm` formalization. A fresh
-`Element`-level primitive, same reasoning as `OwnedFeatureTypedBy`. -/
-axiom OwnedFeatureTypedByExact : Element → Element → Element → ℕ → Prop
-
-/-- `Chapter/CoreSemanticsChapter.tex` §2.4 `df-fixedfeaturemultiplicity`: a feature
-member declared with exact multiplicity `k` has a relation of cardinality exactly `k`,
-every pair's co-domain drawn from `Y`'s extension. Reuses `Set.ncard` the same way
-`cardElem`/`df_typemultiplicity` did in §2.2.3, just for pair-sets instead of plain
-element sets. -/
-axiom df_fixedfeaturemultiplicity {Z x Y' : Element} {Cy : Set Element}
-    {R : Set (Element × Element)} {k : ℕ} (hy : (DesignKind.type, Y', Cy) ∈ Design) :
-    OwnedFeatureTypedByExact Z x Y' k → FeatureMemberOf Z x R →
+  /-- `Chapter/CoreSemanticsChapter.tex` §2.4 `df-fixedfeaturemultiplicity`. -/
+  df_fixedfeaturemultiplicity : ∀ {Z x Y' : Element} {Cy : Set Element}
+      {R : Set (Element × Element)} {k : ℕ}, (DesignKind.type, Y', Cy) ∈ Design →
+      OwnedFeatureTypedByExact Z x Y' k → FeatureMemberOf Z x R →
       R.ncard = k ∧ ∀ p ∈ R, p.2 ∈ Cy
-
-/-- `Chapter/CoreSemanticsChapter.tex` §2.4 `type Z { feature x[*] typed by Y; }`
-(unbounded feature multiplicity) -- book-only, no `SFS.mm` formalization. -/
-axiom OwnedFeatureTypedByStar : Element → Element → Element → Prop
-
-/-- `Chapter/CoreSemanticsChapter.tex` §2.4 `df-undefinedfeaturemultiplicity`: an
-unbounded feature member's relation has every pair's co-domain drawn from `Y`'s
-extension, with no cardinality constraint at all (matching the book's own "cardinality
-may be zero or greater"). -/
-axiom df_undefinedfeaturemultiplicity {Z x Y' : Element} {Cy : Set Element}
-    {R : Set (Element × Element)} (hy : (DesignKind.type, Y', Cy) ∈ Design) :
-    OwnedFeatureTypedByStar Z x Y' → FeatureMemberOf Z x R → ∀ p ∈ R, p.2 ∈ Cy
-
-/-- `Chapter/CoreSemanticsChapter.tex` §2.4 `type Z { feature x[l..u] typed by Y; }`
-(feature multiplicity range) -- book-only, no `SFS.mm` formalization. -/
-axiom OwnedFeatureTypedByRange : Element → Element → Element → ℕ → ℕ → Prop
-
-/-- `Chapter/CoreSemanticsChapter.tex` §2.4 `df-featuremultiplicityrange`: a
-range-bounded feature member's relation has cardinality between `l` and `u`, every
-pair's co-domain drawn from `Y`'s extension. -/
-axiom df_featuremultiplicityrange {Z x Y' : Element} {Cy : Set Element}
-    {R : Set (Element × Element)} {l u : ℕ} (hy : (DesignKind.type, Y', Cy) ∈ Design) :
-    OwnedFeatureTypedByRange Z x Y' l u → FeatureMemberOf Z x R →
+  /-- `Chapter/CoreSemanticsChapter.tex` §2.4 `df-undefinedfeaturemultiplicity`. -/
+  df_undefinedfeaturemultiplicity : ∀ {Z x Y' : Element} {Cy : Set Element}
+      {R : Set (Element × Element)}, (DesignKind.type, Y', Cy) ∈ Design →
+      OwnedFeatureTypedByStar Z x Y' → FeatureMemberOf Z x R → ∀ p ∈ R, p.2 ∈ Cy
+  /-- `Chapter/CoreSemanticsChapter.tex` §2.4 `df-featuremultiplicityrange`. -/
+  df_featuremultiplicityrange : ∀ {Z x Y' : Element} {Cy : Set Element}
+      {R : Set (Element × Element)} {l u : ℕ}, (DesignKind.type, Y', Cy) ∈ Design →
+      OwnedFeatureTypedByRange Z x Y' l u → FeatureMemberOf Z x R →
       l ≤ R.ncard ∧ R.ncard ≤ u ∧ ∀ p ∈ R, p.2 ∈ Cy
-
-/-- `Chapter/CoreSemanticsChapter.tex` §2.4 `type Z { feature x[l..*] typed by Y; }`
-(feature multiplicity range, unbounded upper end) -- book-only, no `SFS.mm`
-formalization. -/
-axiom OwnedFeatureTypedByRangeStar : Element → Element → Element → ℕ → Prop
-
-/-- `Chapter/CoreSemanticsChapter.tex` §2.4 `df-featuremultiplicityrangestar`: same as
-`df_featuremultiplicityrange` above but with only a lower bound `l`. -/
-axiom df_featuremultiplicityrangestar {Z x Y' : Element} {Cy : Set Element}
-    {R : Set (Element × Element)} {l : ℕ} (hy : (DesignKind.type, Y', Cy) ∈ Design) :
-    OwnedFeatureTypedByRangeStar Z x Y' l → FeatureMemberOf Z x R →
+  /-- `Chapter/CoreSemanticsChapter.tex` §2.4 `df-featuremultiplicityrangestar`. -/
+  df_featuremultiplicityrangestar : ∀ {Z x Y' : Element} {Cy : Set Element}
+      {R : Set (Element × Element)} {l : ℕ}, (DesignKind.type, Y', Cy) ∈ Design →
+      OwnedFeatureTypedByRangeStar Z x Y' l → FeatureMemberOf Z x R →
       l ≤ R.ncard ∧ ∀ p ∈ R, p.2 ∈ Cy
-
-/-- `Chapter/CoreSemanticsChapter.tex` §2.4 `type B { member feature g typed by C
-featured by A; }` (`member feature`, not an owned feature member) -- book-only, no
-`SFS.mm` formalization. A fresh `Element`-level primitive: `B` has ordinary
-(non-feature) membership of `g`, distinct from `FeatureMemberOf`/`OwnedFeatureTypedBy`
-above -- matching the book's own point that `g` is *not* an owned feature of `B`. -/
-axiom MemberOf : Element → Element → Prop
-
-/-- `Chapter/CoreSemanticsChapter.tex` §2.4 `df-membershipfeature`: a member feature
-`g`'s own relation is determined entirely by its own `featured by` declaration,
-independent of its containing type `B` -- exactly `df_featuredby`'s own conclusion,
-applied to `g`. `MemberOf B g` is included as a hypothesis only for faithfulness to
-the concrete-syntax shape (`B` does own `g` as a *member*), not because the proof
-needs it: that `B`'s membership plays no role in `g`'s content is precisely the book's
-own point ("the feature is not an owned feature of the containing type"), so this one
-genuinely is a `theorem`. -/
-theorem df_membershipfeature {B g C' A' : Element} {Cc Ca : Set Element}
-    (hc : (DesignKind.type, C', Cc) ∈ Design) (ha : (DesignKind.type, A', Ca) ∈ Design)
-    (_hmem : MemberOf B g) (hfbd : FeaturedByDecl g C' A') :
-    FeatureContent g {p : Element × Element | p.1 ∈ Ca ∧ p.2 ∈ Cc} :=
-  df_featuredby hc ha hfbd
-
-/-- `Chapter/CoreSemanticsChapter.tex` §2.4 `type Z { feature x1 typed by Y1; ...;
-feature xj typed by Yj; }` (`TypeBody` with several feature members, variable arity
-`j`) -- book-only, no `SFS.mm` formalization. `feats` holds the declared
-`(feature, type)` pairs as a `List`, sidestepping Lean's lack of a literal "..."
-ellipsis for a fixed but unspecified arity `j`. -/
-axiom OwnedFeatures : Element → List (Element × Element) → Prop
-
-/-- `Chapter/CoreSemanticsChapter.tex` §2.4 `df-typebody`: generalizes
-`df_featuremember` (domain `Z`'s own extension, since no `specializes` clause is given
-here) to every feature `(x_i, Y_i)` declared in `feats` independently -- the "..." in
-the book's own `C_1,...,C_j` really means "this holds member-by-member", which is
-exactly what quantifying over `feats` states. -/
-axiom df_typebody {Z : Element} {feats : List (Element × Element)} {Cz : Set Element}
-    (hz : (DesignKind.type, Z, Cz) ∈ Design) :
-    OwnedFeatures Z feats →
-      ∀ p ∈ feats, ∃ Cy : Set Element, (DesignKind.type, p.2, Cy) ∈ Design ∧
+  /-- `Chapter/CoreSemanticsChapter.tex` §2.4 `df-typebody`. -/
+  df_typebody : ∀ {Z : Element} {feats : List (Element × Element)} {Cz : Set Element},
+      (DesignKind.type, Z, Cz) ∈ Design →
+      OwnedFeatures Z feats → ∀ p ∈ feats, ∃ Cy : Set Element,
+        (DesignKind.type, p.2, Cy) ∈ Design ∧
         FeatureMemberOf Z p.1 {q : Element × Element | q.1 ∈ Cz ∧ q.2 ∈ Cy}
+  /-- `Chapter/CoreSemanticsChapter.tex` §2.4 `df-featurechaining`. Its hypotheses are
+  `FeatureContent`-shaped, not `Design`-membership-shaped, unlike every other
+  constraint above -- still discharged by the same trick, via `FeatureContent`'s own
+  vacuity rather than `Design`'s. -/
+  df_featurechaining : ∀ {a b c : Element} {Rb Rc : Set (Element × Element)},
+      FeatureContent b Rb → FeatureContent c Rc →
+      ChainsDecl a b c → FeatureContent a (relCompose Rc Rb)
+  /-- `Chapter/ClassifierSemantics.tex` §2.5 `df-classifier`: exact parallel of
+  `df_types`/`df_feature`, one more `ElementKind` tag down. -/
+  df_classifier : ∀ e : Element,
+      (∃ C : Set Element, (DesignKind.ofElementKind ElementKind.Classifier, e, C) ∈ Design) →
+      e ∈ VC
+  /-- `Chapter/ClassifierSemantics.tex` §2.5 `df-classifier2`: every `Classifier` is
+  also a `Type`. Doesn't mention `Design` at all -- the one constraint in this cluster
+  not discharged by the `Design := ∅` trick, but still trivial (`VC := ∅` makes
+  `VC ⊆ VT` hold for any `VT` whatsoever). -/
+  df_classifier2 : VC ⊆ VT
 
-/-- `Chapter/CoreSemanticsChapter.tex` §2.4 "ordered": `OrderedOn Y a b` means `a < b`
-under `Y`'s own (type-relative) ordering -- not every type has a natural order (the
-book's own note: "if `Y` is not ordered, the feature `x` cannot be ordered"), so this
-is parameterized by `Y` rather than a single global order on `Element`. -/
-axiom OrderedOn : Element → Element → Element → Prop
+export CoreDesignModel (Design VT Specializes Unions Intersects Differences Disjoint
+  TypeMultiplicityExact TypeMultiplicityRange VF FeatureContent FeaturedByDecl
+  DomainlessDecl FeatureMemberOf OwnedFeatureTypedBy OwnedFeatureTypedByExact
+  OwnedFeatureTypedByStar OwnedFeatureTypedByRange OwnedFeatureTypedByRangeStar
+  MemberOf OwnedFeatures OrderedOn OrderedDecl ChainsDecl VC
+  df_specializes df_unions df_intersects df_differences df_disjoint
+  df_typemultiplicity df_typemultiplicityrange df_types df_feature df_featuredby
+  df_domainless df_featuremember df_featureoffeature df_fixedfeaturemultiplicity
+  df_undefinedfeaturemultiplicity df_featuremultiplicityrange
+  df_featuremultiplicityrangestar df_typebody df_featurechaining df_classifier
+  df_classifier2)
 
-/-- `Chapter/CoreSemanticsChapter.tex` §2.4 `type Z { feature x[*] ordered typed by
-Y; }` -- book-only, no `SFS.mm` formalization. -/
-axiom OrderedDecl : Element → Element → Element → Prop
+/-- The consistency certificate: `Design := ∅` and `FeatureContent := fun _ _ => False`
+make every `df_*` constraint field above provable by contradiction on its own
+`Design`/`FeatureContent` hypothesis (checked individually per field, via `simp` on
+`Set.mem_empty_iff_false` -- not assumed from the shared hypothesis shape alone); every
+other primitive is left as an arbitrary trivial value of the right type (`False` for
+`Prop`-valued ones, `∅` for `Set Element`-valued ones), since nothing constrains them
+once their own `df_*` axiom is vacuous. `df_classifier2` (`VC ⊆ VT`) is the one field
+not resting on `Design`'s vacuity -- `VC := ∅` handles it directly. This doesn't commit
+the class's fields to these specific values (`coreDesignModelInstance` below goes
+through `Classical.choice`, same opacity guarantee as every other model in this
+project) -- it only certifies *a* model exists. -/
+theorem coreDesignModel_nonempty : Nonempty CoreDesignModel :=
+  ⟨{ Design := ∅
+     VT := ∅
+     Specializes := fun _ _ => False
+     Unions := fun _ _ => False
+     Intersects := fun _ _ => False
+     Differences := fun _ _ => False
+     Disjoint := fun _ _ => False
+     TypeMultiplicityExact := fun _ _ => False
+     TypeMultiplicityRange := fun _ _ _ => False
+     VF := ∅
+     FeatureContent := fun _ _ => False
+     FeaturedByDecl := fun _ _ _ => False
+     DomainlessDecl := fun _ _ => False
+     FeatureMemberOf := fun _ _ _ => False
+     OwnedFeatureTypedBy := fun _ _ _ => False
+     OwnedFeatureTypedByExact := fun _ _ _ _ => False
+     OwnedFeatureTypedByStar := fun _ _ _ => False
+     OwnedFeatureTypedByRange := fun _ _ _ _ _ => False
+     OwnedFeatureTypedByRangeStar := fun _ _ _ _ => False
+     MemberOf := fun _ _ => False
+     OwnedFeatures := fun _ _ => False
+     OrderedOn := fun _ _ _ => False
+     OrderedDecl := fun _ _ _ => False
+     ChainsDecl := fun _ _ _ => False
+     VC := ∅
+     df_specializes := by intro _ _ _ _ hs _ _; exact absurd hs (by simp)
+     df_unions := by intro _ _ _ _ _ _ ha _ _ _ _; exact absurd ha (by simp)
+     df_intersects := by intro _ _ _ _ _ _ ha _ _ _ _; exact absurd ha (by simp)
+     df_differences := by intro _ _ _ _ _ _ ha _ _ _ _; exact absurd ha (by simp)
+     df_disjoint := by intro _ _ _ _ _ _ ha _ _ _ _; exact absurd ha (by simp)
+     df_typemultiplicity := by intro _ _ _ _ _ hA _ _ _; exact absurd hA (by simp)
+     df_typemultiplicityrange := by
+       intro _ _ _ _ _ _ hA _ _ _; exact absurd hA (by simp)
+     df_types := by intro _ h; obtain ⟨_, hC⟩ := h; exact absurd hC (by simp)
+     df_feature := by intro _ h; obtain ⟨_, hC⟩ := h; exact absurd hC (by simp)
+     df_featuredby := by intro _ _ _ _ _ hy _ _; exact absurd hy (by simp)
+     df_domainless := by intro _ _ _ hy _; exact absurd hy (by simp)
+     df_featuremember := by intro _ _ _ _ _ _ ht _ _ _; exact absurd ht (by simp)
+     df_featureoffeature := by
+       intro _ _ _ _ _ _ hy _ _ _; exact absurd hy (by simp)
+     df_fixedfeaturemultiplicity := by
+       intro _ _ _ _ _ _ hy _ _; exact absurd hy (by simp)
+     df_undefinedfeaturemultiplicity := by
+       intro _ _ _ _ _ hy _ _; exact absurd hy (by simp)
+     df_featuremultiplicityrange := by
+       intro _ _ _ _ _ _ _ hy _ _; exact absurd hy (by simp)
+     df_featuremultiplicityrangestar := by
+       intro _ _ _ _ _ _ hy _ _; exact absurd hy (by simp)
+     df_typebody := by intro _ _ _ hz _; exact absurd hz (by simp)
+     df_featurechaining := by intro _ _ _ _ _ hb _ _; exact hb.elim
+     df_classifier := by intro _ h; obtain ⟨_, hC⟩ := h; exact absurd hC (by simp)
+     df_classifier2 := Set.empty_subset _ }⟩
 
-/-- `df-ordered`'s pair order: pairs sharing the same first component are ordered by
-their second component's own (`Y`-relative) order. A genuine `def`, not an axiom --
-this is exactly what "the pair inherits `y1`'s/`y2`'s order when `z` is fixed" means,
-not an independent constraint. -/
+noncomputable instance coreDesignModelInstance : CoreDesignModel :=
+  Classical.choice coreDesignModel_nonempty
+
+/-- `Chapter/CoreSemanticsChapter.tex` §2.2.1 `df-multspec`: proved directly from
+`df_specializes` applied to each generalization independently. -/
+theorem df_multspec {ts tg th : Element} {Cs Cg Ch : Set Element}
+    (hs : (DesignKind.type, ts, Cs) ∈ Design) (hg : (DesignKind.type, tg, Cg) ∈ Design)
+    (hh : (DesignKind.type, th, Ch) ∈ Design)
+    (hsg : Specializes ts tg) (hsh : Specializes ts th) : Cs ⊆ Cg ∩ Ch :=
+  fun _ hx => ⟨df_specializes hs hg hsg hx, df_specializes hs hh hsh hx⟩
+
+/-- `Chapter/CoreSemanticsChapter.tex` §2.4 "Feature Member" ordering: pairs sharing
+the same first component are ordered by their second component's own (`Y`-relative)
+order. A genuine `def`, not an axiom. -/
 def PairOrderedOn (Y : Element) (p q : Element × Element) : Prop := p.1 = q.1 ∧ OrderedOn Y p.2 q.2
 
-/-- `Chapter/CoreSemanticsChapter.tex` §2.4 `df-ordered`: when two pairs of an ordered
-feature's relation share the same first component `z`, and their second components
-are `Y`-ordered, the pairs themselves are `Y`-ordered (via `PairOrderedOn`). Free
-directly from `PairOrderedOn`'s own definition -- genuinely a `theorem`, matching
-`df_typemultiplicity`-family precedent of only axiomatizing what's not already
-definitional. -/
+/-- `Chapter/CoreSemanticsChapter.tex` §2.4 `df-ordered`: free directly from
+`PairOrderedOn`'s own definition. -/
 theorem df_ordered {Z x Y' : Element} {R : Set (Element × Element)} {z y1 y2 : Element}
     (_hR : FeatureMemberOf Z x R) (_hDecl : OrderedDecl Z x Y')
     (_h1 : (z, y1) ∈ R) (_h2 : (z, y2) ∈ R) (hlt : OrderedOn Y' y1 y2) :
     PairOrderedOn Y' (z, y1) (z, y2) :=
   ⟨rfl, hlt⟩
 
-/-- `Chapter/CoreSemanticsChapter.tex` §2.4 `df-specializationwithfeatures`: a type `Y`
-specializing `Z`, with its own owned feature `u` typed by `B`, has a feature member for
-`u` whose relation pairs `Z`'s extension (domain, since `Y` specializes `Z`) with `B`'s
-extension -- exactly `df_featuremember` applied with `T := Z`, so this one genuinely is
-a `theorem`. Scoped down from the book's own full `⟨C_z,C_u,C_x⟩` triple: the
-re-inclusion of `Z`'s own inherited feature `x` as part of `Y`'s content isn't covered
-here, since nothing in this file axiomatizes feature inheritance through
-`Specializes` itself. -/
+/-- `Chapter/CoreSemanticsChapter.tex` §2.4 `df-specializationwithfeatures`: exactly
+`df_featuremember` applied with `T := Z`. -/
 theorem df_specializationwithfeatures {Z Y u B : Element} {Cz Cb : Set Element}
     (hz : (DesignKind.type, Z, Cz) ∈ Design) (hb : (DesignKind.type, B, Cb) ∈ Design)
     (hspec : Specializes Y Z) (hyu : OwnedFeatureTypedBy Y u B) :
     FeatureMemberOf Y u {p : Element × Element | p.1 ∈ Cz ∧ p.2 ∈ Cb} :=
   df_featuremember hz hb hspec hyu
 
-/-- `Chapter/CoreSemanticsChapter.tex` §2.4 `df-featureinverting`: "`inverse w of x`"
-needs no new primitive at all -- it's captured directly as `w` independently satisfying
-`FeaturedByDecl` with domain/co-domain swapped relative to `x`, so both halves reduce
-straight to `df_featuredby`, applied twice. The book's own formula states `⊆`, but
-`df_featuredby` already gives the stronger exact content -- that stronger fact is given
-directly here rather than artificially weakening it, so this one genuinely is a
-`theorem`. -/
+/-- `Chapter/CoreSemanticsChapter.tex` §2.4 `df-membershipfeature`: exactly
+`df_featuredby`'s own conclusion, applied to `g`. `MemberOf B g` is included only for
+faithfulness to the concrete-syntax shape, not because the proof needs it. -/
+theorem df_membershipfeature {B g C' A' : Element} {Cc Ca : Set Element}
+    (hc : (DesignKind.type, C', Cc) ∈ Design) (ha : (DesignKind.type, A', Ca) ∈ Design)
+    (_hmem : MemberOf B g) (hfbd : FeaturedByDecl g C' A') :
+    FeatureContent g {p : Element × Element | p.1 ∈ Ca ∧ p.2 ∈ Cc} :=
+  df_featuredby hc ha hfbd
+
+/-- `Chapter/CoreSemanticsChapter.tex` §2.4 `df-featureinverting`: both halves reduce
+straight to `df_featuredby`, applied twice. -/
 theorem df_featureinverting {x w y z : Element} {Cy Cz : Set Element}
     (hy : (DesignKind.type, y, Cy) ∈ Design) (hz : (DesignKind.type, z, Cz) ∈ Design)
     (hxfb : FeaturedByDecl x y z) (hwfb : FeaturedByDecl w z y) :
     FeatureContent x {p : Element × Element | p.1 ∈ Cz ∧ p.2 ∈ Cy} ∧
     FeatureContent w {p : Element × Element | p.1 ∈ Cy ∧ p.2 ∈ Cz} :=
   ⟨df_featuredby hy hz hxfb, df_featuredby hz hy hwfb⟩
-
-/-- `Chapter/CoreSemanticsChapter.tex` §2.4 `df-co`: composition of two relations. A
-genuine `def`, no axiom needed -- pure set-builder over already-available `Set`/pair
-machinery, matching this file's general practice (`cardElem`, `relCompose` here) of
-using a `def` whenever content is fully determined by existing structure. -/
-def relCompose (A B : Set (Element × Element)) : Set (Element × Element) :=
-  {p : Element × Element | ∃ z, (p.1, z) ∈ B ∧ (z, p.2) ∈ A}
-
-/-- `Chapter/CoreSemanticsChapter.tex` §2.4 `feature a chains b.c;` -- book-only, no
-`SFS.mm` formalization. A fresh `Element`-level primitive, same reasoning as
-`Specializes`. -/
-axiom ChainsDecl : Element → Element → Element → Prop
-
-/-- `Chapter/CoreSemanticsChapter.tex` §2.4 `df-featurechaining`: a feature `a`
-declared as chaining `b.c` has content the composition of `c`'s and `b`'s own
-relations (via `relCompose`). A genuine constraint, not derivable, so this stays an
-`axiom` here too. -/
-axiom df_featurechaining {a b c : Element} {Rb Rc : Set (Element × Element)}
-    (hb : FeatureContent b Rb) (hc : FeatureContent c Rc) :
-    ChainsDecl a b c → FeatureContent a (relCompose Rc Rb)
-
-/-! ## Classifiers Semantics (`Chapter/ClassifierSemantics.tex` §2.5) -/
-
-/-- `Chapter/ClassifierSemantics.tex` §2.5 `df-classifier`: for every `e` declared
-with the bare `classifier` keyword (tagged `Classifier` in `ElementKind`, reused
-directly here -- same reasoning as `df_feature` above), `e ∈ VC`. Exact parallel of
-`df_types`/`VT` and `df_feature`/`VF` above, one more `ElementKind` tag down. -/
-axiom VC : Set Element
-
-axiom df_classifier : ∀ e : Element,
-    (∃ C : Set Element, (DesignKind.ofElementKind ElementKind.Classifier, e, C) ∈ Design) → e ∈ VC
-
-/-- `Chapter/ClassifierSemantics.tex` §2.5 `df-classifier2`: every `Classifier` is
-also a `Type`. Not derivable from `VC`'s/`VT`'s own definitions (each is independently
-primitive, same situation `df_types`/`df_feature` were already in), so this stays an
-`axiom` here too. -/
-axiom df_classifier2 : VC ⊆ VT
 
 /-! ## Concrete syntax (KerML §8.2.4 "Core Concrete Syntax")
 
