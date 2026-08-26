@@ -1029,11 +1029,12 @@ noncomputable instance regionModelInstance : RegionModel where
   expansivity := (Classical.choose_spec
     (Classical.choose_spec (Classical.choose_spec (Classical.choose_spec region_exists)))).2.2.2
 
-/-- Class-based, same batch/treatment as `Item` above. -/
-class SurfaceT where
-  Surface : Type
-export SurfaceT (Surface)
-noncomputable instance surfaceModel : SurfaceT := ⟨Classical.choose (⟨ℕ, trivial⟩ : ∃ _ : Type, True)⟩
+/- SFS.mm `wrp`/`won`: `Surface`/`OnSurface` themselves are now produced by
+`SurfaceModel` further below (bundled with `RegionSurface`/`RegionInterior`/
+`regionSurfaceProp`/`regionInteriorProp`, for the same reason `Region`/`Point`/
+`Location`/`InRegion` had to be: those four genuinely tie `Surface`/`OnSurface` to
+`RegionSurface`/`RegionInterior`, so eliminating them needs one jointly-constructed
+model, not independent trivial witnesses per primitive. -/
 
 /- SFS.mm `wloc`/`win`: `Location`/`InRegion` themselves are now produced by
 `RegionModel` far above (bundled with `lin`/`rdi`/`apar`/`expansivity`, since those
@@ -1047,13 +1048,6 @@ predicate. Deliberately does **not** attempt to wire up the infix `L` notation
 those same real formulas' own *definitions* use (`o L result`) -- disregarded at
 request, `SFS.lean` still has no `L`, and `Location`'s own `@Assert` formula is
 expected to keep failing for that specific reason; see `Assert.lean`'s own note. -/
-
-/-- SFS.mm `won`: primitive. Class-based, same batch/treatment as `Item` above. -/
-class OnSurfaceRel where
-  OnSurface : Point → Surface → Prop
-export OnSurfaceRel (OnSurface)
-noncomputable instance onSurfaceModel : OnSurfaceRel :=
-  ⟨Classical.choose (⟨fun _ _ => True, trivial⟩ : ∃ _ : Point → Surface → Prop, True)⟩
 
 /-- `Regions.kerml`'s own real `Adj(p)` ("the set of adjacent points to `p`"),
 `df-adjp`, was previously genuinely unformalized -- `Regions.kerml`'s own comment
@@ -1110,7 +1104,7 @@ above, including the argument-order fix documented there). -/
 /-- SFS.mm `df-rni`: no interpenetration, a genuine constraint. -/
 axiom no_interpenetration {r1 r2 : Region} : RegionOverlap r1 r2 → RegionContainment r1 r2 ∨ RegionContainment r2 r1
 
-/-- SFS.mm `wrs`, function-valued (`Region → Surface`), not a relation -- 2026-08-21
+/- SFS.mm `wrs`, function-valued (`Region → Surface`), not a relation -- 2026-08-21
 change, at direct request, same reasoning as `Location` above:
 `Regions.kerml`'s own real `RegionSurface`/`RegionInterior`/`RegionFilm` are all
 declared as one-argument functions (`r~Region := result~Surface | ...`), and every
@@ -1124,30 +1118,77 @@ tightened restatement of something already axiomatized**: the old `RegionSurface
 *exactly one* surface -- a real modeling decision, not a mechanical consequence of
 anything already stated, done here because it matches `Regions.kerml`'s own
 functional declaration and was explicitly requested, not derived. -/
-axiom RegionSurface : Region → Surface
 
-/-- SFS.mm `df-rs`'s defining property, restated for the function above (`s` from the
-old relation replaced by `RegionSurface r0`). SFS.mm's own text has a third conjunct
-`r_1 RegionSurface r_0` in the body, self-referentially -- but with a *region*
-(`r_1`) plugged into `RegionSurface`'s old surface-typed argument slot, which cannot
-be what was intended (and `r_0`/`r_1` are already swapped relative to the rest of the
-clause). Rather than guess a specific fix, that conjunct is dropped here (flagged,
-not silently "corrected" to some particular reading); this reflects only the two
-conjuncts whose meaning is unambiguous, same as before the function change. -/
-axiom regionSurfaceProp (r0 : Region) :
-    ∃ r1 : Region, ∀ p, OnSurface p (RegionSurface r0) → InRegion p r0 ∧ ¬ InRegion p r1
+/-- SFS.mm `df-rs`'s defining property, `RegionSurface`'s own. SFS.mm's own text has
+a third conjunct `r_1 RegionSurface r_0` in the body, self-referentially -- but with
+a *region* (`r_1`) plugged into `RegionSurface`'s old surface-typed argument slot,
+which cannot be what was intended (and `r_0`/`r_1` are already swapped relative to
+the rest of the clause). Rather than guess a specific fix, that conjunct is dropped
+here (flagged, not silently "corrected" to some particular reading); this reflects
+only the two conjuncts whose meaning is unambiguous, same as before the function
+change (`SFS.mm`/`df-ri`'s own analogous property for `RegionInterior` below). -/
+private def regionSurfacePropOf {Region Point Surface : Type} (InRegion : Point → Region → Prop)
+    (OnSurface : Point → Surface → Prop) (RegionSurface : Region → Surface) (r0 : Region) : Prop :=
+  ∃ r1 : Region, ∀ p, OnSurface p (RegionSurface r0) → InRegion p r0 ∧ ¬ InRegion p r1
 
-/-- SFS.mm `wri`, function-valued (`Region → Region`) for the same reason as
-`RegionSurface` above -- same caveat too: genuinely new content (region-interior
-uniqueness), not a tightened restatement. -/
-axiom RegionInterior : Region → Region
+private def regionInteriorPropOf {Region Point Surface : Type} (InRegion : Point → Region → Prop)
+    (OnSurface : Point → Surface → Prop) (RegionSurface : Region → Surface)
+    (RegionInterior : Region → Region) (r1 : Region) : Prop :=
+  ∀ p, InRegion p r1 → InRegion p (RegionInterior r1) ∧ ¬ OnSurface p (RegionSurface (RegionInterior r1))
 
-/-- SFS.mm `df-ri`'s defining property, restated for the function above (the old
-relation's existential surface `s` and result-region `r2` both replaced by function
-applications: `RegionSurface (RegionInterior r1)` for `s`, `RegionInterior r1` for
-`r2`). -/
-axiom regionInteriorProp (r1 : Region) :
-    ∀ p, InRegion p r1 → InRegion p (RegionInterior r1) ∧ ¬ OnSurface p (RegionSurface (RegionInterior r1))
+/-- **Class-based (2026-08-26, at direct request): `Surface`/`OnSurface`/
+`RegionSurface`/`RegionInterior` bundled together with `regionSurfaceProp`/
+`regionInteriorProp`**, same reasoning as `RegionModel`/`Mereology` above -- these
+tie `Surface`/`OnSurface` to `RegionSurface`/`RegionInterior` (and to `Region`/
+`InRegion`, already fixed by `RegionModel`), so eliminating them needs one jointly-
+constructed model, not the independent trivial witnesses the earlier `SurfaceT`/
+`OnSurfaceRel` conversions used (which carried no relationship to `RegionSurface`/
+`RegionInterior` at all). -/
+class SurfaceModel where
+  Surface : Type
+  OnSurface : Point → Surface → Prop
+  RegionSurface : Region → Surface
+  RegionInterior : Region → Region
+  regionSurfaceProp : ∀ r0 : Region,
+      regionSurfacePropOf InRegion OnSurface RegionSurface r0
+  regionInteriorProp : ∀ r1 : Region,
+      regionInteriorPropOf InRegion OnSurface RegionSurface RegionInterior r1
+
+export SurfaceModel (Surface OnSurface RegionSurface RegionInterior regionSurfaceProp
+  regionInteriorProp)
+
+/-- The consistency certificate's existence half: `Surface := Region`,
+`OnSurface := fun _ _ => False` (nothing is ever "on" any surface), `RegionSurface :=
+id`, `RegionInterior := id`. Both properties collapse to trivialities under this
+witness: `regionSurfaceProp`'s hypothesis (`OnSurface p (RegionSurface r0)`) is
+vacuously `False`, so *any* `r1` works; `regionInteriorProp`'s first conjunct becomes
+`InRegion p r1 → InRegion p r1` (reflexivity, since `RegionInterior = id`) and its
+second is vacuous the same way `regionSurfaceProp`'s hypothesis is. This doesn't
+commit `Surface`/`OnSurface`/`RegionSurface`/`RegionInterior` to this witness
+(`surfaceModelInstance` below goes through `Classical.choose`, same as
+`RegionModel`/`Mereology`/`Lifetimes`/`Now`, so the actual values stay opaque) -- it
+only certifies *a* model exists. -/
+theorem surface_exists :
+    ∃ (Surface : Type) (OnSurface : Point → Surface → Prop) (RegionSurface : Region → Surface)
+      (RegionInterior : Region → Region),
+      (∀ r0 : Region, regionSurfacePropOf InRegion OnSurface RegionSurface r0) ∧
+      (∀ r1 : Region, regionInteriorPropOf InRegion OnSurface RegionSurface RegionInterior r1) := by
+  refine ⟨Region, fun _ _ => False, id, id, ?_, ?_⟩
+  · intro r0
+    exact ⟨r0, fun p hp => absurd hp (by simp)⟩
+  · intro r1 p hp
+    exact ⟨hp, by simp⟩
+
+noncomputable instance surfaceModelInstance : SurfaceModel where
+  Surface := Classical.choose surface_exists
+  OnSurface := Classical.choose (Classical.choose_spec surface_exists)
+  RegionSurface := Classical.choose (Classical.choose_spec (Classical.choose_spec surface_exists))
+  RegionInterior := Classical.choose
+    (Classical.choose_spec (Classical.choose_spec (Classical.choose_spec surface_exists)))
+  regionSurfaceProp := (Classical.choose_spec (Classical.choose_spec
+    (Classical.choose_spec (Classical.choose_spec surface_exists)))).1
+  regionInteriorProp := (Classical.choose_spec (Classical.choose_spec
+    (Classical.choose_spec (Classical.choose_spec surface_exists)))).2
 
 /-- SFS.mm `df-rf`. Unlike `RegionSurface`/`RegionInterior`, this one needs **no new
 axiom at all** -- once both of those are functions, "the film of `r0`" (SFS.mm: "the
