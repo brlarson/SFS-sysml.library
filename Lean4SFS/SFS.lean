@@ -1680,11 +1680,35 @@ theorem next_uniq {t1 t2 t3 : Time} (h2 : next t1 t2) (h3 : next t1 t3) : t2 = t
   · rw [← hi2, ← hi3, heq]
   · exact absurd ⟨t3, ⟨i3, hi3⟩, h13, hi3 ▸ hi2 ▸ ticks_mono i3 i2 hgt⟩ hno2
 
+/-- `next` lifted to `Option Time` arguments -- needed for the real `@Assert`
+formula `next(death(x), birth(y))` (`death` became `Option Time`-valued
+2026-08-25), and for `nearlyMeets` below. **False, not undefined**, when either
+argument is absent (2026-08-26, at direct request): unlike `kand`/`kor`/`klt`/
+`kle`/`keq`, this is a deliberate departure from Strong Kleene propagation --
+`next` asks "is there a specific consecutive-tick relationship between these two
+instants," and "one of the instants doesn't exist yet" makes that relationship
+false, not merely unknown (contrast `death(x) < birth(y)`, where an unfinished
+`x` genuinely leaves the *comparison* undecided). -/
+noncomputable def nextO (t1 t2 : Option Time) : Prop :=
+  match t1, t2 with
+  | some t1', some t2' => next t1' t2'
+  | _, _ => False
+
 /-- SFS.mm `df-nearlymeets`. The `next (death A) (birth B)` disjunct is, before
 2026-08-26's redesign, provably always `False` (`next` was vacuous on dense `ℝ`);
-now genuinely possible whenever `death A`/`birth B` are consecutive shared ticks. -/
+now genuinely possible whenever `death A`/`birth B` are consecutive shared ticks.
+Rewritten (2026-08-26, same day as `nextO` above) onto the shared `kand`/`kor`/
+`nextO` combinators, matching every other Allen predicate: previously `.map`ped
+the whole body over `death A`, so an unfinished `A` made the *entire* result
+`none` unconditionally; now `kand`'s own short-circuit can still resolve the
+first disjunct to `some False` when `¬(openRight A ∨ openLeft B)` is already
+known, even with `death A` undefined -- a genuine behavior change, not just a
+refactor, and the correct one: it's the same Kleene short-circuiting every other
+predicate here already gets. See `Assert.lean`'s `example ... := rfl` for
+confirmation this now agrees with the DSL-elaborated formula text exactly. -/
 noncomputable def nearlyMeets (A B : Occurrence) : Option Prop :=
-  (death A).map fun tA => (birth B = tA ∧ (openRight A ∨ openLeft B)) ∨ next tA (birth B)
+  kor (kand ((death A).map fun tA => birth B = tA) (some (openRight A ∨ openLeft B)))
+      (some (nextO (death A) (some (birth B))))
 
 -- The old `nearlyMeets_iff` (an unconditional collapse to just the open-boundary
 -- disjunct, via `next_dense`'s vacuity) is retired along with `next_dense` itself:

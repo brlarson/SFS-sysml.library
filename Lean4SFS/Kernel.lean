@@ -1314,6 +1314,66 @@ elab "kernel% " d:kernelDecl : term => do
   x.endShot < y.startShot
 }
 
+-- The remaining eight `Allen.kerml` predicate bodies, verbatim (2026-08-26):
+-- `==`/`!=`/`<=`/`>=`/`or`/`not`, dot-access chained with a comparison, and (for
+-- `nearlyMeets`) a bare `ident "(" kermlExpr,* ")"` invocation of `next` are all
+-- already covered by the operator table above -- no new grammar needed, this is
+-- pure coverage confirming every real predicate body in the file actually parses.
+#check kernel% predicate meets {
+  in x : Occurrence ;
+  in y : Occurrence ;
+  x.endShot == y.startShot and not x.openRight and not y.openLeft
+}
+
+#check kernel% predicate overlaps {
+  in x : Occurrence ;
+  in y : Occurrence ;
+  y.startShot < x.endShot
+}
+
+#check kernel% predicate starts {
+  in x : Occurrence ;
+  in y : Occurrence ;
+  (x.startShot == y.startShot) and (y.endShot < x.endShot)
+    and x.openLeft == y.openLeft
+}
+
+#check kernel% predicate during {
+  in x : Occurrence ;
+  in y : Occurrence ;
+  (y.startShot <= x.startShot) and (x.endShot <= y.endShot)
+}
+
+#check kernel% predicate finishes {
+  in x : Occurrence ;
+  in y : Occurrence ;
+  y.startShot < x.startShot and x.endShot == y.endShot
+    and x.openRight==y.openRight
+}
+
+#check kernel% predicate coincident {
+  in x : Occurrence ;
+  in y : Occurrence ;
+  y.startShot == x.startShot and x.endShot == y.endShot
+    and x.openLeft == y.openLeft and x.openRight==y.openRight
+}
+
+#check kernel% predicate nonoverlaps {
+  in x : Occurrence ;
+  in y : Occurrence ;
+  (y.startShot > x.endShot) or (x.startShot > y.endShot)
+}
+
+-- `nearlyMeets`'s body: its structural KerML body -- `next(x.endShot,
+-- y.startShot)` as a plain invocation, not through the Domain-logic DSL at all --
+-- parses and elaborates fine, and (2026-08-26) so does its `@Assert` formula
+-- below, via the new `DSLNext` class.
+#check kernel% predicate nearlyMeets {
+  in x : Occurrence ;
+  in y : Occurrence ;
+  ( x.endShot==y.startShot and ( x.openRight or y.openLeft) ) or next(x.endShot, y.startShot)
+}
+
 -- Allen.kerml's own real `@Assert{...}` formulas, verbatim, now live again
 -- (2026-08-25, "extend Domain logic for compare only when defined" -- see
 -- Assert.lean's own new `DSLLt`/`DSLLe`/`DSLEq`/`DSLAnd`/`DSLOr` outParam
@@ -1361,10 +1421,19 @@ elab "kernel% " d:kernelDecl : term => do
   " birth(y) = birth(x) and death(x) = death(y)"+
   " and x.openLeft = y.openLeft and x.openRight = y.openRight >>"; t="coincident";}
 
--- `nearlyMeets` remains unattempted: `next(death(x), birth(y))` passes an
--- `Option Time` as a plain argument into `next : Time → Time → Prop`, which would
--- need lifting *function application* through partiality -- a different and larger
--- problem than "compare only when defined."
+-- `nearlyMeets`'s own `@Assert` formula, the last of the nine (2026-08-26, at
+-- direct request: "let next be false if either of its parameters is undefined"):
+-- `next(death(x), birth(y))` now routes through `DSLNext`'s `(Option Time) Time
+-- Prop` instance, landing on `SFS.nextO`'s deliberately non-Kleene semantics --
+-- see `SFS.lean`'s own doc comment on `nextO` for why "false," not "undefined,"
+-- is the right reading specifically for this predicate. `SFS.lean`'s `nearlyMeets`
+-- was rewritten the same day onto the shared `kand`/`kor`/`nextO` combinators so
+-- this agrees exactly with the DSL-elaborated formula (see `Assert.lean`'s own
+-- `example ... := rfl`). This closes the last documented gap in this file's
+-- Allen.kerml coverage -- all nine predicates now have both a live structural
+-- body `#check` and a live `@Assert` formula `#check`.
+#check kernel% @Assert{n="nearlyMeets"; f="<<nearlyMeets : x~Occurrence, y~Occurrence :"+
+  " (birth(y) = death(x) and (x.openRight or y.openLeft)) or next(death(x), birth(y))>>";}
 
 -- Domain.kerml's own real `library package Domain { ... }` wrapper: nine real
 -- `private import ...;` statements (the new `kermlVisibilityFlag`, Core.lean),

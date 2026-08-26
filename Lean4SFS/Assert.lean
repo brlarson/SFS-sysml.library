@@ -409,6 +409,21 @@ noncomputable instance : DSLOr Prop (Option Prop) (Option Prop) := ⟨fun p q =>
 noncomputable instance : DSLOr (Option Prop) Prop (Option Prop) := ⟨fun p q => SFS.kor p (some q)⟩
 noncomputable instance : DSLOr (Option Prop) (Option Prop) (Option Prop) := ⟨SFS.kor⟩
 
+/-- Routes the DSL's `next(...)` calls specifically (`elabDslWff`'s `ident(args)`
+case special-cases the identifier `next`, see below) -- not a generic mechanism
+for arbitrary predicate names the way `DSLLt`/`DSLEq`/`DSLAnd`/`DSLOr` are for
+their operators. `next : Time → Time → Prop` itself is untouched; the `Option`-
+involving cells go through `SFS.nextO`'s deliberately non-Kleene "false if either
+argument is undefined" policy (2026-08-26, at direct request) rather than
+`kand`/`kor`-style propagation -- see `nextO`'s own doc comment for why that's the
+right call specifically for this predicate. -/
+class DSLNext (α β : Type _) (γ : outParam (Type _)) where nextCall : α → β → γ
+
+instance : DSLNext Time Time Prop := ⟨SFS.next⟩
+noncomputable instance : DSLNext (Option Time) (Option Time) Prop := ⟨SFS.nextO⟩
+noncomputable instance : DSLNext (Option Time) Time Prop := ⟨fun a b => SFS.nextO a (some b)⟩
+noncomputable instance : DSLNext Time (Option Time) Prop := ⟨fun a b => SFS.nextO (some a) b⟩
+
 /-- `dslType` → the `SFS.lean` type it names. Recognized DSL type names are mapped to
 their `SFS.lean` counterpart; anything else is passed through as a bare identifier
 (so it resolves if some matching Lean declaration happens to exist, and fails with an
@@ -572,10 +587,34 @@ partial def wrapExists (binders : Array (TSyntax `ident × TSyntax `term))
 
 /-- `dslWff` → the `Prop` it denotes. -/
 partial def elabDslWff : TSyntax `dslWff → MacroM (TSyntax `term)
-  | `(dslWff| $x:ident) => `($x)
+  | `(dslWff| $x:ident) => do
+    -- Same dot-access split as `elabDslTerm`'s matching case (2026-08-26, needed
+    -- for `nearlyMeets`'s bare `x.openRight`/`y.openLeft` disjunction, used
+    -- directly as a `dslWff` rather than inside a `dslTerm`-level comparison like
+    -- `starts`/`finishes`/`coincident`'s `x.openLeft = y.openLeft`): without this,
+    -- `x.openRight` falls through to ordinary Lean dot-notation elaboration
+    -- instead of calling `SFS.lean`'s real top-level `openRight : Occurrence →
+    -- Prop`, and fails (or worse, silently resolves against an unrelated type).
+    -- No `now` special-case here -- nothing bare-`Time`-typed appears as a WFF.
+    match x.getId with
+    | .str pre s =>
+      if pre == .anonymous then `($x)
+      else
+        let recv := mkIdentFrom x pre
+        let f := mkIdentFrom x (Name.mkSimple s)
+        `($f $recv)
+    | _ => `($x)
   | `(dslWff| $f:ident($args,*)) => do
     let args ← args.getElems.mapM elabDslTerm
-    `($f $args*)
+    -- `next(...)` is special-cased to route through `DSLNext` (2026-08-26): every
+    -- other `ident(args)` predicate keeps plain application, since `next` is the
+    -- only one whose real argument types (`death`/`birth`) can be `Option`-wrapped.
+    if f.getId == `next then
+      match args with
+      | #[a, b] => `(DSLNext.nextCall $a $b)
+      | _ => `($f $args*)
+    else
+      `($f $args*)
   | `(dslWff| $a:dslTerm $r:ident $b:dslTerm) => do
     `($r $(← elabDslTerm a) $(← elabDslTerm b))
   | `(dslWff| $a:dslTerm < $b:dslTerm) => do `(DSLLt.lt $(← elabDslTerm a) $(← elabDslTerm b))
@@ -936,9 +975,10 @@ example : domain% <<GetBooleanChange : d~Occurrence, e~BooleanEvaluation, tau~In
 -- is *exactly* `SFS.lean`'s own `precedes`/`meets`/`overlaps`/`during`/`nonoverlaps`
 -- (all rewritten the same day onto the shared `kand`/`kor`/`klt`/`kle`/`keq`
 -- combinators), not merely something that happens to type-check.
--- `nearlyMeets` is not attempted: `next(death(x), birth(y))` passes an `Option Time`
--- as a plain argument to `next : Time → Time → Prop`, which needs lifting *function
--- application* through partiality, a different and larger problem than comparison.
+-- `nearlyMeets`'s own `next(death(x), birth(y))` call is handled separately, via
+-- the new `DSLNext` class below (2026-08-26, at direct request: "false if either
+-- of its parameters is undefined" -- not Kleene propagation, see `SFS.nextO`'s
+-- own doc comment) -- its `#check`/`example` live further down, after `coincident`.
 #check domain% <<precedes : x~Occurrence, y~Occurrence : death(x) < birth(y) >>
 
 example : domain% <<precedes : x~Occurrence, y~Occurrence : death(x) < birth(y) >> = precedes := rfl
@@ -996,6 +1036,18 @@ example : domain% <<finishes : x~Occurrence, y~Occurrence :
 example : domain% <<coincident : x~Occurrence, y~Occurrence :
   birth(y) = birth(x) and death(x) = death(y) and x.openLeft = y.openLeft
   and x.openRight = y.openRight >> = coincident := rfl
+
+-- `nearlyMeets`, the last Allen predicate: `next(death(x), birth(y))` now routes
+-- through `DSLNext`'s `(Option Time) Time Prop` instance (`death` wrapped,
+-- `birth` plain), landing on `SFS.nextO`'s false-if-undefined reading. `SFS.lean`'s
+-- own `nearlyMeets` was rewritten the same day onto `kand`/`kor`/`nextO`
+-- specifically so this `example ... := rfl` would hold, not the other way around.
+#check domain% <<nearlyMeets : x~Occurrence, y~Occurrence :
+  (birth(y) = death(x) and (x.openRight or y.openLeft)) or next(death(x), birth(y))>>
+
+example : domain% <<nearlyMeets : x~Occurrence, y~Occurrence :
+  (birth(y) = death(x) and (x.openRight or y.openLeft)) or next(death(x), birth(y))>>
+    = nearlyMeets := rfl
 
 /- Formulas deliberately *not* included as live `#check`s here, because they are
 expected to fail to elaborate, honestly, rather than being forced:
