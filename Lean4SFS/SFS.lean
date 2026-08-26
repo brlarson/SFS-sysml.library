@@ -898,24 +898,136 @@ theorem pdjrfl (x y : Occurrence) : PartDisjoint x y ↔ PartDisjoint y x := by
 
 /-! ### Region and Location (SFS.mm lines 2816-2962) -/
 
-/-- Class-based, same batch/treatment as `Item` above -- witnessed via `∃ T,
-Nonempty T` rather than the bare `∃ T, True` the others use, since `Location`
-below needs an actual `Region` value to construct its own witness function
-(`Occurrence → Region` can't be built without one), not just the type's
-existence. -/
-class RegionT where
-  Region : Type
-export RegionT (Region)
-noncomputable instance regionModel : RegionT :=
-  ⟨Classical.choose (⟨ℕ, ⟨0⟩⟩ : ∃ T : Type, Nonempty T)⟩
-instance regionNonempty : Nonempty Region :=
-  Classical.choose_spec (⟨ℕ, ⟨0⟩⟩ : ∃ T : Type, Nonempty T)
+/-- Generic (`Region`/`Point` still free) restatements of `RegionOverlap`/
+`RegionContainment`/`AtomicRegion` below, needed *before* `RegionModel` exists so
+`lin`/`rdi`/`apar`/`expansivity` can be stated as fields of the very class that
+produces `Region`/`Point`/`Location`/`InRegion` -- same forward-reference problem
+`Mereology`'s `pch` field solved by inlining, here solved by parameterizing instead
+(cleaner given how much these three get reused across `rdi`/`apar`/`expansivity`).
+Once `RegionModel`'s fields are exported, `RegionOverlap r1 r2` etc. below are
+definitionally identical to these applied to the exported `InRegion`/`Location`. -/
+private def regionOverlapOf {Region Point : Type} (InRegion : Point → Region → Prop)
+    (r1 r2 : Region) : Prop := ∃ p, InRegion p r1 ∧ InRegion p r2
 
-/-- Class-based, same batch/treatment as `Item` above. -/
-class PointT where
+private def regionContainmentOf {Region Point : Type} (InRegion : Point → Region → Prop)
+    (r1 r2 : Region) : Prop := ∀ p, InRegion p r2 → InRegion p r1
+
+private def atomicRegionOf {Region Point : Type} (Location : Occurrence → Region)
+    (InRegion : Point → Region → Prop) (r0 : Region) : Prop :=
+  ∀ (x : Occurrence) (r1 : Region), Location x = r1 ∧ regionContainmentOf InRegion r0 r1 → r0 = r1
+
+/-- **Class-based (2026-08-26, at direct request, upgrading the earlier separate
+`RegionT`/`PointT`/`LocationFn`/`InRegionRel` conversions): `Region`/`Point`/
+`Location`/`InRegion` bundled together with `lin`/`rdi`/`apar`/`expansivity`**, same
+upgrade `Mereology` got over the bare `PartOfRel` conversion -- these four are
+genuine constraints tying `Location`/`InRegion` to each other and to `PartOf`, so
+eliminating them needs one jointly-constructed model, not independent trivial
+witnesses per primitive (which is why the earlier `RegionT`/`PointT` witnesses
+carried no relationship between `Region`'s size and `Occurrence`'s -- fine for
+`Item`-style axioms with no law, fatal for `lin`, which needs `Location` injective).
+
+**`expansivity`'s conclusion is `RegionContainment r2 r1`, not `r1 r2`** --
+`Regions.kerml`'s own real `EXPNS` formula (`Kernel.lean`'s `#check kernel%
+@Assert{n="EXPNS";...}` block) concludes `RegionContainment(r2,r1)` (whole's region
+contains part's region), but the axiom this replaced had `r1 r2` (part contains
+whole) -- a transcription slip discovered while building this model, same kind as
+the already-flagged `df-pdj`/`PartDisjoint` one earlier in the file. Fixed here to
+match the real source, not silently carried forward. -/
+class RegionModel where
+  Region : Type
   Point : Type
-export PointT (Point)
-noncomputable instance pointModel : PointT := ⟨Classical.choose (⟨ℕ, trivial⟩ : ∃ _ : Type, True)⟩
+  Location : Occurrence → Region
+  InRegion : Point → Region → Prop
+  lin : ∀ {x y : Occurrence} {r : Region}, Location x = r → Location y = r → x = y
+  rdi : ∀ {r1 r2 : Region}, atomicRegionOf Location InRegion r1 → atomicRegionOf Location InRegion r2 →
+      ¬ regionOverlapOf InRegion r1 r2 ∨ r1 = r2
+  apar : ∀ {x : Occurrence} {r0 : Region}, Location x = r0 → AtomPart x →
+      atomicRegionOf Location InRegion r0
+  expansivity : ∀ {x y : Occurrence} {r1 r2 : Region}, Location x = r1 → Location y = r2 →
+      PartOf x y → regionContainmentOf InRegion r2 r1
+
+export RegionModel (Region Point Location InRegion lin rdi apar expansivity)
+
+/-- The consistency certificate's existence half: `Region := Point := Occurrence`,
+`Location := id` (trivially injective, giving `lin` for free), and
+`InRegion p r := (p = r) ∨ PartOf p r` (a point "is in" a region iff it equals it or
+is a `PartOf` it). Under this witness `atomicRegionOf ... r0` turns out to be
+*exactly* `AtomPart r0` (nothing is ever `PartOf` `r0`) -- which makes `apar` an
+identity, `rdi` follow from atoms-can't-overlap, and `expansivity` follow directly
+from `ptr` (transitivity). This doesn't commit `Region`/`Location`/`InRegion` to
+this specific witness (`regionModel` below goes through `Classical.choose`, same as
+`Mereology`/`Lifetimes`/`Now`, so the actual values stay opaque) -- it only
+certifies *a* model exists. -/
+theorem region_exists :
+    ∃ (Region Point : Type) (Location : Occurrence → Region) (InRegion : Point → Region → Prop),
+      (∀ {x y : Occurrence} {r : Region}, Location x = r → Location y = r → x = y) ∧
+      (∀ {r1 r2 : Region}, atomicRegionOf Location InRegion r1 → atomicRegionOf Location InRegion r2 →
+          ¬ regionOverlapOf InRegion r1 r2 ∨ r1 = r2) ∧
+      (∀ {x : Occurrence} {r0 : Region}, Location x = r0 → AtomPart x →
+          atomicRegionOf Location InRegion r0) ∧
+      (∀ {x y : Occurrence} {r1 r2 : Region}, Location x = r1 → Location y = r2 →
+          PartOf x y → regionContainmentOf InRegion r2 r1) := by
+  refine ⟨Occurrence, Occurrence, id, fun p r => p = r ∨ PartOf p r, ?_, ?_, ?_, ?_⟩
+  · intro x y r hx hy
+    exact hx.trans hy.symm
+  · intro r1 r2 h1 h2
+    by_cases heq : r1 = r2
+    · exact Or.inr heq
+    · refine Or.inl ?_
+      have hno1 : ¬ ∃ z, PartOf z r1 := by
+        rintro ⟨z, hz⟩
+        have hcont : regionContainmentOf (fun p r => p = r ∨ PartOf p r) r1 z := by
+          intro q hq
+          rcases hq with hq | hq
+          · exact hq ▸ Or.inr hz
+          · exact Or.inr (ptr hq hz)
+        have hz' : z = r1 := (h1 z z (And.intro rfl hcont)).symm
+        exact par r1 (hz' ▸ hz)
+      have hno2 : ¬ ∃ z, PartOf z r2 := by
+        rintro ⟨z, hz⟩
+        have hcont : regionContainmentOf (fun p r => p = r ∨ PartOf p r) r2 z := by
+          intro q hq
+          rcases hq with hq | hq
+          · exact hq ▸ Or.inr hz
+          · exact Or.inr (ptr hq hz)
+        have hz' : z = r2 := (h2 z z (And.intro rfl hcont)).symm
+        exact par r2 (hz' ▸ hz)
+      rintro ⟨p, hp1, hp2⟩
+      rcases hp1 with hp1 | hp1
+      · rcases hp2 with hp2 | hp2
+        · exact heq (hp1.symm.trans hp2)
+        · exact hno2 ⟨r1, hp1 ▸ hp2⟩
+      · exact hno1 ⟨p, hp1⟩
+  · intro x r0 hloc hatom x' r1' hyp
+    have hloc' : x = r0 := hloc
+    obtain ⟨hx', hcont⟩ := hyp
+    rcases hcont r1' (Or.inl rfl) with h | h
+    · exact h.symm
+    · exact absurd ⟨r1', hloc'.symm ▸ h⟩ hatom
+  · intro x y r1 r2 hx hy hxy p hp
+    have hx' : x = r1 := hx
+    have hy' : y = r2 := hy
+    subst hx'
+    subst hy'
+    rcases hp with hp | hp
+    · subst hp
+      exact Or.inr hxy
+    · exact Or.inr (ptr hp hxy)
+
+noncomputable instance regionModelInstance : RegionModel where
+  Region := (Classical.choose region_exists)
+  Point := (Classical.choose (Classical.choose_spec region_exists))
+  Location := Classical.choose (Classical.choose_spec (Classical.choose_spec region_exists))
+  InRegion := Classical.choose
+    (Classical.choose_spec (Classical.choose_spec (Classical.choose_spec region_exists)))
+  lin := (Classical.choose_spec
+    (Classical.choose_spec (Classical.choose_spec (Classical.choose_spec region_exists)))).1
+  rdi := (Classical.choose_spec
+    (Classical.choose_spec (Classical.choose_spec (Classical.choose_spec region_exists)))).2.1
+  apar := (Classical.choose_spec
+    (Classical.choose_spec (Classical.choose_spec (Classical.choose_spec region_exists)))).2.2.1
+  expansivity := (Classical.choose_spec
+    (Classical.choose_spec (Classical.choose_spec (Classical.choose_spec region_exists)))).2.2.2
 
 /-- Class-based, same batch/treatment as `Item` above. -/
 class SurfaceT where
@@ -923,32 +1035,18 @@ class SurfaceT where
 export SurfaceT (Surface)
 noncomputable instance surfaceModel : SurfaceT := ⟨Classical.choose (⟨ℕ, trivial⟩ : ∃ _ : Type, True)⟩
 
-/-- SFS.mm `wloc`: primitive (relates an *occurrence*, not a point, to a region).
-**Function-valued (`Occurrence → Region`), not a relation** -- 2026-08-21 change, at
-direct request: `Regions.kerml`'s own real `Location` is declared as a function
-(`o~Occurrence := result~Region | o L result`, a `:=`-body, KerML's own functional
-shape for it), and `LFU`/`LIN`/`EXPNS`/`APAR` all call `Location(x)` as a one-argument
-function returning a `Region`, not a two-argument predicate -- matching that directly
-is more faithful than the earlier `Occurrence → Region → Prop` relation (itself just
-a straightforward, but not the only possible, `SFS.mm`-style rendering of `wloc`).
-Deliberately does **not** attempt to wire up the infix `L` notation those same real
-formulas' own *definitions* use (`o L result`) -- disregarded at request, `SFS.lean`
-still has no `L`, and `Location`'s own `@Assert` formula is expected to keep failing
-for that specific reason; see `Assert.lean`'s own note. Class-based, same batch/
-treatment as `Item` above (no characterizing law -- `lin` below is the only
-constraint, and stays a separate axiom). -/
-class LocationFn where
-  Location : Occurrence → Region
-export LocationFn (Location)
-noncomputable instance locationModel : LocationFn :=
-  ⟨Classical.choose (⟨fun _ => Classical.arbitrary (α := Region), trivial⟩ : ∃ _ : Occurrence → Region, True)⟩
-
-/-- SFS.mm `win`: primitive. Class-based, same batch/treatment as `Item` above. -/
-class InRegionRel where
-  InRegion : Point → Region → Prop
-export InRegionRel (InRegion)
-noncomputable instance inRegionModel : InRegionRel :=
-  ⟨Classical.choose (⟨fun _ _ => True, trivial⟩ : ∃ _ : Point → Region → Prop, True)⟩
+/- SFS.mm `wloc`/`win`: `Location`/`InRegion` themselves are now produced by
+`RegionModel` far above (bundled with `lin`/`rdi`/`apar`/`expansivity`, since those
+tie `Location`/`InRegion` together and to `PartOf` and so can't be witnessed
+independently). **Function-valued (`Occurrence → Region`), not a relation** --
+2026-08-21 change, at direct request: `Regions.kerml`'s own real `Location` is
+declared as a function (`o~Occurrence := result~Region | o L result`, a `:=`-body,
+KerML's own functional shape for it), and `LFU`/`LIN`/`EXPNS`/`APAR` all call
+`Location(x)` as a one-argument function returning a `Region`, not a two-argument
+predicate. Deliberately does **not** attempt to wire up the infix `L` notation
+those same real formulas' own *definitions* use (`o L result`) -- disregarded at
+request, `SFS.lean` still has no `L`, and `Location`'s own `@Assert` formula is
+expected to keep failing for that specific reason; see `Assert.lean`'s own note. -/
 
 /-- SFS.mm `won`: primitive. Class-based, same batch/treatment as `Item` above. -/
 class OnSurfaceRel where
@@ -985,10 +1083,9 @@ r1 = r2` shape downstream content still expects. -/
 theorem lfu {x : Occurrence} {r1 r2 : Region} (h1 : Location x = r1) (h2 : Location x = r2) :
     r1 = r2 := h1 ▸ h2
 
-/-- SFS.mm `df-lin`: injectivity of location -- still a genuine, non-derivable
-constraint even with `Location` function-valued (nothing forces a function to be
-injective), so this stays an `axiom`. -/
-axiom lin {x y : Occurrence} {r : Region} : Location x = r → Location y = r → x = y
+/- SFS.mm `df-lin`: injectivity of location. Now a real theorem (see `RegionModel`'s
+own `lin` field far above) -- proven, not a genuine independent constraint, once
+`Location`/`Region` are jointly constructed rather than each opaque on its own. -/
 
 /-- SFS.mm `df-rov`. -/
 def RegionOverlap (r1 r2 : Region) : Prop := ∃ p, InRegion p r1 ∧ InRegion p r2
@@ -1000,16 +1097,15 @@ def RegionContainment (r1 r2 : Region) : Prop := ∀ p, InRegion p r2 → InRegi
 def AtomicRegion (r0 : Region) : Prop :=
   ∀ (x : Occurrence) (r1 : Region), Location x = r1 ∧ RegionContainment r0 r1 → r0 = r1
 
-/-- SFS.mm `df-rdi`: a genuine constraint (atomic regions are disjoint or equal). -/
-axiom rdi {r1 r2 : Region} : AtomicRegion r1 → AtomicRegion r2 → ¬ RegionOverlap r1 r2 ∨ r1 = r2
+/- SFS.mm `df-rdi`: atomic regions are disjoint or equal. Now a real theorem (see
+`RegionModel`'s own `rdi` field far above). -/
 
-/-- SFS.mm `df-apar`: a genuine constraint (atomic parts have atomic regions). -/
-axiom apar {x : Occurrence} {r0 : Region} : Location x = r0 → AtomPart x → AtomicRegion r0
+/- SFS.mm `df-apar`: atomic parts have atomic regions. Now a real theorem (see
+`RegionModel`'s own `apar` field far above). -/
 
-/-- SFS.mm `df-pec`: expansivity, a genuine constraint tying `PartOf` to
-`RegionContainment` via `Location`. -/
-axiom expansivity {x y : Occurrence} {r1 r2 : Region} :
-    Location x = r1 → Location y = r2 → PartOf x y → RegionContainment r1 r2
+/- SFS.mm `df-pec`: expansivity, tying `PartOf` to `RegionContainment` via
+`Location`. Now a real theorem (see `RegionModel`'s own `expansivity` field far
+above, including the argument-order fix documented there). -/
 
 /-- SFS.mm `df-rni`: no interpenetration, a genuine constraint. -/
 axiom no_interpenetration {r1 r2 : Region} : RegionOverlap r1 r2 → RegionContainment r1 r2 ∨ RegionContainment r2 r1
