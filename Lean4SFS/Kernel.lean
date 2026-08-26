@@ -2004,6 +2004,57 @@ elab "kernel% " d:kernelDecl : term => do
 -- production).
 #check kernel% @Assert{f="<< middleTimeSlice = startShot ,, endShot >>";}
 
+-- `suboccurrences`/`immediatePredecessors`/`immediateSuccessors`: their real
+-- top-level shape (plain/`composite`-flagged `feature ... : Occurrence[m]
+-- subsets ...`) is covered below via `kerml%` (Core.lean's own entry point --
+-- `kernel%` is Kernel-layer's *mandatory-default* feature production, `= expr`
+-- required, wrong one for these; confirmed via a real build error before
+-- switching). Their nested bodies are simplified to a bare `;` here, dropping
+-- `suboccurrences`' own two `feature redefines X default (that as Occurrence).Y {
+-- ... }` subfeatures (`default`'s value clause only accepts a bare
+-- `kermlQualName`, not a cast+dot chain -- a separate, smaller gap than `end
+-- feature` was, not attempted this round). Their `@Assert` formulas are *not*
+-- attempted: each quantifies `forall x~Occurrence in COLLECTION are ...` where
+-- `COLLECTION` is a bare Set-valued KerML feature name, not an interval bound --
+-- `dslRange` has no production for "range over a named collection" at all (only
+-- `..`/`,,`/`,.`/`.,` interval bounds or a bare `dslWff` guard), and even adding
+-- one wouldn't be enough on its own: `SFS.lean` has no semantic primitive
+-- representing `suboccurrences`/`immediatePredecessors` as an actual `Occurrence →
+-- Set Occurrence` value to range over either -- a real new-modeling question, not
+-- a grammar-only fix, confirmed via the original survey's real probes (not
+-- assumed).
+#check kerml% composite feature suboccurrences: Occurrence[0..*] subsets occurrences ;
+#check kerml% feature immediatePredecessors: Occurrence[0..*] subsets occurrences ;
+#check kerml% feature immediateSuccessors: Occurrence[0..*] subsets occurrences inverse of immediatePredecessors ;
+
+-- `spaceInterior`/`spaceInteriorOf`/`spaceBoundary`: all three real `@Assert`
+-- formulas already elaborate live (confirmed by the original survey's real
+-- probes) -- every free identifier (`innerSpaceDimension`, `this`,
+-- `spaceInterior`/`spaceInteriorOf`/`spaceBoundary` themselves) auto-binds
+-- cleanly since each appears as an argument to an already-typed `SFS.lean`
+-- function (`Location`/`RegionInterior`/`RegionSurface`) or a numeral
+-- comparison. `spaceBoundary`'s own nested body (a named `inv`, plus
+-- `spaceBounder`/`outer`/`inner` subfeatures using `feature redefines X = V;` --
+-- a value-assignment form the named `redefines` clause doesn't have, only the
+-- separate `default`/anonymous-`:>>` clauses do) is simplified to a bare `;` here
+-- too, same reasoning as `suboccurrences` above.
+#check kerml% feature spaceInterior: Occurrence[0..1] subsets spaceSlices ;
+#check kernel% @Assert{f="<< innerSpaceDimension = 3 implies Location(spaceInterior) = RegionInterior(Location(this)) >>";}
+
+#check kerml% feature spaceInteriorOf: Occurrence[0..1] subsets spaceSliceOf inverse of spaceInterior ;
+#check kernel% @Assert{f="<< innerSpaceDimension = 3 implies Location(this) = RegionInterior(Location(spaceInteriorOf)) >>";}
+
+#check kerml% feature spaceBoundary: Occurrence[0..1] subsets spaceShots ;
+#check kernel% @Assert{f="<< innerSpaceDimension = 3 implies RegionSurface(this) = spaceBoundary >>";}
+
+-- `getLife` remains unattempted: its real body uses two more new KerML forms
+-- (`expr`, a value-producing declaration keyword distinct from `function`/
+-- `predicate`/`behavior`, and a ternary `cond ? then : else` `kermlExpr`), and its
+-- own `@Assert` formula independently fails on `result` (nothing in a bare,
+-- headerless probe binds it -- it would need a real enclosing `expr` declaration
+-- providing that context first). Not attempted this round -- a larger, separate
+-- grammar addition than `composite`/the others above.
+
 #check kexpr% 1 + 2 * 3
 #check kexpr% true and not false
 #check kexpr% x.y.z

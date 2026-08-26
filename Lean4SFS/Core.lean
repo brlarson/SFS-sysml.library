@@ -938,6 +938,13 @@ visibility flags) rather than growing the target types just to round-trip them. 
 declare_syntax_cat kermlEndFlag
 syntax "end " : kermlEndFlag
 
+/-- KerML §8.2.4.3.1's `composite` marker on a `Feature` (`Occurrences.kerml`'s own
+`composite feature suboccurrences: Occurrence[0..*] subsets occurrences {...}`,
+marking part-whole/ownership semantics for the association it subsets). Same
+"parsed but not stored" treatment as `abstract`/`end` above. -/
+declare_syntax_cat kermlCompositeFlag
+syntax "composite " : kermlCompositeFlag
+
 /-- A `Membership`/`Import` visibility prefix: `private`/`public`. Parsed but
 discarded, same status as `abstract` above -- `Import`'s own visibility already
 defaults to `.private` (see `import`'s own doc comment below), so `private import
@@ -1102,7 +1109,7 @@ would need `Kernel.lean`'s own type (not available here, wrong dependency direct
 same reason `inv`/`Invariant` can't live in `Core.lean` either), and `V` is always a
 bare qualified name in every real use of this clause in this repo, never a general
 expression that would additionally need `kermlExpr`. -/
-syntax (name := kermlFeature) (kermlEndFlag)? (kermlAbstractFlag)? "feature " ident
+syntax (name := kermlFeature) (kermlEndFlag)? (kermlCompositeFlag)? (kermlAbstractFlag)? "feature " ident
   (" typed" " by " kermlQualName,+)?
   (" : " kermlQualName,+)?
   (" default " kermlQualName)?
@@ -1319,7 +1326,7 @@ partial def elabKermlDecl : TSyntax `kermlDecl → MacroM (Array (TSyntax `term)
       | none => pure #[]
     let bodyElems ← elabKermlBody body
     pure (#[← `(($aT).elt)] ++ specElems ++ conjElems ++ disjElems ++ uniElems ++ interElems ++ diffElems ++ bodyElems)
-  | `(kermlDecl| $[$_end:kermlEndFlag]? $[$_abs:kermlAbstractFlag]? feature $a:ident
+  | `(kermlDecl| $[$_end:kermlEndFlag]? $[$_comp:kermlCompositeFlag]? $[$_abs:kermlAbstractFlag]? feature $a:ident
         $[typed by $tys,*]?
         $[: $tys2,*]?
         $[default $_defV:kermlQualName]?
