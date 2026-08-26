@@ -89,9 +89,27 @@ namespace SFS
 
 /-! ## Time (SFS.mm lines 1002-1099) -/
 
-/-- SFS.mm `cnow`/`df-bl.nowrr`: a fixed nonnegative real, the end of recorded time. -/
-axiom now : ℝ
-axiom now_nonneg : 0 ≤ now
+/-- SFS.mm `cnow`/`df-bl.nowrr`: a fixed nonnegative real, the end of recorded time.
+Class-based (2026-08-26, at direct request, porting the `Lifetimes` recipe here
+too): `now` needs no guard the way `birth`/`death`/`timeof` did -- "does a
+nonnegative real exist" is trivially true (witnessed by `0` itself) -- so this is
+the simplest instance of the pattern: no new axiom, `Classical.choice` alone
+(already one of Lean's own standard axioms) is enough to build a real model. -/
+class Now where
+  now : ℝ
+  now_nonneg : 0 ≤ now
+
+export Now (now now_nonneg)
+
+/-- The consistency certificate, exactly as trivial as the class itself: `0` is a
+genuine witness, `Classical.choose` just picks *some* nonnegative real (opaquely,
+matching what `axiom now : ℝ` asserted directly before) rather than committing to
+`0` specifically -- fixing `now := 0` here would be wrong, not just inelegant:
+`TIME := Set.Icc 0 now` would collapse to the single point `{0}`, degenerating
+everything built on `Time` (density arguments, `next`'s distinctness, ...). -/
+noncomputable instance nowModel : Now :=
+  ⟨Classical.choose (⟨0, le_refl (0:ℝ)⟩ : ∃ x : ℝ, 0 ≤ x),
+    Classical.choose_spec (⟨0, le_refl (0:ℝ)⟩ : ∃ x : ℝ, 0 ≤ x)⟩
 
 abbrev Instant := ℝ
 
