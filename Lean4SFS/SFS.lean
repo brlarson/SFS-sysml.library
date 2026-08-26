@@ -932,7 +932,17 @@ carried no relationship between `Region`'s size and `Occurrence`'s -- fine for
 contains part's region), but the axiom this replaced had `r1 r2` (part contains
 whole) -- a transcription slip discovered while building this model, same kind as
 the already-flagged `df-pdj`/`PartDisjoint` one earlier in the file. Fixed here to
-match the real source, not silently carried forward. -/
+match the real source, not silently carried forward.
+
+**`no_interpenetration` folded in too (2026-08-26, at direct request, extending this
+same class rather than a fresh one)**: unlike `lin`/`rdi`/`apar`/`expansivity`,
+`no_interpenetration` isn't tied to `Location`/`AtomPart` at all -- it's a bare
+laminarity statement about `InRegion` and `PartOf` (any two overlapping regions must
+be nested), so it needed re-verifying against the *same* witness below (`region_exists`'s
+own proof), not a new one: given a common point `p` of `r1`/`r2`, `pch`'s own
+comparable-or-disjoint guarantee (with the "disjoint" branch directly contradicted by
+`p` itself) forces `r1`/`r2` into exactly the cases `expansivity`'s own transitivity
+argument already handles. -/
 class RegionModel where
   Region : Type
   Point : Type
@@ -945,8 +955,11 @@ class RegionModel where
       atomicRegionOf Location InRegion r0
   expansivity : ∀ {x y : Occurrence} {r1 r2 : Region}, Location x = r1 → Location y = r2 →
       PartOf x y → regionContainmentOf InRegion r2 r1
+  no_interpenetration : ∀ {r1 r2 : Region}, regionOverlapOf InRegion r1 r2 →
+      regionContainmentOf InRegion r1 r2 ∨ regionContainmentOf InRegion r2 r1
 
-export RegionModel (Region Point Location InRegion lin rdi apar expansivity)
+export RegionModel (Region Point Location InRegion lin rdi apar expansivity
+  no_interpenetration)
 
 /-- The consistency certificate's existence half: `Region := Point := Occurrence`,
 `Location := id` (trivially injective, giving `lin` for free), and
@@ -966,8 +979,10 @@ theorem region_exists :
       (∀ {x : Occurrence} {r0 : Region}, Location x = r0 → AtomPart x →
           atomicRegionOf Location InRegion r0) ∧
       (∀ {x y : Occurrence} {r1 r2 : Region}, Location x = r1 → Location y = r2 →
-          PartOf x y → regionContainmentOf InRegion r2 r1) := by
-  refine ⟨Occurrence, Occurrence, id, fun p r => p = r ∨ PartOf p r, ?_, ?_, ?_, ?_⟩
+          PartOf x y → regionContainmentOf InRegion r2 r1) ∧
+      (∀ {r1 r2 : Region}, regionOverlapOf InRegion r1 r2 →
+          regionContainmentOf InRegion r1 r2 ∨ regionContainmentOf InRegion r2 r1) := by
+  refine ⟨Occurrence, Occurrence, id, fun p r => p = r ∨ PartOf p r, ?_, ?_, ?_, ?_, ?_⟩
   · intro x y r hx hy
     exact hx.trans hy.symm
   · intro r1 r2 h1 h2
@@ -1013,6 +1028,32 @@ theorem region_exists :
     · subst hp
       exact Or.inr hxy
     · exact Or.inr (ptr hp hxy)
+  · intro r1 r2 hover
+    have partOf_contains : ∀ {x y : Occurrence}, PartOf x y →
+        ∀ p, (p = x ∨ PartOf p x) → (p = y ∨ PartOf p y) := by
+      intro x y hxy p hp
+      rcases hp with hp | hp
+      · subst hp; exact Or.inr hxy
+      · exact Or.inr (ptr hp hxy)
+    obtain ⟨p, hp1, hp2⟩ := hover
+    rcases hp1 with hp1 | hp1
+    · rcases hp2 with hp2 | hp2
+      · left
+        have heq : r1 = r2 := hp1.symm.trans hp2
+        subst heq
+        exact fun q hq => hq
+      · right
+        have hpr : PartOf r1 r2 := by subst hp1; exact hp2
+        exact partOf_contains hpr
+    · rcases hp2 with hp2 | hp2
+      · left
+        have hpr : PartOf r2 r1 := by subst hp2; exact hp1
+        exact partOf_contains hpr
+      · rcases (pch r1 r2).1 with (hc | hc) | (heq | hdisj)
+        · right; exact partOf_contains hc
+        · left; exact partOf_contains hc
+        · left; subst heq; exact fun q hq => hq
+        · exact absurd ⟨p, hp1, hp2⟩ hdisj
 
 noncomputable instance regionModelInstance : RegionModel where
   Region := (Classical.choose region_exists)
@@ -1027,7 +1068,9 @@ noncomputable instance regionModelInstance : RegionModel where
   apar := (Classical.choose_spec
     (Classical.choose_spec (Classical.choose_spec (Classical.choose_spec region_exists)))).2.2.1
   expansivity := (Classical.choose_spec
-    (Classical.choose_spec (Classical.choose_spec (Classical.choose_spec region_exists)))).2.2.2
+    (Classical.choose_spec (Classical.choose_spec (Classical.choose_spec region_exists)))).2.2.2.1
+  no_interpenetration := (Classical.choose_spec
+    (Classical.choose_spec (Classical.choose_spec (Classical.choose_spec region_exists)))).2.2.2.2
 
 /- SFS.mm `wrp`/`won`: `Surface`/`OnSurface` themselves are now produced by
 `SurfaceModel` further below (bundled with `RegionSurface`/`RegionInterior`/
@@ -1101,8 +1144,9 @@ def AtomicRegion (r0 : Region) : Prop :=
 `Location`. Now a real theorem (see `RegionModel`'s own `expansivity` field far
 above, including the argument-order fix documented there). -/
 
-/-- SFS.mm `df-rni`: no interpenetration, a genuine constraint. -/
-axiom no_interpenetration {r1 r2 : Region} : RegionOverlap r1 r2 → RegionContainment r1 r2 ∨ RegionContainment r2 r1
+/- SFS.mm `df-rni`: no interpenetration. Now a real theorem (see `RegionModel`'s own
+`no_interpenetration` field far above), folded into that class once it turned out to
+follow from the same witness's `pch`/`ptr` reasoning `expansivity` already used. -/
 
 /- SFS.mm `wrs`, function-valued (`Region → Surface`), not a relation -- 2026-08-21
 change, at direct request, same reasoning as `Location` above:
