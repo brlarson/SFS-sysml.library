@@ -928,6 +928,16 @@ it to parse real KerML text like `Base.kerml`'s `abstract classifier Anything`. 
 declare_syntax_cat kermlAbstractFlag
 syntax "abstract " : kermlAbstractFlag
 
+/-- KerML §8.2.4.3.1's `end` marker on a `Feature` declared as an `Association`'s own
+end feature (`Occurrences.kerml`'s own `end feature sourceOccurrence: Occurrence
+redefines BinaryLink::source;`, repeated for every `assoc`-based Allen/Region
+relationship it declares). Same "parsed but not stored" treatment as `abstract`
+above -- `Root.lean`'s `Feature` has no dedicated end-marking field, matching how
+this grammar already drops other structural-only markers (`abstract` itself,
+visibility flags) rather than growing the target types just to round-trip them. -/
+declare_syntax_cat kermlEndFlag
+syntax "end " : kermlEndFlag
+
 /-- A `Membership`/`Import` visibility prefix: `private`/`public`. Parsed but
 discarded, same status as `abstract` above -- `Import`'s own visibility already
 defaults to `.private` (see `import`'s own doc comment below), so `private import
@@ -1092,7 +1102,7 @@ would need `Kernel.lean`'s own type (not available here, wrong dependency direct
 same reason `inv`/`Invariant` can't live in `Core.lean` either), and `V` is always a
 bare qualified name in every real use of this clause in this repo, never a general
 expression that would additionally need `kermlExpr`. -/
-syntax (name := kermlFeature) (kermlAbstractFlag)? "feature " ident
+syntax (name := kermlFeature) (kermlEndFlag)? (kermlAbstractFlag)? "feature " ident
   (" typed" " by " kermlQualName,+)?
   (" : " kermlQualName,+)?
   (" default " kermlQualName)?
@@ -1115,6 +1125,22 @@ above) is parsed but not stored, same reason. Distinct from `Kernel.lean`'s own
 `GetBooleanChange`) -- this one has no `kermlDirFlag` prefix at all, and lives here
 in `Core.lean` since it needs nothing `Kernel.lean`-only (no `kermlExpr`). -/
 syntax "feature " " :>> " kermlQualName (" = " kermlQualName)? kermlBody : kermlDecl
+
+/-- Undirected anonymous `Feature`, `redefines` keyword spelling: `end? feature
+redefines G [: T] ;` -- `Occurrences.kerml`'s own real `end feature redefines
+earlierOccurrence: Occurrence;` (`HappensJustBefore`/`JustOutsideOf`): no distinct
+new name is given, the local feature takes `G`'s own name (KerML §8.2.4.3.1's
+`FeatureDeclaration`, "if `redefines` is present without a preceding identifier, the
+declared feature has the same name as the redefined feature"), narrowing an
+inherited association end feature in a subtype without renaming it. Distinct from
+the symbolic `:>>` anonymous form above (keyword spelling, not spelling
+interchangeable at this position since the two are separate `syntax` alternatives)
+and from the *named* `kermlFeature` production (`feature $a:ident ... redefines
+...`), which this can't be confused with: `redefines` is already a reserved keyword
+token throughout this grammar (via that same named production's own `redefines`
+clause), so it can never lex as the `ident` the named form's parse alternative
+requires at this position -- ordinary alternation resolves it, no ambiguity. -/
+syntax (kermlEndFlag)? "feature " " redefines " kermlQualName (" : " kermlQualName)? kermlBody : kermlDecl
 
 /-- KerML §8.2.4.1.2 `Specialization`, standalone form: `subtype A specializes B ;`.
 Both `A`/`B` are `QualifiedName` references (`SpecificType`/`GeneralType`), not
@@ -1293,7 +1319,7 @@ partial def elabKermlDecl : TSyntax `kermlDecl → MacroM (Array (TSyntax `term)
       | none => pure #[]
     let bodyElems ← elabKermlBody body
     pure (#[← `(($aT).elt)] ++ specElems ++ conjElems ++ disjElems ++ uniElems ++ interElems ++ diffElems ++ bodyElems)
-  | `(kermlDecl| $[$_abs:kermlAbstractFlag]? feature $a:ident
+  | `(kermlDecl| $[$_end:kermlEndFlag]? $[$_abs:kermlAbstractFlag]? feature $a:ident
         $[typed by $tys,*]?
         $[: $tys2,*]?
         $[default $_defV:kermlQualName]?
@@ -1366,6 +1392,21 @@ partial def elabKermlDecl : TSyntax `kermlDecl → MacroM (Array (TSyntax `term)
     let rel ← mkRedefinitionTerm aT gT elemId gn
     let bodyElems ← elabKermlBody body
     pure (#[← `(($aT).elt), ← `(($rel).elt)] ++ bodyElems)
+  | `(kermlDecl| $[$_end4:kermlEndFlag]? feature redefines $g:kermlQualName $[: $ty:kermlQualName]?
+        $body:kermlBody) => do
+    let gn := qualNameStr g
+    let elemId := "anon-redefines-" ++ gn
+    let aT ← `(mkAnonFeatureStub $(quote elemId))
+    let gT ← featureStubTermQ g
+    let rel ← mkRedefinitionTerm aT gT elemId gn
+    let tyElems ← match ty with
+      | some t => do
+          let tT ← kTypeStubTermQ t
+          let tyRel ← mkFeatureTypingTerm aT tT elemId (qualNameStr t)
+          pure #[← `(($tyRel).elt)]
+      | none => pure #[]
+    let bodyElems ← elabKermlBody body
+    pure (#[← `(($aT).elt), ← `(($rel).elt)] ++ tyElems ++ bodyElems)
   | `(kermlDecl| subtype $a:kermlQualName specializes $b:kermlQualName ;) => do
     let aT ← kTypeStubTermQ a; let bT ← kTypeStubTermQ b
     let rel ← mkSpecializationTerm aT bT (qualNameStr a) (qualNameStr b)

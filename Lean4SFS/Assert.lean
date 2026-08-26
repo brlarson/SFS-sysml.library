@@ -190,6 +190,18 @@ syntax dslTerm " <= " dslTerm : dslWff
 syntax dslTerm " > " dslTerm : dslWff
 syntax dslTerm " >= " dslTerm : dslWff
 syntax dslTerm " = " dslTerm : dslWff
+/-- `X = A ,, B`, equality against an open-interval literal (`Occurrences.kerml`'s
+`middleTimeSlice = startShot ,, endShot`) -- a dedicated `dslWff`-level production
+for this exact three-`dslTerm` shape, not a general `,,`-producing `dslTerm`
+alternative: giving `dslTerm` itself a `,,` production was tried first and rejected
+-- `dslRange`'s own *existing* `,,` production (`elabDslRangeGuard`'s `$a:dslTerm ,,
+$b:dslTerm` arm below) already embeds a literal `,,` inside a `dslTerm`-antiquotation
+pattern, and once `dslTerm` can itself produce `,,`, that quotation becomes
+genuinely unparseable (confirmed via a real build attempt, not assumed) -- the two
+uses of `,,` recursively conflict when both are reachable from a bare `$x:dslTerm`
+antiquotation. Scoping `,,` to this one three-operand `dslWff` shape sidesteps the
+conflict entirely: `dslTerm` itself never gains a `,,` alternative. -/
+syntax dslTerm " = " dslTerm " ,, " dslTerm : dslWff
 /-- `≠`, e.g. `I[[d::f,tau]] <> I[[d::f,now]]`. -/
 syntax dslTerm " <> " dslTerm : dslWff
 
@@ -621,6 +633,8 @@ partial def elabDslWff : TSyntax `dslWff → MacroM (TSyntax `term)
   | `(dslWff| $a:dslTerm <= $b:dslTerm) => do `(DSLLe.le $(← elabDslTerm a) $(← elabDslTerm b))
   | `(dslWff| $a:dslTerm > $b:dslTerm) => do `(DSLLt.lt $(← elabDslTerm b) $(← elabDslTerm a))
   | `(dslWff| $a:dslTerm >= $b:dslTerm) => do `(DSLLe.le $(← elabDslTerm b) $(← elabDslTerm a))
+  | `(dslWff| $a:dslTerm = $b:dslTerm ,, $c:dslTerm) => do
+    `(DSLEq.eq $(← elabDslTerm a) (SFS.mkOpenInterval $(← elabDslTerm b) $(← elabDslTerm c)))
   | `(dslWff| $a:dslTerm = $b:dslTerm) => do `(DSLEq.eq $(← elabDslTerm a) $(← elabDslTerm b))
   | `(dslWff| $a:dslTerm <> $b:dslTerm) => do `($(← elabDslTerm a) ≠ $(← elabDslTerm b))
   | `(dslWff| $a:dslTerm in $b:dslTerm) => do
@@ -767,6 +781,8 @@ partial def freeIdentsInWff (bound : List Name) : TSyntax `dslWff → MacroM (Li
   | `(dslWff| $a:dslTerm <= $b:dslTerm) => return (← freeIdentsInTerm bound a) ++ (← freeIdentsInTerm bound b)
   | `(dslWff| $a:dslTerm > $b:dslTerm) => return (← freeIdentsInTerm bound a) ++ (← freeIdentsInTerm bound b)
   | `(dslWff| $a:dslTerm >= $b:dslTerm) => return (← freeIdentsInTerm bound a) ++ (← freeIdentsInTerm bound b)
+  | `(dslWff| $a:dslTerm = $b:dslTerm ,, $c:dslTerm) =>
+    return (← freeIdentsInTerm bound a) ++ (← freeIdentsInTerm bound b) ++ (← freeIdentsInTerm bound c)
   | `(dslWff| $a:dslTerm = $b:dslTerm) => return (← freeIdentsInTerm bound a) ++ (← freeIdentsInTerm bound b)
   | `(dslWff| $a:dslTerm <> $b:dslTerm) => return (← freeIdentsInTerm bound a) ++ (← freeIdentsInTerm bound b)
   | `(dslWff| $a:dslTerm in $b:dslTerm) => return (← freeIdentsInTerm bound a) ++ (← freeIdentsInTerm bound b)

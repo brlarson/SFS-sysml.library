@@ -1885,6 +1885,125 @@ elab "kernel% " d:kernelDecl : term => do
 #check kernel% @Assert{n="FilmConnected"; f="<< FilmConnected : r1~Region, r2~Region :"+
     " exists p~Point that ( PointOnSurface(p,RegionFilm(r1)) and PointOnSurface(p,RegionFilm(r2)) ) >>";}
 
+-- Occurrences.kerml's own real `assoc`-based Allen/Region relationship hierarchy
+-- (2026-08-26, after a survey confirmed all 10 of these formulas already elaborate
+-- live standalone -- the missing piece was purely structural: association *end*
+-- features, `end feature X : T redefines Y;`, had no grammar support at all until
+-- now, see `Core.lean`'s new `kermlEndFlag`/anonymous-`redefines` productions).
+-- `HappensLink`/`SpaceLink` have no `@Assert` of their own -- pure structural bases
+-- the formula-bearing associations below `specializes`/`redefines` from.
+#check kernel% assoc HappensLink specializes BinaryLink disjoint from Occurrence {
+  end feature sourceOccurrence: Occurrence redefines BinaryLink::source ;
+  end feature targetOccurrence: Occurrence redefines BinaryLink::target ;
+}
+#check kernel% assoc SpaceLink specializes BinaryLink disjoint from Occurrence {
+  end feature sourceOccurrence: Occurrence redefines BinaryLink::source ;
+  end feature targetOccurrence: Occurrence redefines BinaryLink::target ;
+}
+
+#check kernel% assoc HappensDuring specializes HappensLink {
+  end feature shorterOccurrence: Occurrence redefines sourceOccurrence ;
+  end feature longerOccurrence: Occurrence redefines targetOccurrence ;
+}
+#check kernel% @Assert{f="<< during(shorterOccurrence, longerOccurrence) >>";}
+
+#check kernel% assoc HappensWhile specializes HappensDuring {
+  end feature thisOccurrence: Occurrence redefines shorterOccurrence ;
+  end feature thatOccurrence: Occurrence redefines longerOccurrence ;
+}
+#check kernel% @Assert{f="<< coincident(thisOccurrence, thatOccurrence) >>";}
+
+#check kernel% assoc InsideOf specializes SpaceLink {
+  end feature smallerSpace: Occurrence redefines sourceOccurrence ;
+  end feature largerSpace: Occurrence redefines targetOccurrence ;
+}
+#check kernel% @Assert{f="<< RegionContainment(Location(smallerSpace), Location(largerSpace)) >>";}
+
+-- `Within`'s own header exercises `specializes X,Y` together with a trailing
+-- `intersects X,Y` clause on the same `assoc` -- both already-existing grammar,
+-- just never combined this way in a live `#check` before.
+#check kernel% assoc Within specializes HappensDuring, InsideOf intersects HappensDuring, InsideOf {
+  end feature smallerOccurrence: Occurrence redefines shorterOccurrence, smallerSpace ;
+  end feature largerOccurrence: Occurrence redefines longerOccurrence, largerSpace ;
+}
+#check kernel% @Assert{f="<< RegionContainment(Location(smallerOccurrence), Location(largerOccurrence))"+
+    " and during(smallerOccurrence, largerOccurrence) >>";}
+
+-- `WithinBoth`'s own end features omit the `: Occurrence` type entirely (already
+-- covered: the named `kermlFeature` production's type clause is optional) and
+-- redefine a qualified target (`HappensWhile::thisOccurrence`) alongside a bare one.
+#check kernel% assoc WithinBoth specializes Within, HappensWhile {
+  end feature thisOccurrence redefines smallerOccurrence, HappensWhile::thisOccurrence ;
+  end feature thatOccurrence redefines largerOccurrence, HappensWhile::thatOccurrence ;
+}
+#check kernel% @Assert{f="<< coincident(thisOccurrence, thatOccurrence)"+
+    " and RegionContainment(Location(thisOccurrence), Location(thatOccurrence))"+
+    " and RegionContainment(Location(thatOccurrence), Location(thisOccurrence)) >>";}
+
+#check kernel% assoc Without specializes BinaryLink {
+  end feature separateOccurrenceToo: Occurrence redefines BinaryLink::source ;
+  end feature separateOccurrence: Occurrence redefines BinaryLink::target ;
+}
+#check kernel% @Assert{f="<< nonoverlaps(separateOccurrenceToo, separateOccurrence)"+
+    " or not RegionOverlap(Location(separateOccurrenceToo), Location(separateOccurrence)) >>";}
+
+#check kernel% assoc HappensBefore specializes HappensLink {
+  end feature earlierOccurrence: Occurrence redefines sourceOccurrence ;
+  end feature laterOccurrence: Occurrence redefines targetOccurrence ;
+}
+#check kernel% @Assert{f="<< precedes(earlierOccurrence, laterOccurrence) >>";}
+
+-- `HappensJustBefore`'s own end features are the truly anonymous `redefines` form
+-- (no distinct new name, the local feature keeps `earlierOccurrence`'s/
+-- `laterOccurrence`'s own name) -- the case the new `kermlEndFlag`-prefixed
+-- anonymous production exists specifically for.
+#check kernel% assoc HappensJustBefore specializes HappensBefore {
+  end feature redefines earlierOccurrence: Occurrence ;
+  end feature redefines laterOccurrence: Occurrence ;
+}
+#check kernel% @Assert{f="<< nearlyMeets(earlierOccurrence, laterOccurrence) >>";}
+
+#check kernel% assoc OutsideOf specializes SpaceLink {
+  end feature separateSpaceToo: Occurrence redefines sourceOccurrence ;
+  end feature separateSpace: Occurrence redefines targetOccurrence ;
+}
+#check kernel% @Assert{f="<< not RegionOverlap(Location(separateSpaceToo), Location(separateSpace)) >>";}
+
+#check kernel% assoc JustOutsideOf specializes OutsideOf {
+  end feature redefines separateSpaceToo: Occurrence ;
+  end feature redefines separateSpace: Occurrence ;
+}
+#check kernel% @Assert{f="<< FilmConnected(Location(separateSpaceToo), Location(separateSpace)) >>";}
+
+-- `MatesWith` has no `@Assert` of its own (`Occurrences.kerml`'s own comment:
+-- "MatesWith=JustOutsideOf" -- it adds no new formal content, just a same-doc alias).
+#check kernel% assoc MatesWith specializes JustOutsideOf {
+  end feature matingSpaceToo: Occurrence redefines separateSpaceToo ;
+  end feature matingSpace: Occurrence redefines separateSpace ;
+}
+
+-- `InnerSpaceOf`'s real end feature `innerSpace` also has an active (non-commented)
+-- `crosses outerSpace.innerSpaceOccurrences` clause -- dropped here, a small
+-- separate documented gap: `crosses` only accepts a single `kermlQualName`
+-- (`::`-qualified), not a dotted feature-access chain like `outerSpace.
+-- innerSpaceOccurrences` (`.`-qualified) -- a different, narrower problem than
+-- `end feature` itself, not attempted this round.
+#check kernel% assoc InnerSpaceOf specializes SpaceLink {
+  end feature outerSpace: Occurrence redefines sourceOccurrence ;
+  end feature innerSpace: Occurrence redefines targetOccurrence ;
+}
+#check kernel% @Assert{f="<< Location(innerSpace) = RegionInterior(Location(outerSpace)) >>";}
+
+-- `SurroundedBy` is commented out in the real source itself ("remove completely
+-- because of Regions definitions") -- not attempted, matching the source's own
+-- dead-code status, not a gap.
+
+-- `middleTimeSlice`'s own real `@Assert` (2026-08-26, "middleTimeSlice is a time
+-- interval open on both ends" -- see `SFS.lean`'s new `Interval`/`mkOpenInterval`
+-- and `Assert.lean`'s new dedicated `dslTerm = dslTerm ,, dslTerm : dslWff`
+-- production).
+#check kernel% @Assert{f="<< middleTimeSlice = startShot ,, endShot >>";}
+
 #check kexpr% 1 + 2 * 3
 #check kexpr% true and not false
 #check kexpr% x.y.z

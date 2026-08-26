@@ -1589,6 +1589,29 @@ noncomputable def precedes (A B : Occurrence) : Option Prop := (death A).map fun
 noncomputable def meets (A B : Occurrence) : Option Prop := (death A).map fun tA => tA = birth B
 /-- SFS.mm `df-overlaps`: needs only `A`'s death, same reasoning as `precedes`. -/
 noncomputable def overlaps (A B : Occurrence) : Option Prop := (death A).map fun tA => (birth B).val ≺ tA.val
+/-- `Domain::Interval` itself, `Occurrences.kerml`'s own `,,` term-literal target
+(`startShot ,, endShot`, `middleTimeSlice`'s real `@Assert`): a genuine two-endpoint
+value with boundary-openness flags, mirroring `Domain.kerml`'s real `classifier
+Interval { lowerBound; upperBound; openLeft; openRight; inv {lowerBound <=
+upperBound} }` structurally. A plain record, not a class-based opaque primitive like
+`Occurrence`'s own `birth`/`death`/`openLeft`/`openRight` -- its four fields ARE its
+whole content, nothing further to characterize (the real `inv`'s `lowerBound <=
+upperBound` isn't baked in as a proof-carrying field, matching how `Occurrence`'s own
+analogous constraints stay separate axioms/theorems rather than type-level proofs). -/
+structure Interval where
+  lowerBound : Time
+  upperBound : Time
+  openLeft : Bool
+  openRight : Bool
+
+/-- `,,`'s own reading, "open interval `[a,b]`, open on both ends" -- at direct
+request ("middleTimeSlice is a time interval open on both ends. Can you make `,,`
+mean that?"), matching `,,`'s existing `dslRange` convention exactly (comma side of
+each `dslRange` separator already means "open" -- `.,`/`,.`'s own comma marks the
+open end, `..`/`,,` the fully-closed/fully-open extremes), now given a `dslTerm`-
+level (not just range-bound) reading too. -/
+def mkOpenInterval (a b : Time) : Interval := ⟨a, b, true, true⟩
+
 /-- `Interval`'s boundary-openness features (`Domain.kerml`'s `openLeft`/`openRight`),
 reused on `Occurrence` here since `Allen.kerml`'s own `starts`/`finishes`/`coincident`/
 `nearlyMeets` all call them on `x`/`y : Occurrence`. Fresh primitives: nothing here
