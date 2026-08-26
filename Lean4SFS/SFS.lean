@@ -1442,9 +1442,18 @@ reused on `Occurrence` here since `Allen.kerml`'s own `starts`/`finishes`/`coinc
 represented interval boundary openness before `df-nearlymeets` was added to `SFS.mm`.
 Declared here, ahead of `starts` below (rather than immediately before `nearlyMeets`,
 where they first appeared 2026-08-25), so `starts`/`finishes`/`coincident` can
-reference them too. -/
-axiom openLeft : Occurrence → Prop
-axiom openRight : Occurrence → Prop
+reference them too. Class-based (2026-08-26), same batch/treatment as `Item` above
+-- no characterizing law (nothing else constrains what `openLeft`/`openRight` say
+about a given `Occurrence`), bundled together (like `Now`'s `now`/`now_nonneg` or
+`BoolItems`' `trueItem`/`falseItem`) since they're declared and used as a pair,
+though each is chosen independently. -/
+class OpenBoundary where
+  openLeft : Occurrence → Prop
+  openRight : Occurrence → Prop
+export OpenBoundary (openLeft openRight)
+noncomputable instance openBoundaryModel : OpenBoundary :=
+  ⟨Classical.choose (⟨fun _ => False, trivial⟩ : ∃ _ : Occurrence → Prop, True),
+    Classical.choose (⟨fun _ => False, trivial⟩ : ∃ _ : Occurrence → Prop, True)⟩
 
 /-- SFS.mm `df-starts`: compares `A`'s and `B`'s deaths directly, so needs both --
 via `kand`/`klt`, which (unlike the old hand-rolled match) short-circuits to a
