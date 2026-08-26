@@ -109,7 +109,7 @@ standard library package Occurrences {
 		expr getLife {
 			doc /* Life is top-level Occurrence, suboccurrence of no other */
 			@Assert{f="<< during(this,result) and"+
-			   " not exists o~Occurrence in o<>this that during(o,result) >>";}
+			   " not exists p~Occurrence that PartOf(result,p) >>";}
 			return result : Life[1];
 			if superoccurrence->isEmpty() ? this as Life
 			  else superoccurrence->head().getLife	

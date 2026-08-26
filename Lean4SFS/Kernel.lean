@@ -690,6 +690,17 @@ syntax (kermlAbstractFlag)? "predicate " ident (" specializes " kermlQualName,+)
 syntax (kermlAbstractFlag)? "interaction " ident (" specializes " kermlQualName,+)? (" conjugates " kermlQualName)?
   (" disjoint" " from " kermlQualName,+)? (" unions " kermlQualName,+)? (" intersects " kermlQualName,+)?
   (" differences " kermlQualName,+)? kermlBody : kernelDecl
+/-- `expr`, KerML's shorthand value-producing declaration keyword (`Occurrences.kerml`'s
+own real `expr getLife {...}`) -- same production shape as `function`/`predicate`
+(`kermlPredBody`, so a trailing bare `kermlExpr` body-expression is allowed, needed
+for `getLife`'s own ternary). Elaborated via the same `kFunctionStubTerm` `function`
+itself uses -- `expr` has no dedicated metaclass modeled here (this grammar's
+existing "structure without semantics" trade, same as the unit-bracket/`as`-cast
+simplifications above), and a shorthand value-producing declaration is closest in
+spirit to `function` among the four already-modeled classifier-like keywords. -/
+syntax (kermlAbstractFlag)? "expr " ident (" specializes " kermlQualName,+)? (" conjugates " kermlQualName)?
+  (" disjoint" " from " kermlQualName,+)? (" unions " kermlQualName,+)? (" intersects " kermlQualName,+)?
+  (" differences " kermlQualName,+)? kermlPredBody : kernelDecl
 /-- KerML §8.2.5.13 `Package`/`LibraryPackage`: `package Name { ... }` (`Base.kerml`'s
 own package could have been written this way, though the real file's top level isn't
 itself parsed here -- see the `library`/`standard library` forms just below, which
@@ -876,6 +887,12 @@ the cast target is parsed but discarded, and the operand's own elements pass thr
 unchanged, matching every other "structure without semantics" simplification this grammar
 already makes (`kermlMult`, unit brackets, ...). -/
 syntax:90 kermlExpr:90 " as " kermlQualName : kermlExpr
+/-- Sequence/Collection function invocation via `->` (KerML §7.4.7, `Occurrences.
+kerml`'s own real `superoccurrence->isEmpty()`/`superoccurrence->head()`): same
+"structure without semantics" treatment as everything else here -- no distinction
+drawn from a plain `.`-chained call, both just an `InvocationExpression` stub plus
+the receiver's and arguments' own elements. -/
+syntax:90 kermlExpr:90 "->" ident "(" kermlExpr,* ")" : kermlExpr
 
 syntax:80 "-" kermlExpr:80 : kermlExpr
 syntax:80 "not " kermlExpr:80 : kermlExpr
@@ -899,6 +916,15 @@ syntax:40 kermlExpr:40 " or " kermlExpr:41 : kermlExpr
 syntax:35 kermlExpr:35 " implies " kermlExpr:36 : kermlExpr
 
 syntax "(" kermlExpr ")" : kermlExpr
+
+/-- KerML's own conditional-expression concrete syntax (§7.4.6, distinct from a
+C-style `cond ? a : b` ternary -- `if`/`else` keywords bracket a bare `?` in the
+middle, no colon): `Occurrences.kerml`'s own real `getLife` body, `if
+superoccurrence->isEmpty() ? this as Life else superoccurrence->head().getLife`. No
+operand precedence annotations needed -- `if`/`?`/`else` are all literal delimiter
+tokens, same as `"(" kermlExpr ")"`/`"new " ident "(" ...`'s own unannotated
+operands above. -/
+syntax "if " kermlExpr " ? " kermlExpr " else " kermlExpr : kermlExpr
 
 mutual
 
@@ -931,6 +957,11 @@ partial def elabKermlExpr : TSyntax `kermlExpr → MacroM (Array (TSyntax `term)
     let eElems ← elabKermlExpr e
     pure (eElems ++ #[← `((mkFeatureReferenceStub $(quote (qualNameStr u))).elt)])
   | `(kermlExpr| $e:kermlExpr as $_ty:kermlQualName) => elabKermlExpr e
+  | `(kermlExpr| $e:kermlExpr -> $f:ident($args,*)) => do
+    let eElems ← elabKermlExpr e
+    let argElems ← args.getElems.mapM elabKermlExpr
+    pure (#[← `((mkInvocationStub $(quote ("arrow-" ++ f.getId.toString))).elt)] ++ eElems ++
+      argElems.foldl (· ++ ·) #[])
   | `(kermlExpr| -$e:kermlExpr) => do
     let eElems ← elabKermlExpr e
     pure (#[← `((mkOperatorStub "unary-minus" "-").elt)] ++ eElems)
@@ -955,6 +986,11 @@ partial def elabKermlExpr : TSyntax `kermlExpr → MacroM (Array (TSyntax `term)
   | `(kermlExpr| $a:kermlExpr or $b:kermlExpr) => elabBinOp "or" a b
   | `(kermlExpr| $a:kermlExpr implies $b:kermlExpr) => elabBinOp "implies" a b
   | `(kermlExpr| ($e:kermlExpr)) => elabKermlExpr e
+  | `(kermlExpr| if $c:kermlExpr ? $t:kermlExpr else $e:kermlExpr) => do
+    let cElems ← elabKermlExpr c
+    let tElems ← elabKermlExpr t
+    let eElems ← elabKermlExpr e
+    pure (#[← `((mkOperatorStub "op-if-then-else" "if?else").elt)] ++ cElems ++ tElems ++ eElems)
   | _ => Macro.throwUnsupported
 
 /-- Shared by every binary-operator match arm above: one `OperatorExpression` stub
@@ -1196,6 +1232,10 @@ def elabKernelDecl : TSyntax `kernelDecl → MacroM (Array (TSyntax `term))
         $[disjoint from $disj,*]? $[unions $uni,*]? $[intersects $inter,*]? $[differences $diff,*]? $body:kermlBody) => do
     let declElems ← classifierLikeDeclElems interactionStubTerm a specs conj disj uni inter diff
     pure (declElems ++ (← elabKermlBody body))
+  | `(kernelDecl| $[$_abs:kermlAbstractFlag]? expr $a:ident $[specializes $specs,*]? $[conjugates $conj:kermlQualName]?
+        $[disjoint from $disj,*]? $[unions $uni,*]? $[intersects $inter,*]? $[differences $diff,*]? $body:kermlPredBody) => do
+    let declElems ← classifierLikeDeclElems kFunctionStubTerm a specs conj disj uni inter diff
+    pure (declElems ++ (← elabKermlPredBody body))
   | `(kernelDecl| package $a:ident $body:kermlBody) => do
     let pT ← packageStubTerm a.getId.toString
     pure (#[← `(($pT).elt)] ++ (← elabKermlBody body))
@@ -2004,6 +2044,37 @@ elab "kernel% " d:kernelDecl : term => do
 -- production).
 #check kernel% @Assert{f="<< middleTimeSlice = startShot ,, endShot >>";}
 
+-- `getLife`'s own real structural body (2026-08-26, at direct request: "do expr and
+-- ternary for getLife") -- `expr` (the new declaration keyword) plus the new
+-- `->`-invocation and `if ... ? ... else ...` conditional-expression productions
+-- together let this parse and elaborate verbatim.
+#check kernel% expr getLife {
+  doc "Life is top-level Occurrence, suboccurrence of no other"
+  return result : Life[1] ;
+  if superoccurrence->isEmpty() ? this as Life
+    else superoccurrence->head().getLife
+}
+
+-- `getLife`'s own real `@Assert` formula was itself wrong in `Occurrences.kerml`
+-- (2026-08-26, caught and fixed at direct request): the original text, "not exists
+-- o~Occurrence in o<>this that during(o,result)," doesn't say what the doc comment
+-- promises ("Life is top-level Occurrence, suboccurrence of no other") -- it says no
+-- occurrence *other than `this`* happens during `result`, not that `result` itself
+-- has no superoccurrence. Fixed to `not exists p~Occurrence that PartOf(result,p)`
+-- -- `PartOf`, not a fresh primitive: `suboccurrences`' own real formula above
+-- already establishes `s in suboccurrences ⟹ ... PartOf(s,self)` (a suboccurrence is
+-- `PartOf` its container), so symmetrically a *super*occurrence of `result` is any
+-- `p` with `PartOf(result,p)`, and "no superoccurrence" is that existential negated.
+-- As a bare, headerless `@Assert{f="...";}` probe (matching every other
+-- Occurrences.kerml formula's own treatment here) this still fails on `result`
+-- alone -- nothing to bind it against outside a real `return result : T` context,
+-- unrelated to whether the formula's own logic is right. Verified separately below,
+-- via the `:=`-body header form (`Location`/`Get`'s own convention) providing that
+-- context directly -- `Life` itself has no `SFS.lean` counterpart (nothing here
+-- models it as distinct from `Occurrence`), so `result~Occurrence` stands in.
+#check kernel% @Assert{n="getLife"; f="<<getLife : this~Occurrence := result~Occurrence | "+
+    "during(this,result) and not exists p~Occurrence that PartOf(result,p)>>";}
+
 -- `suboccurrences`/`immediatePredecessors`/`immediateSuccessors`: their real
 -- top-level shape (plain/`composite`-flagged `feature ... : Occurrence[m]
 -- subsets ...`) is covered below via `kerml%` (Core.lean's own entry point --
@@ -2047,14 +2118,6 @@ elab "kernel% " d:kernelDecl : term => do
 #check kerml% feature spaceBoundary: Occurrence[0..1] subsets spaceShots ;
 #check kernel% @Assert{f="<< innerSpaceDimension = 3 implies RegionSurface(this) = spaceBoundary >>";}
 
--- `getLife` remains unattempted: its real body uses two more new KerML forms
--- (`expr`, a value-producing declaration keyword distinct from `function`/
--- `predicate`/`behavior`, and a ternary `cond ? then : else` `kermlExpr`), and its
--- own `@Assert` formula independently fails on `result` (nothing in a bare,
--- headerless probe binds it -- it would need a real enclosing `expr` declaration
--- providing that context first). Not attempted this round -- a larger, separate
--- grammar addition than `composite`/the others above.
-
 #check kexpr% 1 + 2 * 3
 #check kexpr% true and not false
 #check kexpr% x.y.z
@@ -2068,6 +2131,9 @@ elab "kernel% " d:kernelDecl : term => do
 #check kexpr% "hello"
 #check kexpr% *
 #check kexpr% null
+#check kexpr% x->isEmpty()
+#check kexpr% x->head().getLife
+#check kexpr% if true ? 1 else 2
 #check kexpr% Anything::self
 
 /-! ## Smoke tests
