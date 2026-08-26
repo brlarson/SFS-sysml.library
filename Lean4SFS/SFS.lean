@@ -804,21 +804,49 @@ entirely -- every definition/theorem below that used to be `Part`-typed (and
 `Location`/`lfu`/`lin`/`AtomicRegion`/`apar`/`expansivity` further down, which share
 the same variable with `PartOf`/`AtomPart` calls) is `Occurrence`-typed now too, not
 just this one axiom, since a stale `Part` anywhere in this cluster would no longer
-type-check against the others. Class-based, same batch/treatment as `Item` above
-(no characterizing law of its own -- `par`/`ptr`/`pch` below are the genuine
-constraints, and stay separate axioms; they'd need a real constructed model to
-eliminate, not just a trivial existence witness -- see the axiom survey). -/
-class PartOfRel where
+type-check against the others.
+
+**Class-based (2026-08-26, at direct request, upgrading the earlier bare
+`PartOfRel` conversion): `PartOf`/`par`/`ptr`/`pch` bundled together**, unlike the
+`Item`-style batch above -- `par`/`ptr`/`pch` are genuine constraints (not derivable
+from a bare `PartOf` alone), so eliminating them as `axiom`s (per the axiom survey's
+category 3) needs an actual constructed relation satisfying all three at once, not
+just a trivial existence witness for `PartOf`'s own type. `pch`'s `PartDisjoint x y`
+conjunct is inlined here as `¬ ∃ z, PartOf z x ∧ PartOf z y` (its unfolding) rather
+than calling the `PartDisjoint`/`Overlap` `def`s below, since those are defined
+*in terms of* this class's own exported `PartOf` and so can't be referenced from
+inside the class that produces it -- definitionally identical either way. -/
+class Mereology where
   PartOf : Occurrence → Occurrence → Prop
-export PartOfRel (PartOf)
-noncomputable instance partOfModel : PartOfRel :=
-  ⟨Classical.choose (⟨fun _ _ => False, trivial⟩ : ∃ _ : Occurrence → Occurrence → Prop, True)⟩
+  par : ∀ x, ¬ PartOf x x
+  ptr : ∀ {x y z}, PartOf x y → PartOf y z → PartOf x z
+  pch : ∀ x y, ((PartOf x y ∨ PartOf y x) ∨ (x = y ∨ ¬ ∃ z, PartOf z x ∧ PartOf z y)) ∧
+      ¬ (PartOf x y ∧ PartOf y x)
 
-/-- SFS.mm `df-par`: antireflexivity, a genuine constraint on the primitive. -/
-axiom par (x : Occurrence) : ¬ PartOf x x
+export Mereology (PartOf par ptr pch)
 
-/-- SFS.mm `df-ptr`: transitivity, a genuine constraint on the primitive. -/
-axiom ptr {x y z : Occurrence} : PartOf x y → PartOf y z → PartOf x z
+/-- The consistency certificate's existence half: the "nothing is ever part of
+anything" relation genuinely satisfies `par`/`ptr`/`pch` all three at once --
+`ptr`/`par` vacuously (their hypotheses are always `False`), and `pch`'s only real
+content (comparability) holds because an always-`False` `PartOf` makes `Overlap`
+always `False` too, so every pair is unconditionally `PartDisjoint`, satisfying
+`pch`'s fourth disjunct unconditionally. This doesn't commit `PartOf` itself to
+this trivial relation (`mereologyModel` below goes through `Classical.choose`, same
+as `Lifetimes`/`Now`, so the actual witness stays opaque) -- it only certifies *a*
+model exists, which is what turns `par`/`ptr`/`pch` from assumed to proven. -/
+theorem mereology_exists :
+    ∃ R : Occurrence → Occurrence → Prop,
+      (∀ x, ¬ R x x) ∧
+      (∀ x y z, R x y → R y z → R x z) ∧
+      (∀ x y, ((R x y ∨ R y x) ∨ (x = y ∨ ¬ ∃ z, R z x ∧ R z y)) ∧ ¬ (R x y ∧ R y x)) := by
+  refine ⟨fun _ _ => False, fun _ h => h, fun _ _ _ h _ => h, fun _ _ => ?_⟩
+  simp
+
+noncomputable instance mereologyModel : Mereology where
+  PartOf := Classical.choose mereology_exists
+  par := (Classical.choose_spec mereology_exists).1
+  ptr {x y z} := (Classical.choose_spec mereology_exists).2.1 x y z
+  pch := (Classical.choose_spec mereology_exists).2.2
 
 /-- SFS.mm `df-pov`. -/
 def Overlap (x y : Occurrence) : Prop := ∃ z, PartOf z x ∧ PartOf z y
@@ -837,10 +865,13 @@ def PartDisjoint (x y : Occurrence) : Prop := ¬ Overlap x y
 
 /-- SFS.mm `df-pch`: despite the `df-` name this doesn't define a new symbol -- it's
 purely a constraint (any two parts are comparable, equal, or disjoint, and not
-mutually part of each other) that is not derivable from `df-par`/`df-ptr` alone,
-so, like those two, it stays an `axiom` rather than becoming a `def`. -/
-axiom pch (x y : Occurrence) :
-    ((PartOf x y ∨ PartOf y x) ∨ (x = y ∨ PartDisjoint x y)) ∧ ¬ (PartOf x y ∧ PartOf y x)
+mutually part of each other), not derivable from `df-par`/`df-ptr` alone. Now a real
+theorem (see `Mereology`'s own `pch` field far above), restated here in terms of
+`PartDisjoint` -- its original, non-inlined shape -- since `PartDisjoint` itself
+wasn't in scope yet at the class declaration. -/
+theorem pch' (x y : Occurrence) :
+    ((PartOf x y ∨ PartOf y x) ∨ (x = y ∨ PartDisjoint x y)) ∧ ¬ (PartOf x y ∧ PartOf y x) :=
+  pch x y
 
 /-- SFS.mm `df-pat`. -/
 def AtomPart (x : Occurrence) : Prop := ¬ ∃ z, PartOf z x
