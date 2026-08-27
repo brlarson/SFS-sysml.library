@@ -2197,4 +2197,23 @@ private def _testMetaFeature : MetadataFeature :=
 -- during(ep,thisPerformance)`), not attempted here.
 #check kernel% @Assert{f="<< forall sp~Occurrence in subperformances are during(sp,self) and PartOf(sp,self) >>";}
 
+-- `Objects.kerml`'s own real `subobjects` (`composite feature subobjects: Object[0..*]
+-- subsets objects, suboccurrences intersects objects, suboccurrences`) -- same
+-- treatment as `subperformances` above: directly `subsets suboccurrences`, so its
+-- new `@Assert` reuses `IsSuboccurrenceOf` (`collectionRangeName`/
+-- `mkCollectionGuard` extended to recognize `subobjects` by name too).
+#check kernel% @Assert{f="<< forall so~Occurrence in subobjects are during(so,self) and PartOf(so,self) >>";}
+
+-- `Objects.kerml`'s own real `ownedPerformances` (2026-08-27, user-edited directly
+-- in the source: replaced the old `self.timeEnclosedOccurrence(op)` dotted-call
+-- formula with the same `during`/`PartOf` pattern). Its own real `subsets
+-- suboccurrences` clause is commented out in the source, but `composite` still
+-- means the same containment concept -- reuses `IsSuboccurrenceOf` too (see
+-- `mkCollectionGuard`'s own doc comment). `op~Performance` needed `"Performance"`
+-- added to `elabDslType`'s mapping table (-> `Occurrence`, since `Performance` has
+-- no `SFS.lean` type of its own) -- confirmed via a real build error before adding
+-- it, not assumed; `"Object"` added alongside it for the same reason.
+#check kernel% @Assert{f="<< forall op~Performance in ownedPerformances are during(op,self)"+
+  " and PartOf(op,self) >>";}
+
 end KerML.Kernel

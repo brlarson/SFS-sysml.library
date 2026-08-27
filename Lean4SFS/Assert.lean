@@ -399,7 +399,12 @@ only real use of that name anywhere in the repo) were changed to `x~Occurrence` 
 the KerML source itself, and `SFS.lean`'s own `Part` type they used to map to was
 retired the same day (`PartOf` etc. are `Occurrence`-typed now); leaving `"Class"`
 mapped to a nonexistent (or, worse, Mathlib's *own* unrelated `Part`) target would be
-a live footgun, not dead code worth keeping around. -/
+a live footgun, not dead code worth keeping around. `"Performance"`/`"Object"` added
+2026-08-27 (`Objects.kerml`'s own real `op~Performance in ownedPerformances`) --
+neither has its own `SFS.lean` type (real KerML has `Performance specializes
+Occurrence`/`Object specializes Occurrence`, both structural-only, no independent
+Domain-logic content), so both map to `Occurrence` directly, same reasoning as
+`"Anything"`/`"BooleanEvaluation"` collapsing to the one representation that exists. -/
 def elabDslType : TSyntax `dslType → MacroM (TSyntax `term)
   | `(dslType| $t:ident) => do
     match t.getId.toString with
@@ -410,6 +415,8 @@ def elabDslType : TSyntax `dslType → MacroM (TSyntax `term)
     | "Surface" => `(Surface)
     | "Anything" => `(KerML.Root.Element)
     | "BooleanEvaluation" => `(KerML.Root.Element)
+    | "Performance" => `(Occurrence)
+    | "Object" => `(Occurrence)
     | _ => `($t)
   | _ => Macro.throwUnsupported
 
@@ -536,10 +543,9 @@ partial def elabDslRangeGuard (x : TSyntax `term) : TSyntax `dslRange → MacroM
 /-- Recognizes a bare-`ident` `dslWff` naming one of the `composite`-flagged
 association-derived collections found so far across the Kernel Semantic Library
 (`Occurrences.kerml`'s `suboccurrences`/`immediatePredecessors`/
-`immediateSuccessors`; `Performances.kerml`'s `subperformances`, which genuinely
-`subsets suboccurrences` in the real KerML, so it reuses the same
-`IsSuboccurrenceOf` relation rather than getting its own) by checking its *name*,
-rather than adding new dedicated `dslRange` grammar for them: a dedicated
+`immediateSuccessors`; `Performances.kerml`'s `subperformances`; `Objects.kerml`'s
+`subobjects`/`ownedPerformances`) by checking its *name*, rather than adding new
+dedicated `dslRange` grammar for them: a dedicated
 `syntax "suboccurrences" : dslRange` was tried first and rejected -- it reserves
 the word as a literal token file-wide, which collides with `kermlFeature`'s own
 declared-name position (`feature suboccurrences: ...`, needed as a plain
@@ -558,7 +564,8 @@ partial def collectionRangeName (φ : TSyntax `dslWff) : Option Name :=
   match φ with
   | `(dslWff| $rangeName:ident) =>
     if rangeName.getId == `suboccurrences ∨ rangeName.getId == `immediatePredecessors ∨
-        rangeName.getId == `immediateSuccessors ∨ rangeName.getId == `subperformances then
+        rangeName.getId == `immediateSuccessors ∨ rangeName.getId == `subperformances ∨
+        rangeName.getId == `subobjects ∨ rangeName.getId == `ownedPerformances then
       some rangeName.getId
     else none
   | _ => none
@@ -566,7 +573,13 @@ partial def collectionRangeName (φ : TSyntax `dslWff) : Option Name :=
 /-- The guard itself for one of `collectionRangeName`'s recognized names,
 given the bound-variable term `x`. Unlike a genuine guard (which ignores the bound
 variable entirely, see `wrapForall`/`wrapExists`'s other branch), these genuinely
-depend on it: `IsSuboccurrenceOf $x self`, not a free-standing condition.
+depend on it: `IsSuboccurrenceOf $x self`, not a free-standing condition. Every
+recognized name routes to this one relation -- not because each literally `subsets
+suboccurrences` in the real KerML (`ownedPerformances`'s own such clause is
+commented out there), but because `composite` itself means the same containment
+concept regardless (per the request that started this whole thread: "composite
+means temporal and mereological containment"), and the relation is opaque anyway
+(no characterizing law to violate by sharing it).
 `self`/`this` aren't declared here -- they're spliced directly into the elaborated
 term, relying on every real formula using one of these ranges to *also*
 mention `self`/`this` elsewhere in the same body (true of every real case so
@@ -582,7 +595,8 @@ partial def mkCollectionGuard (name : Name) (x : TSyntax `term) : MacroM (TSynta
   -- already established for exactly this shape of problem.
   let selfIdent := mkIdent `self
   let thisIdent := mkIdent `this
-  if name == `suboccurrences ∨ name == `subperformances then
+  if name == `suboccurrences ∨ name == `subperformances ∨ name == `subobjects ∨
+      name == `ownedPerformances then
     `(SFS.IsSuboccurrenceOf $x $selfIdent)
   else if name == `immediatePredecessors then `(SFS.IsImmediatePredecessorOf $x $thisIdent)
   else `(SFS.IsImmediateSuccessorOf $x $thisIdent)

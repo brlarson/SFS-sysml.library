@@ -22,6 +22,7 @@ standard library package Objects {
 	private import ScalarValues::Natural;
 //SFS:
 	private import Assertion::Assert;
+	private import Allen::during;
 
 
 	abstract struct Object specializes Occurrence {
@@ -38,6 +39,7 @@ standard library package Objects {
 			/*
 			 * The suboccurrences of this Object that are also Objects.
 			 */
+			@Assert{f="<< forall so~Occurrence in subobjects are during(so,self) and PartOf(so,self) >>";}
 		}
 		
 		feature involvingPerformances: Performance[0..*] subsets performances {
@@ -66,7 +68,8 @@ standard library package Objects {
 			/*
 			 * Performances that are owned by this object.
 			 */
-			@Assert{f="<< forall op~Performance in ownedPerformances are self.timeEnclosedOccurrence(op) >>";}
+			@Assert{f="<< forall op~Performance in ownedPerformances are during(op,self)"+
+			  " and PartOf(op,self) >>";}
 			 
 			feature redefines this default that {
 				doc
