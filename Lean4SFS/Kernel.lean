@@ -2183,4 +2183,18 @@ private def _testMetaFeature : MetadataFeature :=
   { elementId := "mf" }
 #check (_testMetaFeature.elementId, _testMetaFeature.isVariable)
 
+-- `Performances.kerml`'s own real `subperformances` (2026-08-27, at direct
+-- request: "composite means temporal and mereological containment... find
+-- other uses of composite... add a similar @Assert one-at-a-time"). Directly
+-- `subsets suboccurrences`, so its new `@Assert` reuses `IsSuboccurrenceOf`
+-- rather than a fresh primitive (`collectionRangeName`/`mkCollectionGuard` in
+-- `Assert.lean` extended to recognize `subperformances` by name, same
+-- treatment as `suboccurrences` itself). Uses `sp~Occurrence`, not
+-- `sp~Performance` -- `Performance` has no `SFS.lean`/DSL counterpart at all
+-- (confirmed via a real build error, "Unknown identifier Performance"), a
+-- separate, pre-existing gap from this file's own real (untested until now)
+-- `enclosedPerformances` formula (`ep~Performance in enclosedPerformances are
+-- during(ep,thisPerformance)`), not attempted here.
+#check kernel% @Assert{f="<< forall sp~Occurrence in subperformances are during(sp,self) and PartOf(sp,self) >>";}
+
 end KerML.Kernel

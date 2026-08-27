@@ -68,12 +68,13 @@ standard library package Performances {
 
 //SFS:  enclosedPerformances are suboccurrences (containment)		
 		composite step subperformances: Performance[0..*] subsets suboccurrences {
-			// enclosedPerformances, suboccurrences intersects enclosedPerformances, suboccurrences 
+			// enclosedPerformances, suboccurrences intersects enclosedPerformances, suboccurrences
 			doc
 			/*
-			 * enclosedPerformances that are composite. 
+			 * enclosedPerformances that are composite.
 			 */
-		
+			@Assert{f="<< forall sp~Occurrence in subperformances are during(sp,self) and PartOf(sp,self) >>";}
+
 			feature redefines this default (that as Performance).this {
 				doc
 				/*

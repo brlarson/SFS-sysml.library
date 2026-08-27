@@ -430,6 +430,40 @@ def elabDslParam : TSyntax `dslParam → MacroM (Array (TSyntax `ident × TSynta
     pure (xs.getElems.map (·, ty'))
   | _ => Macro.throwUnsupported
 
+/-- Recursively splits a compound dotted identifier `a.b.c...` into nested function
+application `c (b a)`, reusing whatever real Lean identifiers already exist for each
+segment -- no new `SFS.lean` objects needed for an arbitrary-length chain, just
+repeated application of the single-level trick already established for `x.openLeft`
+(2026-08-27, at direct request: "there will be many references... sometimes names
+which will be a sequence of identifiers separated by periods. Can you interpret such
+references without adding new objects?"). Lean's *lexer* fuses an unspaced `a.b.c`
+into one compound `ident` token before any grammar-level choice runs (same reasoning
+as the original single-level fix's own doc note), so this is still the only way to
+reach it -- a `dslTerm "." ident` grammar production could never fire for real,
+unspaced formula text. `now` is special-cased at the base case exactly as before,
+only reachable when the *whole* chain is just `now` (a dotted `now.x` would be
+strange and isn't attempted). A chain segment that isn't a real Lean identifier still
+fails honestly (unresolved identifier), not guessed at. -/
+partial def elabDotChain (x : Ident) : MacroM (TSyntax `term) := do
+  match x.getId with
+  | .str pre s =>
+    if pre == .anonymous then
+      if x.getId == `now then `((⟨now, dl_nowt⟩ : Time)) else pure x
+    else
+      let f := mkIdentFrom x (Name.mkSimple s)
+      let recv ← elabDotChain (mkIdentFrom x pre)
+      `($f $recv)
+  | _ => pure x
+
+/-- The root/base identifier of a dotted chain `a.b.c...` -- `a` itself, recursed
+all the way down rather than peeling one level (`freeIdentsInTerm`'s counterpart to
+`elabDotChain` above: only the base is a genuine free identifier needing binding,
+every other segment is a call head). -/
+partial def dotChainBase (n : Name) : Name :=
+  match n with
+  | .str pre _ => if pre == .anonymous then n else dotChainBase pre
+  | _ => n
+
 mutual
 
 /-- `dslTerm` → the `SFS.lean`/Lean term it denotes. -/
@@ -437,35 +471,7 @@ partial def elabDslTerm : TSyntax `dslTerm → MacroM (TSyntax `term)
   | `(dslTerm| result) => `($resultIdent)
   | `(dslTerm| true) => `(Bool.true)
   | `(dslTerm| false) => `(Bool.false)
-  | `(dslTerm| $x:ident) => do
-    -- Dot-access sugar, `x.f` (`Allen.kerml`'s own `starts`/`finishes`/`coincident`,
-    -- `x.openLeft = y.openLeft`/`x.openRight = y.openRight`): Lean's *lexer* fuses an
-    -- unspaced `x.openLeft` into a single dotted `ident` token before any grammar-level
-    -- choice runs, so a separate `dslTerm "." ident` production can never actually fire
-    -- for real (unspaced) formula text -- the only way to reach this is to detect the
-    -- compound name here and split it. `openLeft`/`openRight` are ordinary `SFS.lean`
-    -- top-level functions (`Occurrence → Prop`), not structure fields, so this is not
-    -- KerML feature access (that's `I[[d::f,tau]]` below) and not real Lean generalized
-    -- field notation either (which would need them renamespaced under `Occurrence`, not
-    -- attempted -- per this project's own standing convention, fix the grammar rather
-    -- than rename around a real identifier). Only one dot level is handled (`recv.f`,
-    -- not `a.b.c`) -- no real formula needs more, and a deeper chain fails honestly
-    -- (unresolved identifier) rather than being guessed at.
-    match x.getId with
-    | .str pre s =>
-      if pre == .anonymous then
-        -- `now` is special-cased: every real formula uses it in a `Time`-typed
-        -- position (`I[[d::f,now]]`'s `tau` argument, or a range's upper bound
-        -- alongside another `Time`-typed term like `tau`), never as bare `ℝ`, but
-        -- `SFS.now : ℝ` is the raw unrestricted constant. `dl_nowt : now ∈ TIME`
-        -- closes the gap, matching how `Time := ↥TIME` is threaded everywhere else
-        -- `SFS.lean` needs an in-range instant.
-        if x.getId == `now then `((⟨now, dl_nowt⟩ : Time)) else `($x)
-      else
-        let recv := mkIdentFrom x pre
-        let f := mkIdentFrom x (Name.mkSimple s)
-        `($f $recv)
-    | _ => `($x)
+  | `(dslTerm| $x:ident) => elabDotChain x
   | `(dslTerm| $n:num) => `($n)
   | `(dslTerm| $f:ident($args,*)) => do
     let args ← args.getElems.mapM elabDslTerm
@@ -527,38 +533,45 @@ partial def elabDslRangeGuard (x : TSyntax `term) : TSyntax `dslRange → MacroM
     | none => elabDslWff φ
   | _ => Macro.throwUnsupported
 
-/-- Recognizes a bare-`ident` `dslWff` naming one of `Occurrences.kerml`'s three
-association-derived collections (`suboccurrences`/`immediatePredecessors`/
-`immediateSuccessors`) by checking its *name*, rather than adding new dedicated
-`dslRange` grammar for them: a dedicated `syntax "suboccurrences" : dslRange` was
-tried first and rejected -- it reserves the word as a literal token file-wide,
-which collides with `kermlFeature`'s own declared-name position (`feature
-suboccurrences: ...`, needed as a plain identifier there), confirmed via a real
-build error. Same "check the name, don't reserve the token" fix `elabDslWff`'s own
-`next` special-case already uses. Used by both `elabDslRangeGuard`'s own bare-guard
-case above and `wrapForall`/`wrapExists`'s own dedicated bare-`dslWff`-range
-short-circuit below -- the latter is the *actually*-exercised path for `forall
-x~T in RANGE are ...` (confirmed the hard way: an earlier version of this fix lived
-only in `elabDslRangeGuard`, which `wrapForall`/`wrapExists` never call for this
-shape at all, and it silently never fired). -/
+/-- Recognizes a bare-`ident` `dslWff` naming one of the `composite`-flagged
+association-derived collections found so far across the Kernel Semantic Library
+(`Occurrences.kerml`'s `suboccurrences`/`immediatePredecessors`/
+`immediateSuccessors`; `Performances.kerml`'s `subperformances`, which genuinely
+`subsets suboccurrences` in the real KerML, so it reuses the same
+`IsSuboccurrenceOf` relation rather than getting its own) by checking its *name*,
+rather than adding new dedicated `dslRange` grammar for them: a dedicated
+`syntax "suboccurrences" : dslRange` was tried first and rejected -- it reserves
+the word as a literal token file-wide, which collides with `kermlFeature`'s own
+declared-name position (`feature suboccurrences: ...`, needed as a plain
+identifier there), confirmed via a real build error. Same "check the name, don't
+reserve the token" fix `elabDslWff`'s own `next` special-case already uses. Used
+by both `elabDslRangeGuard`'s own bare-guard case above and `wrapForall`/
+`wrapExists`'s own dedicated bare-`dslWff`-range short-circuit below -- the latter
+is the *actually*-exercised path for `forall x~T in RANGE are ...` (confirmed the
+hard way: an earlier version of this fix lived only in `elabDslRangeGuard`, which
+`wrapForall`/`wrapExists` never call for this shape at all, and it silently never
+fired). Not a general "range over any named collection" mechanism -- only these
+specific, observed names get a production, same "no over-generalization"
+discipline as `DSLMem`'s own hard-coded pairs; grows one name at a time as
+`composite` features get their own `@Assert` added across the library. -/
 partial def collectionRangeName (φ : TSyntax `dslWff) : Option Name :=
   match φ with
   | `(dslWff| $rangeName:ident) =>
     if rangeName.getId == `suboccurrences ∨ rangeName.getId == `immediatePredecessors ∨
-        rangeName.getId == `immediateSuccessors then
+        rangeName.getId == `immediateSuccessors ∨ rangeName.getId == `subperformances then
       some rangeName.getId
     else none
   | _ => none
 
-/-- The guard itself for one of `collectionRangeName`'s three recognized names,
+/-- The guard itself for one of `collectionRangeName`'s recognized names,
 given the bound-variable term `x`. Unlike a genuine guard (which ignores the bound
-variable entirely, see `wrapForall`/`wrapExists`'s other branch), these three
-genuinely depend on it: `IsSuboccurrenceOf $x self`, not a free-standing condition.
+variable entirely, see `wrapForall`/`wrapExists`'s other branch), these genuinely
+depend on it: `IsSuboccurrenceOf $x self`, not a free-standing condition.
 `self`/`this` aren't declared here -- they're spliced directly into the elaborated
-term, relying on every real formula using one of these three ranges to *also*
-mention `self`/`this` elsewhere in the same body (true of all three real cases), so
-the ordinary free-identifier auto-binder discovers and types them from that other
-occurrence. -/
+term, relying on every real formula using one of these ranges to *also*
+mention `self`/`this` elsewhere in the same body (true of every real case so
+far), so the ordinary free-identifier auto-binder discovers and types them from
+that other occurrence. -/
 partial def mkCollectionGuard (name : Name) (x : TSyntax `term) : MacroM (TSyntax `term) := do
   -- `mkIdent`, not a bare literal `self`/`this` in the quotation -- a plain
   -- unquoted identifier here gets hygienically renamed (confirmed via a real
@@ -569,7 +582,8 @@ partial def mkCollectionGuard (name : Name) (x : TSyntax `term) : MacroM (TSynta
   -- already established for exactly this shape of problem.
   let selfIdent := mkIdent `self
   let thisIdent := mkIdent `this
-  if name == `suboccurrences then `(SFS.IsSuboccurrenceOf $x $selfIdent)
+  if name == `suboccurrences ∨ name == `subperformances then
+    `(SFS.IsSuboccurrenceOf $x $selfIdent)
   else if name == `immediatePredecessors then `(SFS.IsImmediatePredecessorOf $x $thisIdent)
   else `(SFS.IsImmediateSuccessorOf $x $thisIdent)
 
@@ -623,23 +637,7 @@ partial def wrapExists (binders : Array (TSyntax `ident × TSyntax `term))
 
 /-- `dslWff` → the `Prop` it denotes. -/
 partial def elabDslWff : TSyntax `dslWff → MacroM (TSyntax `term)
-  | `(dslWff| $x:ident) => do
-    -- Same dot-access split as `elabDslTerm`'s matching case (2026-08-26, needed
-    -- for `nearlyMeets`'s bare `x.openRight`/`y.openLeft` disjunction, used
-    -- directly as a `dslWff` rather than inside a `dslTerm`-level comparison like
-    -- `starts`/`finishes`/`coincident`'s `x.openLeft = y.openLeft`): without this,
-    -- `x.openRight` falls through to ordinary Lean dot-notation elaboration
-    -- instead of calling `SFS.lean`'s real top-level `openRight : Occurrence →
-    -- Prop`, and fails (or worse, silently resolves against an unrelated type).
-    -- No `now` special-case here -- nothing bare-`Time`-typed appears as a WFF.
-    match x.getId with
-    | .str pre s =>
-      if pre == .anonymous then `($x)
-      else
-        let recv := mkIdentFrom x pre
-        let f := mkIdentFrom x (Name.mkSimple s)
-        `($f $recv)
-    | _ => `($x)
+  | `(dslWff| $x:ident) => elabDotChain x
   | `(dslWff| $f:ident($args,*)) => do
     let args ← args.getElems.mapM elabDslTerm
     `($f $args*)
@@ -734,15 +732,18 @@ partial def freeIdentsInTerm (bound : List Name) : TSyntax `dslTerm → MacroM (
   | `(dslTerm| true) => pure []
   | `(dslTerm| false) => pure []
   | `(dslTerm| $x:ident) => pure (
-      -- `x.f` dot-access sugar (see `elabDslTerm`'s matching case): only the
-      -- receiver `pre` is a real free identifier -- `f` itself is a call head,
-      -- excluded the same way `f(args)`'s own `$_f` is above.
+      -- `x.f`/`a.b.c...` dot-access sugar (see `elabDotChain`): only the *base*
+      -- receiver is a real free identifier -- every other segment is a call head,
+      -- excluded the same way `f(args)`'s own `$_f` is above. `dotChainBase`
+      -- recurses to the root, not just one level (2026-08-27, generalizing the
+      -- original single-dot fix the same way `elabDotChain` itself was).
       match x.getId with
       | .str pre _ =>
         if pre == .anonymous then
           (if x.getId == `now || bound.contains x.getId then [] else [x.getId])
         else
-          (if bound.contains pre then [] else [pre])
+          let base := dotChainBase x.getId
+          (if bound.contains base then [] else [base])
       | _ => [])
   | `(dslTerm| $_n:num) => pure []
   | `(dslTerm| $_f:ident($args,*)) => do
