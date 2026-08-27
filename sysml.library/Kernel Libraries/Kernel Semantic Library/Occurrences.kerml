@@ -150,7 +150,7 @@ standard library package Occurrences {
 			 * Composite suboccurrences of this Occurrence.
 			 */
 
-      @Assert{f="<< forall s~Occurrence in suboccurrences are during(life(s),life(self))"+
+      @Assert{f="<< forall s~Occurrence in suboccurrences are during(s,self)"+
 			  " and PartOf(s,self) >>";}
 
 			 feature redefines localClock default (that as Occurrence).localClock {

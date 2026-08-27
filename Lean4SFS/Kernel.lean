@@ -2087,12 +2087,19 @@ elab "kernel% " d:kernelDecl : term => do
 -- body) additionally needed the 2026-08-27 total-Allen-predicate redesign
 -- (`nearlyMeets` used to be `Option Prop`-valued, and `forall`/`exists` only ever
 -- accepted a plain `Prop` body) -- both now elaborate live below.
--- `suboccurrences`'s own formula remains excluded: `during(life(s),life(self))`
--- passes `life(s)` (a `Set Instant`) where `during` expects an `Occurrence` --
--- looks like a genuine transcription bug in `Occurrences.kerml` itself (same
--- category as `getLife`'s own, already fixed), flagged but not yet confirmed/
--- fixed at the source.
+-- `suboccurrences`'s own real `@Assert` formula was itself wrong in
+-- `Occurrences.kerml` (2026-08-27, fixed at direct request, same category as
+-- `getLife`'s own bug): the original text, `during(life(s),life(self))`,
+-- passes `life(s)` (a `Set Instant`) where `during` expects an `Occurrence`
+-- -- a real type mismatch. Fixed to `during(s,self)`, comparing the two
+-- occurrences directly (Allen's `during` already reads their `birth`/
+-- `effectiveEnd` internally -- "s's life is during self's life" *is*
+-- "s is during self"), which is exactly what `PartOf(s,self)` (the formula's
+-- other conjunct) already expects `s`/`self` to be. Verified via a real
+-- build attempt before editing the source, not assumed.
 #check kerml% composite feature suboccurrences: Occurrence[0..*] subsets occurrences ;
+#check kernel% @Assert{f="<< forall s~Occurrence in suboccurrences are during(s,self)"+
+    " and PartOf(s,self) >>";}
 #check kerml% feature immediatePredecessors: Occurrence[0..*] subsets occurrences ;
 #check kernel% @Assert{f="<< forall i~Occurrence in immediatePredecessors are nearlyMeets(i,this) >>";}
 #check kerml% feature immediateSuccessors: Occurrence[0..*] subsets occurrences inverse of immediatePredecessors ;
