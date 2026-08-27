@@ -23,6 +23,17 @@ library package Mereology {
     // SFS:  Define part transitivity.
     @Assert{n="PTR"; f="<< PTR : : forall x,y,z~Occurrence are ( (PartOf(x,y) and PartOf(y,z)) implies PartOf(x,z) ) >>"; t="ptr";}
 
+    abstract predicate ContainedBy specializes BooleanEvaluation {
+        doc /* Contains is direct (one-level) proper part relation */
+        @Assert{n="Containment"; f="<<Containment : : ContainedBy(x,y) implies PartOf(x,y)>>"; t="Containment";}
+        in x : Occurrence;
+        in y : Occurrence;
+    }
+
+    // SFS: Things may have at most one container.
+    @Assert{n="UniqueContainer"; f="<<UniqueContainer : : forall x,y,z~Occurrence are "+
+        "ContainedBy(x,y) and ContainedBy (x,z) implies y=z>>"; t="UniqueContainer";}
+
     abstract predicate PartOverlap specializes BooleanEvaluation {
         doc /* SFS: PartOverlap is the overlap relation xOy */
         @Assert{n="PartOverlap"; f="<< PartOverlap : x~Occurrence, y~Occurrence : "+

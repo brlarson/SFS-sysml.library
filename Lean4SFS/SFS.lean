@@ -848,6 +848,37 @@ noncomputable instance mereologyModel : Mereology where
   ptr {x y z} := (Classical.choose_spec mereology_exists).2.1 x y z
   pch := (Classical.choose_spec mereology_exists).2.2
 
+/-- `Mereology.kerml`'s own new `ContainedBy` (2026-08-27, user-added directly in
+the KerML source, then ported here and to SFS.mm's own new `df-containment`/
+`df-uniquecontainer`): the direct (one-level) proper part relation, distinct from
+`PartOf` (the general, possibly-transitive parthood relation). `Containment`/
+`UniqueContainer` below are real laws about it, not a definition -- same
+class-based, `Classical.choose`-proven treatment as `Mereology` above. -/
+class Containment where
+  ContainedBy : Occurrence → Occurrence → Prop
+  /-- Mereology.kerml's own `Containment`: every direct container is also a
+  (general) part. -/
+  containment : ∀ x y, ContainedBy x y → PartOf x y
+  /-- Mereology.kerml's own `UniqueContainer`: each occurrence has at most one
+  direct container. -/
+  uniqueContainer : ∀ x y z, ContainedBy x y → ContainedBy x z → y = z
+
+export Containment (ContainedBy containment uniqueContainer)
+
+/-- The consistency certificate's existence half, same trick as
+`mereology_exists`: the always-`False` relation satisfies both laws vacuously
+(`False → PartOf x y` and `False → False → y = z` both hold by `ex falso`, no
+constraint on `PartOf` itself needed). -/
+theorem containment_exists :
+    ∃ R : Occurrence → Occurrence → Prop,
+      (∀ x y, R x y → PartOf x y) ∧ (∀ x y z, R x y → R x z → y = z) :=
+  ⟨fun _ _ => False, fun _ _ h => h.elim, fun _ _ _ h _ => h.elim⟩
+
+noncomputable instance containmentModel : Containment where
+  ContainedBy := Classical.choose containment_exists
+  containment := (Classical.choose_spec containment_exists).1
+  uniqueContainer := (Classical.choose_spec containment_exists).2
+
 /-- SFS.mm `df-pov`. -/
 def Overlap (x y : Occurrence) : Prop := ∃ z, PartOf z x ∧ PartOf z y
 

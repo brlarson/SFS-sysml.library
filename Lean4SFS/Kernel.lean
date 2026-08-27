@@ -1672,6 +1672,23 @@ elab "kernel% " d:kernelDecl : term => do
 #check kernel% @Assert{n="PTR"; f="<< PTR : : forall x,y,z~Occurrence are "+
   "( (PartOf(x,y) and PartOf(y,z)) implies PartOf(x,z) ) >>"; t="ptr";}
 
+-- Mereology.kerml's own new `ContainedBy` (2026-08-27, user-added directly in the
+-- KerML source): unlike `PartOf`'s own placeholder body (`xPy`), `ContainedBy`'s
+-- own nested `@Assert` genuinely *is* the `Containment` law (`ContainedBy(x,y)
+-- implies PartOf(x,y)`) -- real content, not an informal shorthand, so this one
+-- lives here (kept nested-body-excluded per the file's own convention of testing
+-- @Assert as a sibling check, not because it's expected to fail).
+#check kernel% abstract predicate ContainedBy specializes BooleanEvaluation {
+  in x : Occurrence ;
+  in y : Occurrence ;
+}
+#check kernel% @Assert{n="Containment"; f="<<Containment : : ContainedBy(x,y) implies PartOf(x,y)>>"; t="Containment";}
+
+-- `UniqueContainer`: another bare top-level `@Assert{...}`, same shape as
+-- `PAR`/`PTR`/`PCH` -- a law about `ContainedBy`, not a new predicate.
+#check kernel% @Assert{n="UniqueContainer"; f="<<UniqueContainer : : forall x,y,z~Occurrence are "+
+    "ContainedBy(x,y) and ContainedBy (x,z) implies y=z>>"; t="UniqueContainer";}
+
 #check kernel% abstract predicate PartOverlap specializes BooleanEvaluation {
   in x : Occurrence ;
   in y : Occurrence ;
@@ -2190,11 +2207,16 @@ private def _testMetaFeature : MetadataFeature :=
 -- rather than a fresh primitive (`collectionRangeName`/`mkCollectionGuard` in
 -- `Assert.lean` extended to recognize `subperformances` by name, same
 -- treatment as `suboccurrences` itself). Uses `sp~Occurrence`, not
--- `sp~Performance` -- `Performance` has no `SFS.lean`/DSL counterpart at all
--- (confirmed via a real build error, "Unknown identifier Performance"), a
--- separate, pre-existing gap from this file's own real (untested until now)
--- `enclosedPerformances` formula (`ep~Performance in enclosedPerformances are
--- during(ep,thisPerformance)`), not attempted here.
+-- `sp~Performance` -- at the time this was written, `Performance` had no
+-- `SFS.lean`/DSL counterpart at all (confirmed via a real build error,
+-- "Unknown identifier Performance"); `"Performance"` was added to
+-- `elabDslType`'s mapping table shortly after (`Objects.kerml`'s own
+-- `ownedPerformances`, below), so `~Performance` would work here too now --
+-- left as `~Occurrence` since it was already verified and there's no reason
+-- to churn it. This file's own real `enclosedPerformances` formula
+-- (`ep~Performance in enclosedPerformances are during(ep,thisPerformance)`)
+-- remains untested/unattempted -- it also needs `enclosedPerformances` added
+-- to `collectionRangeName`, not done here.
 #check kernel% @Assert{f="<< forall sp~Occurrence in subperformances are during(sp,self) and PartOf(sp,self) >>";}
 
 -- `Objects.kerml`'s own real `subobjects` (`composite feature subobjects: Object[0..*]
@@ -2215,5 +2237,15 @@ private def _testMetaFeature : MetadataFeature :=
 -- it, not assumed; `"Object"` added alongside it for the same reason.
 #check kernel% @Assert{f="<< forall op~Performance in ownedPerformances are during(op,self)"+
   " and PartOf(op,self) >>";}
+
+-- `Objects.kerml`'s own real `enactedPerformances` (2026-08-27, user-edited
+-- directly in the source, same category as `ownedPerformances` above: replaced
+-- the old `self.timeEnclosedOccurrence(ep)` dotted-call formula with a plain
+-- `during`). Not `composite` at all, and its formula asserts only `during`, no
+-- `PartOf` -- still reuses `IsSuboccurrenceOf` (extended `collectionRangeName`/
+-- `mkCollectionGuard` to recognize `enactedPerformances` too), purely as a
+-- convenient opaque "some KerML-derived Performance collection" placeholder,
+-- not a containment claim (see that function's own doc comment).
+#check kernel% @Assert{f="<< forall ep~Performance in enactedPerformances are during(ep,self) >>";}
 
 end KerML.Kernel

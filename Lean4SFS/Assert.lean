@@ -540,11 +540,11 @@ partial def elabDslRangeGuard (x : TSyntax `term) : TSyntax `dslRange → MacroM
     | none => elabDslWff φ
   | _ => Macro.throwUnsupported
 
-/-- Recognizes a bare-`ident` `dslWff` naming one of the `composite`-flagged
-association-derived collections found so far across the Kernel Semantic Library
-(`Occurrences.kerml`'s `suboccurrences`/`immediatePredecessors`/
-`immediateSuccessors`; `Performances.kerml`'s `subperformances`; `Objects.kerml`'s
-`subobjects`/`ownedPerformances`) by checking its *name*, rather than adding new
+/-- Recognizes a bare-`ident` `dslWff` naming one of the association-derived
+collections found so far across the Kernel Semantic Library (`Occurrences.kerml`'s
+`suboccurrences`/`immediatePredecessors`/`immediateSuccessors`; `Performances.
+kerml`'s `subperformances`; `Objects.kerml`'s `subobjects`/`ownedPerformances`/
+`enactedPerformances`) by checking its *name*, rather than adding new
 dedicated `dslRange` grammar for them: a dedicated
 `syntax "suboccurrences" : dslRange` was tried first and rejected -- it reserves
 the word as a literal token file-wide, which collides with `kermlFeature`'s own
@@ -565,7 +565,8 @@ partial def collectionRangeName (φ : TSyntax `dslWff) : Option Name :=
   | `(dslWff| $rangeName:ident) =>
     if rangeName.getId == `suboccurrences ∨ rangeName.getId == `immediatePredecessors ∨
         rangeName.getId == `immediateSuccessors ∨ rangeName.getId == `subperformances ∨
-        rangeName.getId == `subobjects ∨ rangeName.getId == `ownedPerformances then
+        rangeName.getId == `subobjects ∨ rangeName.getId == `ownedPerformances ∨
+        rangeName.getId == `enactedPerformances then
       some rangeName.getId
     else none
   | _ => none
@@ -579,7 +580,11 @@ suboccurrences` in the real KerML (`ownedPerformances`'s own such clause is
 commented out there), but because `composite` itself means the same containment
 concept regardless (per the request that started this whole thread: "composite
 means temporal and mereological containment"), and the relation is opaque anyway
-(no characterizing law to violate by sharing it).
+(no characterizing law to violate by sharing it). `enactedPerformances` isn't
+`composite` at all, and its own real formula only asserts `during`, never
+`PartOf` -- reused here purely as a convenient opaque "some KerML-derived
+Performance collection" placeholder, not a containment claim; nothing about
+this relation's own (nonexistent) characterizing law distinguishes the two uses.
 `self`/`this` aren't declared here -- they're spliced directly into the elaborated
 term, relying on every real formula using one of these ranges to *also*
 mention `self`/`this` elsewhere in the same body (true of every real case so
@@ -596,7 +601,7 @@ partial def mkCollectionGuard (name : Name) (x : TSyntax `term) : MacroM (TSynta
   let selfIdent := mkIdent `self
   let thisIdent := mkIdent `this
   if name == `suboccurrences ∨ name == `subperformances ∨ name == `subobjects ∨
-      name == `ownedPerformances then
+      name == `ownedPerformances ∨ name == `enactedPerformances then
     `(SFS.IsSuboccurrenceOf $x $selfIdent)
   else if name == `immediatePredecessors then `(SFS.IsImmediatePredecessorOf $x $thisIdent)
   else `(SFS.IsImmediateSuccessorOf $x $thisIdent)
@@ -918,6 +923,15 @@ elab "domain% " a:dslAssert : term => do
 -- Mereology.kerml `PTR`.
 #check domain% << PTR : : forall x,y,z~Occurrence are
   ( (PartOf(x,y) and PartOf(y,z)) implies PartOf(x,z) ) >>
+
+-- Mereology.kerml `Containment` (2026-08-27, user-added directly in the KerML
+-- source, nested inside `ContainedBy`'s own predicate declaration -- see
+-- `SFS.lean`'s new `Containment` class).
+#check domain% <<Containment : : ContainedBy(x,y) implies PartOf(x,y)>>
+
+-- Mereology.kerml `UniqueContainer`, same top-level-law shape as `PAR`/`PTR`.
+#check domain% <<UniqueContainer : : forall x,y,z~Occurrence are
+  ContainedBy(x,y) and ContainedBy (x,z) implies y=z>>
 
 -- Mereology.kerml `PartOverlap`.
 #check domain% << PartOverlap : x~Occurrence, y~Occurrence :

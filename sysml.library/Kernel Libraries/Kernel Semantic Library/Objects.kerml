@@ -56,7 +56,7 @@ standard library package Objects {
 			/*
 			 * Performances that are enacted by this object.
 			 */
-			@Assert{f="<< forall ep~Performance in enactedPerformances are self.timeEnclosedOccurrence(ep) >>";}
+			@Assert{f="<< forall ep~Performance in enactedPerformances are during(ep,self) >>";}
 		}
 		
 //SFS: 	feature timeEnclosedOccurrences replaced by function timeEnclosedOccurrences,
