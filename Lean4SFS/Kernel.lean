@@ -1406,29 +1406,25 @@ elab "kernel% " d:kernelDecl : term => do
 
 -- `nearlyMeets`'s body: its structural KerML body -- `next(x.endShot,
 -- y.startShot)` as a plain invocation, not through the Domain-logic DSL at all --
--- parses and elaborates fine, and (2026-08-26) so does its `@Assert` formula
--- below, via the new `DSLNext` class.
+-- parses and elaborates fine, and so does its `@Assert` formula below.
 #check kernel% predicate nearlyMeets {
   in x : Occurrence ;
   in y : Occurrence ;
   ( x.endShot==y.startShot and ( x.openRight or y.openLeft) ) or next(x.endShot, y.startShot)
 }
 
--- Allen.kerml's own real `@Assert{...}` formulas, verbatim, now live again
--- (2026-08-25, "extend Domain logic for compare only when defined" -- see
--- Assert.lean's own new `DSLLt`/`DSLLe`/`DSLEq`/`DSLAnd`/`DSLOr` outParam
--- instances, and SFS.lean's `kand`/`kor`/`klt`/`kle`/`keq` Strong Kleene
--- combinators). Briefly, after `death` became `Occurrence → Option Time`
--- (2026-08-25, fixing the `birth`/`deathIff` inconsistency), `death(x) < birth(y)`
--- stopped elaborating: comparing `Option Time` to `Time` had no instance. Rather
--- than treating that as an unfixable gap, the DSL itself was taught genuine
--- partiality -- comparisons/`and`/`or` over an `Option`-wrapped operand now
--- propagate undefinedness (Strong Kleene, "compare only when defined"), short-
--- circuiting to a definite answer where one is already forced (e.g. a known-false
--- conjunct makes the whole `and` false even if the other side is unknown). The
--- formula text below is *unchanged* from Allen.kerml -- only the semantics/types
--- assigned to it changed; see Assert.lean's own `example ... := rfl` checks for
--- confirmation each elaborates to exactly `SFS.lean`'s real predicate.
+-- Allen.kerml's own real `@Assert{...}` formulas, verbatim. `death(x)` here means
+-- `SFS.effectiveEnd x` (2026-08-27, "Can the Kleene operators be removed?" --
+-- `Assert.lean`'s `elabDslTerm` special-cases the identifier `death`): `A`'s real
+-- end if known, else `now` -- total, unlike `SFS.death` itself (still `Option`-
+-- valued, the faithful structural fact `Occurrences.kerml`'s own `endShot[0..1]`
+-- needs). This retired the whole `Option Prop`-valued Strong Kleene layer
+-- (`kand`/`kor`/`klt`/`kle`/`keq`/`nextO`, `DSLNext` entirely) that a 2026-08-25/26
+-- detour had built specifically to route around `death`'s partiality -- once the
+-- thing being compared is total, there's nothing left to propagate. The formula
+-- text below is *unchanged* from Allen.kerml; see `Assert.lean`'s own
+-- `example ... := rfl` checks for confirmation each elaborates to exactly
+-- `SFS.lean`'s real (now total) predicate.
 #check kernel% @Assert{n="precedes"; f="<<precedes : x~Occurrence, y~Occurrence : death(x) < birth(y) >>"; t="precedes";}
 
 #check kernel% @Assert{n="meets"; f="<<meets : x~Occurrence, y~Occurrence : death(x) = birth(y) >>"; t="meets";}
@@ -1461,17 +1457,13 @@ elab "kernel% " d:kernelDecl : term => do
   " birth(y) = birth(x) and death(x) = death(y)"+
   " and x.openLeft = y.openLeft and x.openRight = y.openRight >>"; t="coincident";}
 
--- `nearlyMeets`'s own `@Assert` formula, the last of the nine (2026-08-26, at
--- direct request: "let next be false if either of its parameters is undefined"):
--- `next(death(x), birth(y))` now routes through `DSLNext`'s `(Option Time) Time
--- Prop` instance, landing on `SFS.nextO`'s deliberately non-Kleene semantics --
--- see `SFS.lean`'s own doc comment on `nextO` for why "false," not "undefined,"
--- is the right reading specifically for this predicate. `SFS.lean`'s `nearlyMeets`
--- was rewritten the same day onto the shared `kand`/`kor`/`nextO` combinators so
--- this agrees exactly with the DSL-elaborated formula (see `Assert.lean`'s own
--- `example ... := rfl`). This closes the last documented gap in this file's
--- Allen.kerml coverage -- all nine predicates now have both a live structural
--- body `#check` and a live `@Assert` formula `#check`.
+-- `nearlyMeets`'s own `@Assert` formula, the last of the nine: `next(death(x),
+-- birth(y))` -- `death(x)` means `effectiveEnd x` (see above), a plain `Time`, so
+-- `next` applies directly with no lifting at all now (`SFS.nextO`, the
+-- deliberately non-Kleene "false if undefined" primitive this needed before the
+-- 2026-08-27 redesign, is retired along with the rest of the Kleene layer). All
+-- nine predicates have both a live structural body `#check` and a live `@Assert`
+-- formula `#check`.
 #check kernel% @Assert{n="nearlyMeets"; f="<<nearlyMeets : x~Occurrence, y~Occurrence :"+
   " (birth(y) = death(x) and (x.openRight or y.openLeft)) or next(death(x), birth(y))>>";}
 
@@ -2079,24 +2071,32 @@ elab "kernel% " d:kernelDecl : term => do
 -- top-level shape (plain/`composite`-flagged `feature ... : Occurrence[m]
 -- subsets ...`) is covered below via `kerml%` (Core.lean's own entry point --
 -- `kernel%` is Kernel-layer's *mandatory-default* feature production, `= expr`
--- required, wrong one for these; confirmed via a real build error before
--- switching). Their nested bodies are simplified to a bare `;` here, dropping
--- `suboccurrences`' own two `feature redefines X default (that as Occurrence).Y {
--- ... }` subfeatures (`default`'s value clause only accepts a bare
--- `kermlQualName`, not a cast+dot chain -- a separate, smaller gap than `end
--- feature` was, not attempted this round). Their `@Assert` formulas are *not*
--- attempted: each quantifies `forall x~Occurrence in COLLECTION are ...` where
--- `COLLECTION` is a bare Set-valued KerML feature name, not an interval bound --
--- `dslRange` has no production for "range over a named collection" at all (only
--- `..`/`,,`/`,.`/`.,` interval bounds or a bare `dslWff` guard), and even adding
--- one wouldn't be enough on its own: `SFS.lean` has no semantic primitive
--- representing `suboccurrences`/`immediatePredecessors` as an actual `Occurrence →
--- Set Occurrence` value to range over either -- a real new-modeling question, not
--- a grammar-only fix, confirmed via the original survey's real probes (not
--- assumed).
+-- required, wrong one for these). Their nested bodies are simplified to a bare
+-- `;` here, dropping `suboccurrences`' own two `feature redefines X default
+-- (that as Occurrence).Y { ... }` subfeatures (`default`'s value clause only
+-- accepts a bare `kermlQualName`, not a cast+dot chain -- a separate, smaller
+-- gap than `end feature` was, not attempted). `forall x~Occurrence in COLLECTION
+-- are ...` (where `COLLECTION` names one of these three) is handled by
+-- `SFS.SuboccurrenceRelations` (`IsSuboccurrenceOf`/`IsImmediatePredecessorOf`/
+-- `IsImmediateSuccessorOf`, opaque binary relations) plus `Assert.lean`'s own
+-- `collectionRangeName`/`mkCollectionGuard` (checking the *name* of the bound
+-- collection, not new `dslRange` grammar -- a dedicated `syntax "suboccurrences"
+-- : dslRange` was tried first and broke `kermlFeature`'s own declared-name
+-- position, confirmed via a real build error). `immediatePredecessors`/
+-- `immediateSuccessors`'s own formulas (`nearlyMeets(...)` as the quantifier
+-- body) additionally needed the 2026-08-27 total-Allen-predicate redesign
+-- (`nearlyMeets` used to be `Option Prop`-valued, and `forall`/`exists` only ever
+-- accepted a plain `Prop` body) -- both now elaborate live below.
+-- `suboccurrences`'s own formula remains excluded: `during(life(s),life(self))`
+-- passes `life(s)` (a `Set Instant`) where `during` expects an `Occurrence` --
+-- looks like a genuine transcription bug in `Occurrences.kerml` itself (same
+-- category as `getLife`'s own, already fixed), flagged but not yet confirmed/
+-- fixed at the source.
 #check kerml% composite feature suboccurrences: Occurrence[0..*] subsets occurrences ;
 #check kerml% feature immediatePredecessors: Occurrence[0..*] subsets occurrences ;
+#check kernel% @Assert{f="<< forall i~Occurrence in immediatePredecessors are nearlyMeets(i,this) >>";}
 #check kerml% feature immediateSuccessors: Occurrence[0..*] subsets occurrences inverse of immediatePredecessors ;
+#check kernel% @Assert{f="<< forall i~Occurrence in immediateSuccessors are nearlyMeets(this,i) >>";}
 
 -- `spaceInterior`/`spaceInteriorOf`/`spaceBoundary`: all three real `@Assert`
 -- formulas already elaborate live (confirmed by the original survey's real

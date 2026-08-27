@@ -879,6 +879,24 @@ def AtomPart (x : Occurrence) : Prop := ¬ ∃ z, PartOf z x
 /-- SFS.mm `df-pwh`. -/
 def WholePart (x : Occurrence) : Prop := ∀ z, PartOf z x ∨ x = z
 
+/-- `Occurrences.kerml`'s `suboccurrences`/`immediatePredecessors`/
+`immediateSuccessors`: association-derived collections, given as opaque binary
+relations (2026-08-26) -- not `Occurrence → Set Occurrence` functions, which would
+need an implicit `self`/`this` receiver threaded through the DSL side for no real
+benefit, and every other KerML-association-derived primitive here (`PartOf`,
+`Adjacent`) is already binary-relation-shaped, not collection-valued. No
+characterizing law baked in (same treatment as `Adjacent`) -- each real `@Assert`
+below states a genuine constraint on the relation, not a definition of it. -/
+class SuboccurrenceRelations where
+  IsSuboccurrenceOf : Occurrence → Occurrence → Prop
+  IsImmediatePredecessorOf : Occurrence → Occurrence → Prop
+  IsImmediateSuccessorOf : Occurrence → Occurrence → Prop
+export SuboccurrenceRelations (IsSuboccurrenceOf IsImmediatePredecessorOf IsImmediateSuccessorOf)
+noncomputable instance suboccurrenceRelationsModel : SuboccurrenceRelations :=
+  ⟨Classical.choose (⟨fun _ _ => False, trivial⟩ : ∃ _ : Occurrence → Occurrence → Prop, True),
+    Classical.choose (⟨fun _ _ => False, trivial⟩ : ∃ _ : Occurrence → Occurrence → Prop, True),
+    Classical.choose (⟨fun _ _ => False, trivial⟩ : ∃ _ : Occurrence → Occurrence → Prop, True)⟩
+
 -- SFS.mm's `povrfl`/`punrfl`/`pimrfl`/`pdjrfl` are unproven placeholders (`$= ?`)
 -- there too (see `reference_metamath_sfs_toolchain.md`'s baseline-placeholder list).
 -- Three are, in fact, real theorems here, needing no axiom:
@@ -1542,53 +1560,35 @@ finite shared-tick structure is what supplies it (2026-08-26, retiring the earli
 separately-axiomatized `hasFirstInstant`). -/
 #print axioms model
 
-/-- Strong Kleene conjunction on `Option Prop`, the general form of the ad hoc
-"`some tA, some tB => some (...) | _, _ => none`" pattern this file used to repeat
-per-predicate: unlike that pattern, `kand` *short-circuits* to `some False` when the
-known operand is already false, even if the other is `none` -- matching real
-three-valued (Kleene) `∧`, not merely "both defined or nothing." Needs `Classical`
-(same as `nonoverlaps`'s pre-existing hand-rolled version below did) only to decide
-which branch a `some`-wrapped `Prop` operand is in. -/
-noncomputable def kand (p q : Option Prop) : Option Prop :=
-  open Classical in
-  match p, q with
-  | some P, some Q => some (P ∧ Q)
-  | some P, none => if P then none else some False
-  | none, some Q => if Q then none else some False
-  | none, none => none
+/-- `Occurrences.kerml`'s "active-now" property (2026-08-27, at direct request,
+replacing the whole Strong Kleene layer this section used to hold): an `Occurrence`
+is active-now exactly when it hasn't reached its `endShot` yet. -/
+def activeNow (A : Occurrence) : Prop := death A = none
 
-/-- Strong Kleene disjunction on `Option Prop`, dual to `kand`: short-circuits to
-`some True` when the known operand is already true. -/
-noncomputable def kor (p q : Option Prop) : Option Prop :=
-  open Classical in
-  match p, q with
-  | some P, some Q => some (P ∨ Q)
-  | some P, none => if P then some True else none
-  | none, some Q => if Q then some True else none
-  | none, none => none
+/-- The *effective* end of an `Occurrence`, always evaluated at the fixed `now`:
+`death A` when it's known, else `now` itself -- "if the endShot has not been
+reached, the end of the interval is considered to be now" (2026-08-27, at direct
+request). Total, unlike `death` -- the key move that lets every Allen predicate
+below drop `Option Prop` entirely: `death`'s own partiality was the *only* source
+of it anywhere in this file. Retires `kand`/`kor`/`klt`/`kle`/`keq`/`nextO` (all
+Strong Kleene machinery built specifically to propagate `death`'s partiality
+through comparisons/connectives, added 2026-08-25/26) outright -- once the thing
+being compared is total, there's nothing left to propagate. `Assert.lean`'s own
+DSL routes the real `@Assert` formulas' `death(x)` calls to this function, not
+`SFS.lean`'s `death` directly (see that file's matching special-case) -- the
+formula text itself is unchanged, only what "death" denotes when evaluated. -/
+noncomputable def effectiveEnd (A : Occurrence) : Time := (death A).getD ⟨now, dl_nowt⟩
 
-/-- Comparisons lifted through `Option Time`: `none` unless both operands are known
-(there is nothing to short-circuit on for a bare order/equality atom -- the
-short-circuiting happens one level up, in `kand`/`kor`). -/
-noncomputable def klt (a b : Option Time) : Option Prop :=
-  match a, b with | some a', some b' => some (a'.val ≺ b'.val) | _, _ => none
-noncomputable def kle (a b : Option Time) : Option Prop :=
-  match a, b with | some a', some b' => some (a'.val ≼ b'.val) | _, _ => none
-noncomputable def keq (a b : Option Time) : Option Prop :=
-  match a, b with | some a', some b' => some (a' = b') | _, _ => none
+/-- SFS.mm `df-lifetime`, now total via `effectiveEnd` -- no longer `Option`-valued,
+since `effectiveEnd` isn't. -/
+noncomputable def life (A : Occurrence) : Set Instant := Set.Icc (birth A).val (effectiveEnd A).val
 
-/-- SFS.mm `df-lifetime`, `Option`-valued: undefined (`none`) exactly when `death A`
-is, i.e. for an ongoing occurrence -- matching `Occurrences::HappensDuring`-style KerML
-constructs already requiring a definite `endShot`. -/
-noncomputable def life (A : Occurrence) : Option (Set Instant) := (death A).map fun tA => Set.Icc (birth A).val tA.val
-
-/-- SFS.mm `df-precedes`, `Option`-valued: needs only `A`'s death (`B`'s `endShot`,
-if any, is irrelevant to whether `A` precedes `B`) -- `none` iff `death A = none`. -/
-noncomputable def precedes (A B : Occurrence) : Option Prop := (death A).map fun tA => tA.val ≺ (birth B).val
-/-- SFS.mm `df-meets`: needs only `A`'s death, same reasoning as `precedes`. -/
-noncomputable def meets (A B : Occurrence) : Option Prop := (death A).map fun tA => tA = birth B
-/-- SFS.mm `df-overlaps`: needs only `A`'s death, same reasoning as `precedes`. -/
-noncomputable def overlaps (A B : Occurrence) : Option Prop := (death A).map fun tA => (birth B).val ≺ tA.val
+/-- SFS.mm `df-precedes`, now total via `effectiveEnd`. -/
+noncomputable def precedes (A B : Occurrence) : Prop := (effectiveEnd A).val ≺ (birth B).val
+/-- SFS.mm `df-meets`, now total. -/
+noncomputable def meets (A B : Occurrence) : Prop := effectiveEnd A = birth B
+/-- SFS.mm `df-overlaps`, now total. -/
+noncomputable def overlaps (A B : Occurrence) : Prop := (birth B).val ≺ (effectiveEnd A).val
 /-- `Domain::Interval` itself, `Occurrences.kerml`'s own `,,` term-literal target
 (`startShot ,, endShot`, `middleTimeSlice`'s real `@Assert`): a genuine two-endpoint
 value with boundary-openness flags, mirroring `Domain.kerml`'s real `classifier
@@ -1631,41 +1631,27 @@ noncomputable instance openBoundaryModel : OpenBoundary :=
   ⟨Classical.choose (⟨fun _ => False, trivial⟩ : ∃ _ : Occurrence → Prop, True),
     Classical.choose (⟨fun _ => False, trivial⟩ : ∃ _ : Occurrence → Prop, True)⟩
 
-/-- SFS.mm `df-starts`: compares `A`'s and `B`'s deaths directly, so needs both --
-via `kand`/`klt`, which (unlike the old hand-rolled match) short-circuits to a
-definite answer as soon as any known conjunct settles it, even if a death is
-unknown. `openLeft A = openLeft B` (2026-08-26) matches `Allen.kerml`'s real
-formula, which this definition had been missing -- both boundaries must agree
-open/closed the same way for `starts` to hold. Nested `kand`s deliberately mirror
-`Allen.kerml`'s own right-associative `and`-chain (`Assert.lean`'s `dslWff` grammar
-parses `A and B and C` as `A and (B and C)`) rather than grouping the two
-non-partial conjuncts together, so this is *literally*, not just logically, what
-the real `@Assert` formula elaborates to -- see `Assert.lean`/`Kernel.lean`'s own
-`example ... := rfl` checks. -/
-noncomputable def starts (A B : Occurrence) : Option Prop :=
-  kand (some (birth A = birth B)) (kand (klt (death B) (death A)) (some (openLeft A = openLeft B)))
-/-- SFS.mm `df-during`: needs both, same reasoning as `starts`. -/
-noncomputable def during (A B : Occurrence) : Option Prop :=
-  kand (some ((birth B).val ≼ (birth A).val)) (kle (death A) (death B))
-/-- SFS.mm `df-finishes`: needs both, same reasoning as `starts` -- `openRight A =
-openRight B` (2026-08-26) matches `Allen.kerml`'s real formula, same fix and same
-right-associative nesting as `starts` above. -/
-noncomputable def finishes (A B : Occurrence) : Option Prop :=
-  kand (some ((birth B).val ≺ (birth A).val)) (kand (keq (death A) (death B)) (some (openRight A = openRight B)))
-/-- SFS.mm `df-coincident`: needs both, same reasoning as `starts` -- both boundary
-conjuncts (2026-08-26), matching `Allen.kerml`'s real formula, same fix and nesting
-as `starts`/`finishes` above; the trailing pair (`openLeft`/`openRight`, both
-non-partial) combine via plain `∧`, matching how the DSL's own right-associative
-parse bottoms out. -/
-noncomputable def coincident (A B : Occurrence) : Option Prop :=
-  kand (some (birth B = birth A))
-    (kand (keq (death A) (death B)) (some (openLeft A = openLeft B ∧ openRight A = openRight B)))
+/-- SFS.mm `df-starts`, now total via `effectiveEnd`. `openLeft A = openLeft B`
+(2026-08-26) matches `Allen.kerml`'s real formula -- both boundaries must agree
+open/closed the same way for `starts` to hold. -/
+noncomputable def starts (A B : Occurrence) : Prop :=
+  birth A = birth B ∧ (effectiveEnd B).val ≺ (effectiveEnd A).val ∧ openLeft A = openLeft B
+/-- SFS.mm `df-during`, now total via `effectiveEnd`. -/
+noncomputable def during (A B : Occurrence) : Prop :=
+  (birth B).val ≼ (birth A).val ∧ (effectiveEnd A).val ≼ (effectiveEnd B).val
+/-- SFS.mm `df-finishes`, now total via `effectiveEnd` -- `openRight A = openRight B`
+(2026-08-26) matches `Allen.kerml`'s real formula. -/
+noncomputable def finishes (A B : Occurrence) : Prop :=
+  (birth B).val ≺ (birth A).val ∧ effectiveEnd A = effectiveEnd B ∧ openRight A = openRight B
+/-- SFS.mm `df-coincident`, now total via `effectiveEnd` -- both boundary conjuncts
+(2026-08-26), matching `Allen.kerml`'s real formula. -/
+noncomputable def coincident (A B : Occurrence) : Prop :=
+  birth B = birth A ∧ effectiveEnd A = effectiveEnd B ∧
+    (openLeft A = openLeft B ∧ openRight A = openRight B)
 /-- SFS.mm `df-nonoverlaps`: `death(x) < birth(y) ∨ death(y) < birth(x)`, i.e.
-exactly `precedes A B ∨ precedes B A` -- `kor` gives the correct strong-Kleene
-disjunction for free (a known-true disjunct wins even if the other occurrence
-hasn't ended), replacing what used to be a bespoke hand-rolled `if`/`match` block
-here. -/
-noncomputable def nonoverlaps (A B : Occurrence) : Option Prop := kor (precedes A B) (precedes B A)
+exactly `precedes A B ∨ precedes B A` -- now a plain `Or`, total like everything
+else here. -/
+noncomputable def nonoverlaps (A B : Occurrence) : Prop := precedes A B ∨ precedes B A
 
 /- `finitePartition`/`tickCount`/`ticks`/`ticks_zero`/`ticks_last`/`ticks_mono`/
 `ticks_constant`/`isTick` moved earlier (2026-08-26, at direct request), right
@@ -1703,35 +1689,14 @@ theorem next_uniq {t1 t2 t3 : Time} (h2 : next t1 t2) (h3 : next t1 t3) : t2 = t
   · rw [← hi2, ← hi3, heq]
   · exact absurd ⟨t3, ⟨i3, hi3⟩, h13, hi3 ▸ hi2 ▸ ticks_mono i3 i2 hgt⟩ hno2
 
-/-- `next` lifted to `Option Time` arguments -- needed for the real `@Assert`
-formula `next(death(x), birth(y))` (`death` became `Option Time`-valued
-2026-08-25), and for `nearlyMeets` below. **False, not undefined**, when either
-argument is absent (2026-08-26, at direct request): unlike `kand`/`kor`/`klt`/
-`kle`/`keq`, this is a deliberate departure from Strong Kleene propagation --
-`next` asks "is there a specific consecutive-tick relationship between these two
-instants," and "one of the instants doesn't exist yet" makes that relationship
-false, not merely unknown (contrast `death(x) < birth(y)`, where an unfinished
-`x` genuinely leaves the *comparison* undecided). -/
-noncomputable def nextO (t1 t2 : Option Time) : Prop :=
-  match t1, t2 with
-  | some t1', some t2' => next t1' t2'
-  | _, _ => False
-
-/-- SFS.mm `df-nearlymeets`. The `next (death A) (birth B)` disjunct is, before
-2026-08-26's redesign, provably always `False` (`next` was vacuous on dense `ℝ`);
-now genuinely possible whenever `death A`/`birth B` are consecutive shared ticks.
-Rewritten (2026-08-26, same day as `nextO` above) onto the shared `kand`/`kor`/
-`nextO` combinators, matching every other Allen predicate: previously `.map`ped
-the whole body over `death A`, so an unfinished `A` made the *entire* result
-`none` unconditionally; now `kand`'s own short-circuit can still resolve the
-first disjunct to `some False` when `¬(openRight A ∨ openLeft B)` is already
-known, even with `death A` undefined -- a genuine behavior change, not just a
-refactor, and the correct one: it's the same Kleene short-circuiting every other
-predicate here already gets. See `Assert.lean`'s `example ... := rfl` for
-confirmation this now agrees with the DSL-elaborated formula text exactly. -/
-noncomputable def nearlyMeets (A B : Occurrence) : Option Prop :=
-  kor (kand ((death A).map fun tA => birth B = tA) (some (openRight A ∨ openLeft B)))
-      (some (nextO (death A) (some (birth B))))
+/-- SFS.mm `df-nearlymeets`, now total via `effectiveEnd` -- `next`'s own argument
+no longer needs any `Option`-lifting at all, since `effectiveEnd A` is already a
+plain `Time`. The `next (effectiveEnd A) (birth B)` disjunct is, before
+2026-08-26's tick redesign, provably always `False` (`next` was vacuous on dense
+`ℝ`); now genuinely possible whenever `effectiveEnd A`/`birth B` are consecutive
+shared ticks. -/
+noncomputable def nearlyMeets (A B : Occurrence) : Prop :=
+  (birth B = effectiveEnd A ∧ (openRight A ∨ openLeft B)) ∨ next (effectiveEnd A) (birth B)
 
 -- The old `nearlyMeets_iff` (an unconditional collapse to just the open-boundary
 -- disjunct, via `next_dense`'s vacuity) is retired along with `next_dense` itself:

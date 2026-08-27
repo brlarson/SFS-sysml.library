@@ -338,17 +338,16 @@ lets `tau1 < tau2` (both elaborating to `SFS.Time`) produce `SFS.tprec`-based
 comparison while a real-valued `<` elsewhere in the same file produces plain `ℝ`
 comparison, from the exact same generated `DSLLt.lt` call.
 
-Three type parameters (`α β : Type _`, `γ : outParam Type _`), not one -- mirrors
-Lean's own `HAdd`/`HMul` idiom -- so a *heterogeneous* comparison like
-`death(x) < birth(y)` (`Option Time` against plain `Time`, since `SFS.death` became
-`Option`-valued 2026-08-25) can still resolve: `α`/`β` need not agree, and the
-result type `γ` (`Prop` when both sides are total, `Option Prop` -- "compare only
-when defined," Strong Kleene, matching `SFS.kand`/`SFS.kor`'s established semantics
--- when either side is `Option`-wrapped) is inferred as an output rather than fixed
-in advance. All instances below are on closed, concrete types (`Time`/`Option Time`/
-`ℝ`, never a bare type variable), so Lean's instance search resolves every query
-unambiguously -- no risk of overlap between, say, the `Time Time Prop` and
-`(Option Time) Time (Option Prop)` instances, since no single query can match both. -/
+2026-08-27, at direct request ("Can the Kleene operators be removed?"): the whole
+`Option Prop`-valued layer this section held (`DSLLt`/`DSLLe`/`DSLEq`/`DSLAnd`/
+`DSLOr`'s `Option`-involving instances, `DSLNext` entirely) is retired.
+`SFS.death`'s own partiality was the *only* thing ever routing a real formula
+through them; now that `death(x)` calls in a formula are special-cased to
+`SFS.effectiveEnd` instead (a total `Time`, see `elabDslTerm`'s matching case
+below), nothing produces an `Option Prop`/`Option Time` operand here anymore. Two
+type parameters would suffice now, but `α β : Type _`/`γ : outParam Type _` is kept
+(mirroring Lean's own `HAdd`/`HMul` idiom) since it costs nothing and keeps the
+door open if a genuinely partial value shows up here again. -/
 class DSLLt (α β : Type _) (γ : outParam (Type _)) where lt : α → β → γ
 class DSLLe (α β : Type _) (γ : outParam (Type _)) where le : α → β → γ
 
@@ -356,16 +355,6 @@ instance : DSLLt Time Time Prop := ⟨fun t1 t2 => t1.val ≺ t2.val⟩
 instance : DSLLe Time Time Prop := ⟨fun t1 t2 => t1.val ≼ t2.val⟩
 instance : DSLLt ℝ ℝ Prop := ⟨(· < ·)⟩
 instance : DSLLe ℝ ℝ Prop := ⟨(· ≤ ·)⟩
-
-/-- The `Option Time`-involving cases needed for `precedes`/`overlaps` (`death(x) <
-birth(y)`/`birth(y) < death(x)`, one side `Option`-wrapped, the other total) and
-`during` (`death(x) <= death(y)`, both wrapped, via `SFS.kle`). No `Option ℝ`
-instances exist -- nothing in the repo's real `@Assert` formulas compares a raw
-`Option`-wrapped real, only `Option Time`. -/
-instance : DSLLt (Option Time) Time (Option Prop) := ⟨fun a b => a.map fun a' => a'.val ≺ b.val⟩
-instance : DSLLt Time (Option Time) (Option Prop) := ⟨fun a b => b.map fun b' => a.val ≺ b'.val⟩
-noncomputable instance : DSLLt (Option Time) (Option Time) (Option Prop) := ⟨SFS.klt⟩
-noncomputable instance : DSLLe (Option Time) (Option Time) (Option Prop) := ⟨SFS.kle⟩
 
 /-- `in`'s dslWff sense (`x in y`, e.g. `PointInRegion`'s own body `point in region`) is
 overloaded the same way `<`/`<=` are: `SFS.lean` doesn't model spatial containment via
@@ -380,61 +369,26 @@ class DSLMem (α : Type _) (β : Type _) where mem : α → β → Prop
 instance : DSLMem Point Region := ⟨InRegion⟩
 instance : DSLMem Point Surface := ⟨OnSurface⟩
 
-/-- `=` is, unlike `<`/`<=`, used generically across an open-ended set of types today
-(`Occurrence`, `Bool`, `Set Item`, ...) via bare Lean `Eq` -- so unlike `DSLLt`/`DSLLe`
-it needs an actual generic fallback, not just a fixed list of concrete instances. That
-fallback must not win when both sides are `Option Time`: the whole point of
-`death(x) = death(y)`-style formulas becoming Kleene-aware is that `none = none`
-must NOT silently elaborate to `True` the way bare `Option` equality would. The
-concrete `(Option Time) (Option Time) (Option Prop)` instance below is therefore
-given no explicit priority (default = 1000) while the generic fallback is marked
-`priority := low`, so Lean's instance search tries (and succeeds on) the concrete one
-first for that exact query; the fallback is only ever reached when no concrete
-instance matches. -/
+/-- `=` is used generically across an open-ended set of types today (`Occurrence`,
+`Bool`, `Set Item`, `Time`, ...) via bare Lean `Eq` -- a single generic fallback,
+no fixed list of concrete instances needed (the `Option Time`-involving concrete
+instances this used to need, to keep `none = none` from silently elaborating to
+`True`, are gone along with `death`'s own partiality -- see this section's header
+note). -/
 class DSLEq (α β : Type _) (γ : outParam (Type _)) where eq : α → β → γ
 
-instance : DSLEq (Option Time) Time (Option Prop) := ⟨fun a b => a.map (· = b)⟩
-instance : DSLEq Time (Option Time) (Option Prop) := ⟨fun a b => b.map (a = ·)⟩
-noncomputable instance : DSLEq (Option Time) (Option Time) (Option Prop) := ⟨SFS.keq⟩
-instance (priority := low) {α : Type _} : DSLEq α α Prop := ⟨Eq⟩
+instance {α : Type _} : DSLEq α α Prop := ⟨Eq⟩
 
-/-- `and`/`or` are, like `=`, used generically on plain `Prop` today (every existing
-`@Assert` formula) but must also accept an `Option Prop` operand (mixed with a plain
-`Prop`, or with another `Option Prop`) and route through `SFS.kand`/`SFS.kor` --
-Strong Kleene, not "undefined poisons the whole formula" and not "undefined treated
-as false." All four cells of each 2x2 (`Prop`/`Option Prop` on each side) are given
-explicit, non-overlapping concrete instances -- no generic fallback is needed since
-every operand shape a real formula can produce is already one of these four.
-Field names are `conj`/`disj`, not `and`/`or` -- the latter are this file's own
-`dslWff` syntax keywords (`syntax ... " and " ...` above), so `where and : ...`
-would parse `and` as that keyword, not a field name. -/
+/-- `and`/`or` are used generically on plain `Prop` (every `@Assert` formula, now
+that nothing here is `Option`-valued). Field names are `conj`/`disj`, not `and`/
+`or` -- the latter are this file's own `dslWff` syntax keywords (`syntax ... "
+and " ...` above), so `where and : ...` would parse `and` as that keyword, not a
+field name. -/
 class DSLAnd (α β : Type _) (γ : outParam (Type _)) where conj : α → β → γ
 class DSLOr (α β : Type _) (γ : outParam (Type _)) where disj : α → β → γ
 
 instance : DSLAnd Prop Prop Prop := ⟨And⟩
-noncomputable instance : DSLAnd Prop (Option Prop) (Option Prop) := ⟨fun p q => SFS.kand (some p) q⟩
-noncomputable instance : DSLAnd (Option Prop) Prop (Option Prop) := ⟨fun p q => SFS.kand p (some q)⟩
-noncomputable instance : DSLAnd (Option Prop) (Option Prop) (Option Prop) := ⟨SFS.kand⟩
-
 instance : DSLOr Prop Prop Prop := ⟨Or⟩
-noncomputable instance : DSLOr Prop (Option Prop) (Option Prop) := ⟨fun p q => SFS.kor (some p) q⟩
-noncomputable instance : DSLOr (Option Prop) Prop (Option Prop) := ⟨fun p q => SFS.kor p (some q)⟩
-noncomputable instance : DSLOr (Option Prop) (Option Prop) (Option Prop) := ⟨SFS.kor⟩
-
-/-- Routes the DSL's `next(...)` calls specifically (`elabDslWff`'s `ident(args)`
-case special-cases the identifier `next`, see below) -- not a generic mechanism
-for arbitrary predicate names the way `DSLLt`/`DSLEq`/`DSLAnd`/`DSLOr` are for
-their operators. `next : Time → Time → Prop` itself is untouched; the `Option`-
-involving cells go through `SFS.nextO`'s deliberately non-Kleene "false if either
-argument is undefined" policy (2026-08-26, at direct request) rather than
-`kand`/`kor`-style propagation -- see `nextO`'s own doc comment for why that's the
-right call specifically for this predicate. -/
-class DSLNext (α β : Type _) (γ : outParam (Type _)) where nextCall : α → β → γ
-
-instance : DSLNext Time Time Prop := ⟨SFS.next⟩
-noncomputable instance : DSLNext (Option Time) (Option Time) Prop := ⟨SFS.nextO⟩
-noncomputable instance : DSLNext (Option Time) Time Prop := ⟨fun a b => SFS.nextO a (some b)⟩
-noncomputable instance : DSLNext Time (Option Time) Prop := ⟨fun a b => SFS.nextO (some a) b⟩
 
 /-- `dslType` → the `SFS.lean` type it names. Recognized DSL type names are mapped to
 their `SFS.lean` counterpart; anything else is passed through as a bare identifier
@@ -515,7 +469,18 @@ partial def elabDslTerm : TSyntax `dslTerm → MacroM (TSyntax `term)
   | `(dslTerm| $n:num) => `($n)
   | `(dslTerm| $f:ident($args,*)) => do
     let args ← args.getElems.mapM elabDslTerm
-    `($f $args*)
+    -- `death(...)` is special-cased to `SFS.effectiveEnd` (2026-08-27, "Can the
+    -- Kleene operators be removed?"): every real `@Assert` formula's `death(x)`
+    -- now means "A's real end if known, else now" -- `SFS.death` itself (still
+    -- Option-valued, the faithful structural fact) is untouched, only what a
+    -- *formula* means by "death" changes. Every other `ident(args)` term keeps
+    -- plain application.
+    if f.getId == `death then
+      match args with
+      | #[a] => `(SFS.effectiveEnd $a)
+      | _ => `($f $args*)
+    else
+      `($f $args*)
   | `(dslTerm| I[[ $d:dslTerm :: $f:ident $[, $tau:dslTerm]? ]]) => do
     let d' ← elabDslTerm d
     match tau with
@@ -556,8 +521,57 @@ partial def elabDslRangeGuard (x : TSyntax `term) : TSyntax `dslRange → MacroM
     `($x ∈ Set.Ioc $(← elabDslTerm a) $(← elabDslTerm b))
   | `(dslRange| $a:dslTerm ., $b:dslTerm) => do
     `($x ∈ Set.Ico $(← elabDslTerm a) $(← elabDslTerm b))
-  | `(dslRange| $φ:dslWff) => elabDslWff φ
+  | `(dslRange| $φ:dslWff) => do
+    match collectionRangeName φ with
+    | some name => mkCollectionGuard name x
+    | none => elabDslWff φ
   | _ => Macro.throwUnsupported
+
+/-- Recognizes a bare-`ident` `dslWff` naming one of `Occurrences.kerml`'s three
+association-derived collections (`suboccurrences`/`immediatePredecessors`/
+`immediateSuccessors`) by checking its *name*, rather than adding new dedicated
+`dslRange` grammar for them: a dedicated `syntax "suboccurrences" : dslRange` was
+tried first and rejected -- it reserves the word as a literal token file-wide,
+which collides with `kermlFeature`'s own declared-name position (`feature
+suboccurrences: ...`, needed as a plain identifier there), confirmed via a real
+build error. Same "check the name, don't reserve the token" fix `elabDslWff`'s own
+`next` special-case already uses. Used by both `elabDslRangeGuard`'s own bare-guard
+case above and `wrapForall`/`wrapExists`'s own dedicated bare-`dslWff`-range
+short-circuit below -- the latter is the *actually*-exercised path for `forall
+x~T in RANGE are ...` (confirmed the hard way: an earlier version of this fix lived
+only in `elabDslRangeGuard`, which `wrapForall`/`wrapExists` never call for this
+shape at all, and it silently never fired). -/
+partial def collectionRangeName (φ : TSyntax `dslWff) : Option Name :=
+  match φ with
+  | `(dslWff| $rangeName:ident) =>
+    if rangeName.getId == `suboccurrences ∨ rangeName.getId == `immediatePredecessors ∨
+        rangeName.getId == `immediateSuccessors then
+      some rangeName.getId
+    else none
+  | _ => none
+
+/-- The guard itself for one of `collectionRangeName`'s three recognized names,
+given the bound-variable term `x`. Unlike a genuine guard (which ignores the bound
+variable entirely, see `wrapForall`/`wrapExists`'s other branch), these three
+genuinely depend on it: `IsSuboccurrenceOf $x self`, not a free-standing condition.
+`self`/`this` aren't declared here -- they're spliced directly into the elaborated
+term, relying on every real formula using one of these three ranges to *also*
+mention `self`/`this` elsewhere in the same body (true of all three real cases), so
+the ordinary free-identifier auto-binder discovers and types them from that other
+occurrence. -/
+partial def mkCollectionGuard (name : Name) (x : TSyntax `term) : MacroM (TSyntax `term) := do
+  -- `mkIdent`, not a bare literal `self`/`this` in the quotation -- a plain
+  -- unquoted identifier here gets hygienically renamed (confirmed via a real
+  -- build error, "Unknown identifier self✝") since it looks like a fresh local
+  -- reference to Lean's macro hygiene, not the free outer-scope name that needs
+  -- to line up with `self`/`this`'s *other* occurrence elsewhere in the same
+  -- formula (see this function's own doc comment above). Same fix `resultIdent`
+  -- already established for exactly this shape of problem.
+  let selfIdent := mkIdent `self
+  let thisIdent := mkIdent `this
+  if name == `suboccurrences then `(SFS.IsSuboccurrenceOf $x $selfIdent)
+  else if name == `immediatePredecessors then `(SFS.IsImmediatePredecessorOf $x $thisIdent)
+  else `(SFS.IsImmediateSuccessorOf $x $thisIdent)
 
 /-- Shared by the plain and chained `forall` productions: nests `∀` over every
 `(name, type)` binder, with an optional trailing range/guard. An *interval*-shaped
@@ -573,9 +587,14 @@ partial def wrapForall (binders : Array (TSyntax `ident × TSyntax `term))
   match r with
   | some rr =>
     match rr with
-    | `(dslRange| $φ:dslWff) => do
-      let inner ← `($(← elabDslWff φ) → $base)
-      binders.foldrM (fun b acc => `(∀ ($(b.1) : $(b.2)), $acc)) inner
+    | `(dslRange| $φ:dslWff) =>
+      match collectionRangeName φ with
+      | some name => binders.foldrM (fun b acc => do
+          let g ← mkCollectionGuard name (← `($(b.1)))
+          `(∀ ($(b.1) : $(b.2)), $g → $acc)) base
+      | none => do
+        let inner ← `($(← elabDslWff φ) → $base)
+        binders.foldrM (fun b acc => `(∀ ($(b.1) : $(b.2)), $acc)) inner
     | _ => binders.foldrM (fun b acc => do
         let g ← elabDslRangeGuard (← `($(b.1))) rr
         `(∀ ($(b.1) : $(b.2)), $g → $acc)) base
@@ -589,9 +608,14 @@ partial def wrapExists (binders : Array (TSyntax `ident × TSyntax `term))
   match r with
   | some rr =>
     match rr with
-    | `(dslRange| $φ:dslWff) => do
-      let inner ← `($(← elabDslWff φ) ∧ $base)
-      binders.foldrM (fun b acc => `(Exists (fun ($(b.1) : $(b.2)) => $acc))) inner
+    | `(dslRange| $φ:dslWff) =>
+      match collectionRangeName φ with
+      | some name => binders.foldrM (fun b acc => do
+          let g ← mkCollectionGuard name (← `($(b.1)))
+          `(Exists (fun ($(b.1) : $(b.2)) => $g ∧ $acc))) base
+      | none => do
+        let inner ← `($(← elabDslWff φ) ∧ $base)
+        binders.foldrM (fun b acc => `(Exists (fun ($(b.1) : $(b.2)) => $acc))) inner
     | _ => binders.foldrM (fun b acc => do
         let g ← elabDslRangeGuard (← `($(b.1))) rr
         `(Exists (fun ($(b.1) : $(b.2)) => $g ∧ $acc))) base
@@ -618,15 +642,7 @@ partial def elabDslWff : TSyntax `dslWff → MacroM (TSyntax `term)
     | _ => `($x)
   | `(dslWff| $f:ident($args,*)) => do
     let args ← args.getElems.mapM elabDslTerm
-    -- `next(...)` is special-cased to route through `DSLNext` (2026-08-26): every
-    -- other `ident(args)` predicate keeps plain application, since `next` is the
-    -- only one whose real argument types (`death`/`birth`) can be `Option`-wrapped.
-    if f.getId == `next then
-      match args with
-      | #[a, b] => `(DSLNext.nextCall $a $b)
-      | _ => `($f $args*)
-    else
-      `($f $args*)
+    `($f $args*)
   | `(dslWff| $a:dslTerm $r:ident $b:dslTerm) => do
     `($r $(← elabDslTerm a) $(← elabDslTerm b))
   | `(dslWff| $a:dslTerm < $b:dslTerm) => do `(DSLLt.lt $(← elabDslTerm a) $(← elabDslTerm b))
@@ -976,25 +992,18 @@ example : domain% <<GetBooleanChange : d~Occurrence, e~BooleanEvaluation, tau~In
 -- header at all): both `self` and `thisPerformance` are scope-visible (KerML's
 -- implicit self-reference and a redefinable feature of `Performance`), auto-bound
 -- here with their types inferred from `SFS.lean`'s real `during : Occurrence →
--- Occurrence → Option Prop` (2026-08-25: was `Prop`, before `death` became
--- `Option`-valued -- this `#check` still elaborates fine, it just now reports
--- `Option Prop` rather than `Prop`; `#check` doesn't itself constrain the result
--- type the way `example ... := rfl` above does).
+-- Occurrence → Prop`.
 #check domain% << during(self, thisPerformance) >>
 
--- Allen.kerml's own real `@Assert` formulas, verbatim (2026-08-25, "extend Domain
--- logic for compare only when defined"): `death(x)`/`death(y)` elaborate to
--- `Option Time` (2026-08-25's earlier `Occurrence → Option Time` change), so `<`/`=`/
--- `and`/`or` here go through the new `DSLLt`/`DSLLe`/`DSLEq`/`DSLAnd`/`DSLOr`
--- outParam instances above instead of the plain-`Prop` operators used everywhere
--- else in this file -- each `example ... := rfl` below confirms the elaborated form
--- is *exactly* `SFS.lean`'s own `precedes`/`meets`/`overlaps`/`during`/`nonoverlaps`
--- (all rewritten the same day onto the shared `kand`/`kor`/`klt`/`kle`/`keq`
--- combinators), not merely something that happens to type-check.
--- `nearlyMeets`'s own `next(death(x), birth(y))` call is handled separately, via
--- the new `DSLNext` class below (2026-08-26, at direct request: "false if either
--- of its parameters is undefined" -- not Kleene propagation, see `SFS.nextO`'s
--- own doc comment) -- its `#check`/`example` live further down, after `coincident`.
+-- Allen.kerml's own real `@Assert` formulas, verbatim. `death(x)`/`death(y)`
+-- special-case to `SFS.effectiveEnd x`/`SFS.effectiveEnd y` (`elabDslTerm`'s
+-- matching case above), a plain `Time` -- so `<`/`=`/`and`/`or` here go through
+-- the ordinary total instances, same as everywhere else in this file. Each
+-- `example ... := rfl` below confirms the elaborated form is *exactly* `SFS.lean`'s
+-- own `precedes`/`meets`/`overlaps`/`during`/`nonoverlaps`, not merely something
+-- that happens to type-check. `nearlyMeets`'s own `next(death(x), birth(y))` call
+-- needs no special handling at all now (`next : Time → Time → Prop` applies
+-- directly) -- its `#check`/`example` live further down, after `coincident`.
 #check domain% <<precedes : x~Occurrence, y~Occurrence : death(x) < birth(y) >>
 
 example : domain% <<precedes : x~Occurrence, y~Occurrence : death(x) < birth(y) >> = precedes := rfl
@@ -1014,15 +1023,6 @@ example : domain% <<during : x~Occurrence, y~Occurrence : birth(y) <= birth(x) a
 #check domain% <<nonoverlaps : x~Occurrence, y~Occurrence : birth(y) > death(x) or birth(x) > death(y)>>
 
 example : domain% <<nonoverlaps : x~Occurrence, y~Occurrence : birth(y) > death(x) or birth(x) > death(y)>> = nonoverlaps := rfl
-
--- Pins the one genuinely risky ambiguity case at build time (not just by
--- inspection): `death(x) = death(y)` is `Option Time` on both sides, and must
--- resolve to the concrete `DSLEq (Option Time) (Option Time) (Option Prop)`
--- instance (`keq`), never the generic `priority := low` fallback (`Eq`) -- the
--- latter would make `none = none` silently `True`, exactly the bug this whole
--- extension exists to prevent.
-example : domain% <<finishesEqCheck : x~Occurrence, y~Occurrence : death(x) = death(y)>>
-    = fun x y => SFS.keq (death x) (death y) := rfl
 
 -- `starts`/`finishes`/`coincident`, now that dot-access (`x.openLeft`/`y.openRight`)
 -- has real grammar support, and `SFS.lean`'s own definitions (2026-08-26) gained
@@ -1053,11 +1053,9 @@ example : domain% <<coincident : x~Occurrence, y~Occurrence :
   birth(y) = birth(x) and death(x) = death(y) and x.openLeft = y.openLeft
   and x.openRight = y.openRight >> = coincident := rfl
 
--- `nearlyMeets`, the last Allen predicate: `next(death(x), birth(y))` now routes
--- through `DSLNext`'s `(Option Time) Time Prop` instance (`death` wrapped,
--- `birth` plain), landing on `SFS.nextO`'s false-if-undefined reading. `SFS.lean`'s
--- own `nearlyMeets` was rewritten the same day onto `kand`/`kor`/`nextO`
--- specifically so this `example ... := rfl` would hold, not the other way around.
+-- `nearlyMeets`, the last Allen predicate: `next(death(x), birth(y))` is now a
+-- plain `next` call on two `Time`s (`death(x)` → `effectiveEnd x`), no lifting
+-- needed.
 #check domain% <<nearlyMeets : x~Occurrence, y~Occurrence :
   (birth(y) = death(x) and (x.openRight or y.openLeft)) or next(death(x), birth(y))>>
 
