@@ -972,6 +972,17 @@ declare_syntax_cat kermlMult
 syntax "[" kermlMultBound "]" : kermlMult
 syntax "[" kermlMultBound ".." kermlMultBound "]" : kermlMult
 
+/-- KerML §8.2.5.11 `MultiplicityRange`'s own `isOrdered`/`isUnique` flags, written as
+trailing keywords right after a multiplicity (`SequenceFunctions.kerml`'s own real
+`in seq: Anything[0..*] ordered nonunique;`). Same "parsed but not stored" trade as
+`kermlMult` itself -- `isOrdered`/`isUnique` aren't modeled as stored fields here
+either (see `kermlMult`'s own doc comment; `Kernel.lean`'s `MultiplicityRange`
+structure has none). -/
+declare_syntax_cat kermlOrderedFlag
+syntax "ordered " : kermlOrderedFlag
+declare_syntax_cat kermlNonuniqueFlag
+syntax "nonunique " : kermlNonuniqueFlag
+
 /-- KerML `QualifiedName`: `A` or `A::B::C`. Used at every *reference* position below
 (a `specializes`/`typed by`/`subsets`/... target, or either operand of a standalone
 relationship declaration) -- never for a *primary* declared name, which stays plain
@@ -1223,10 +1234,21 @@ is legitimate: `Feature`'s own production allows `BasicFeaturePrefix FeatureDecl
 with no literal `'feature'` token, since a direction (or `derived`/`abstract`/...)
 prefix flag alone already disambiguates that a `Feature` is being declared. This
 covers just that minimal name+type shape (matching every real usage found), not the
-full optional-clause list `feature` itself supports. -/
-syntax "in " ident " : " kermlQualName " ;" : kermlDecl
-syntax "out " ident " : " kermlQualName " ;" : kermlDecl
-syntax "inout " ident " : " kermlQualName " ;" : kermlDecl
+full optional-clause list `feature` itself supports. Also accepts `kermlMult`
+(`SequenceFunctions.kerml`'s own real `in seq: Anything[0..*] ordered nonunique;`,
+mult before the trailing `ordered`/`nonunique` flags) and those flags themselves
+(`kermlOrderedFlag`/`kermlNonuniqueFlag`, KerML's `isOrdered`/`isUnique`, see their
+own doc comment). Deliberately has **no** `default` clause here, unlike `feature`
+itself -- a real one is needed (`SequenceFunctions.kerml`'s own `in endIndex:
+Positive[1] default startIndex;` / `... default size(seq) as Positive;`), but only
+`Kernel.lean`'s own richer `kermlKDecl`-layer alternative provides it (see that
+production's own doc comment): a `default kermlDefaultVal` clause added here too was
+tried first and rejected, `default startIndex` (a bare identifier) parses as *both*
+`kermlDefaultVal` and `kermlExpr`, a genuine ambiguity confirmed via a real
+"unexpected syntax" error once both alternatives coexisted. -/
+syntax "in " ident " : " kermlQualName (kermlMult)? (kermlOrderedFlag)? (kermlNonuniqueFlag)? " ;" : kermlDecl
+syntax "out " ident " : " kermlQualName (kermlMult)? (kermlOrderedFlag)? (kermlNonuniqueFlag)? " ;" : kermlDecl
+syntax "inout " ident " : " kermlQualName (kermlMult)? (kermlOrderedFlag)? (kermlNonuniqueFlag)? " ;" : kermlDecl
 
 /-- KerML §8.2.3.4 `Import` family (`Root.lean`'s `MembershipImport`/
 `NamespaceImport`): `import A::B ;` (one specific member) or `import A::* ;` (every
@@ -1485,17 +1507,17 @@ partial def elabKermlDecl : TSyntax `kermlDecl → MacroM (Array (TSyntax `term)
     let rel ← mkTypeFeaturingTerm aT bT (qualNameStr a) (qualNameStr b)
     pure #[← `(($rel).elt)]
   | `(kermlDecl| doc $s:str) => do pure #[← `((mkDocumentationStub $s).elt)]
-  | `(kermlDecl| in $a:ident : $t:kermlQualName ;) => do
+  | `(kermlDecl| in $a:ident : $t:kermlQualName $[$_mult:kermlMult]? $[$_ord:kermlOrderedFlag]? $[$_nu:kermlNonuniqueFlag]? ;) => do
     let aT ← `(mkDirFeatureStub $(quote a.getId.toString) FeatureDirectionKind.inDir)
     let tT ← kTypeStubTermQ t
     let rel ← mkFeatureTypingTerm aT tT a.getId.toString (qualNameStr t)
     pure #[← `(($aT).elt), ← `(($rel).elt)]
-  | `(kermlDecl| out $a:ident : $t:kermlQualName ;) => do
+  | `(kermlDecl| out $a:ident : $t:kermlQualName $[$_mult:kermlMult]? $[$_ord:kermlOrderedFlag]? $[$_nu:kermlNonuniqueFlag]? ;) => do
     let aT ← `(mkDirFeatureStub $(quote a.getId.toString) FeatureDirectionKind.outDir)
     let tT ← kTypeStubTermQ t
     let rel ← mkFeatureTypingTerm aT tT a.getId.toString (qualNameStr t)
     pure #[← `(($aT).elt), ← `(($rel).elt)]
-  | `(kermlDecl| inout $a:ident : $t:kermlQualName ;) => do
+  | `(kermlDecl| inout $a:ident : $t:kermlQualName $[$_mult:kermlMult]? $[$_ord:kermlOrderedFlag]? $[$_nu:kermlNonuniqueFlag]? ;) => do
     let aT ← `(mkDirFeatureStub $(quote a.getId.toString) FeatureDirectionKind.inoutDir)
     let tT ← kTypeStubTermQ t
     let rel ← mkFeatureTypingTerm aT tT a.getId.toString (qualNameStr t)

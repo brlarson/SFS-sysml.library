@@ -512,6 +512,7 @@ def mkKFunctionStub (name : String) : KFunction := { elementId := name, declared
 def mkPredicateStub (name : String) : Predicate := { elementId := name, declaredName := some name }
 def mkInteractionStub (name : String) : Interaction := { elementId := name, declaredName := some name }
 def mkPackageStub (name : String) : Package := { elementId := name, declaredName := some name }
+def mkBindingConnectorStub (name : String) : BindingConnector := { elementId := name, declaredName := some name }
 
 def dataTypeStubTerm (s : String) : MacroM (TSyntax `term) := `(mkDataTypeStub $(quote s))
 def kClassStubTerm (s : String) : MacroM (TSyntax `term) := `(mkKClassStub $(quote s))
@@ -641,6 +642,27 @@ def mkAnonDirFeatureStub (elemId : String) (dir : FeatureDirectionKind) : Featur
   { elementId := elemId, declaredName := none, direction := some dir }
 
 declare_syntax_cat kernelDecl
+/-- `kermlDecl` passthrough (mirrors `kermlKDecl`'s own `syntax kermlDecl :
+kermlKDecl` above): lets `Core.lean`-layer content (`doc`, `import`, `feature`
+typing, relationship declarations, ...) nest directly inside a `kernelDecl*` body
+(`library package`'s own, below) alongside genuinely Kernel-only members
+(`function`/`predicate`/`behavior`/`class`/`assoc`/...) -- `SequenceFunctions.
+kerml`'s own real package body mixes `private import`/`doc` with `function`/
+`behavior` declarations, needing both. -/
+syntax kermlDecl : kernelDecl
+
+/-- A package-like wrapper's body: `;` or `{ kernelDecl* }` -- `library package`/
+`package`/`standard library package` (below) all need this, not `Core.lean`'s own
+simpler `kermlBody` (`kermlDecl*` only, no `function`/`behavior`/nested
+`class`/`assoc`/... members) -- `SequenceFunctions.kerml`'s own real package body is
+the first real file needing a package wrapper to contain `function`/`behavior`
+members directly rather than being tested as a bare wrapper alone (this project's
+prior package-wrapper smoke tests never nested classifier-like content inside,
+confirmed via a real "unexpected token 'function'" error once actually tried). -/
+declare_syntax_cat kernelBody
+syntax " ;" : kernelBody
+syntax " {" kernelDecl* "}" : kernelBody
+
 /-- Declared here (category name only, matching `Assert.lean`'s own "declare every
 category up front" lesson for forward references) so `predicate`'s own `syntax`
 declaration below can end in it; its actual productions -- which need `kermlExpr`,
@@ -709,9 +731,9 @@ itself parsed here -- see the `library`/`standard library` forms just below, whi
 package Base { ... }`/`KerML.kerml`'s `standard library package KerML { ... }`). Real
 KerML also allows `PrefixMetadataMember`s before the keyword -- not covered, matching
 this grammar's usual scope discipline. -/
-syntax "package " ident kermlBody : kernelDecl
-syntax "library " "package " ident kermlBody : kernelDecl
-syntax "standard " "library " "package " ident kermlBody : kernelDecl
+syntax "package " ident kernelBody : kernelDecl
+syntax "library " "package " ident kernelBody : kernelDecl
+syntax "standard " "library " "package " ident kernelBody : kernelDecl
 /-- KerML §8.2.5.11 `MultiplicityRange`, standalone: `multiplicity Name [N..M] ;`
 (`Base.kerml`'s `exactlyOne`/`zeroOrOne`/`oneToMany`/`zeroToMany`). Bounds are parsed
 (`kermlMult`, `Core.lean`) but not stored, same reason as `feature`'s own inline
@@ -887,12 +909,50 @@ the cast target is parsed but discarded, and the operand's own elements pass thr
 unchanged, matching every other "structure without semantics" simplification this grammar
 already makes (`kermlMult`, unit brackets, ...). -/
 syntax:90 kermlExpr:90 " as " kermlQualName : kermlExpr
+/-- `->`'s own method-name slot (below), widened past bare `ident` to also accept
+`"exists"` (`SequenceFunctions.kerml`'s own real `seq1->exists{in y; x == y}`,
+`includes`): `exists` is a Lean-reserved term-level keyword (`Exists`/`∃`), the same
+"real KerML identifier collides with this tool's own reserved keywords" category as
+`result`/`null`/`true`/`false` elsewhere in this grammar -- fixed the same way, a
+dedicated literal alternative, not a renamed smoke test (see this project's own
+established practice for this exact class of bug). -/
+declare_syntax_cat kermlArrowIdent
+syntax ident : kermlArrowIdent
+syntax "exists" : kermlArrowIdent
+
+def kermlArrowIdentStr : TSyntax `kermlArrowIdent → String
+  | `(kermlArrowIdent| $i:ident) => i.getId.toString
+  | `(kermlArrowIdent| exists) => "exists"
+  | _ => ""
+
 /-- Sequence/Collection function invocation via `->` (KerML §7.4.7, `Occurrences.
 kerml`'s own real `superoccurrence->isEmpty()`/`superoccurrence->head()`): same
 "structure without semantics" treatment as everything else here -- no distinction
 drawn from a plain `.`-chained call, both just an `InvocationExpression` stub plus
 the receiver's and arguments' own elements. -/
-syntax:90 kermlExpr:90 "->" ident "(" kermlExpr,* ")" : kermlExpr
+syntax:90 kermlExpr:90 "->" kermlArrowIdent "(" kermlExpr,* ")" : kermlExpr
+
+/-- Sequence/Collection function invocation with a *block* argument (KerML §7.4.7's
+`FeatureChainExpression`-invoking-a-behavior form, distinct from the plain `(args)`
+call above): `SequenceFunctions.kerml`'s own real `(1..size(x))->forAll {in i;
+x#(i) == y#(i)}` (`equals`), `seq2->forAll {in x; seq1->exists{in y; x == y}}`
+(`includes`), etc. -- a trailing bare-expression predicate/collector body over
+untyped `in`-parameters, structurally close to `kermlPredBody`'s own `{ kermlKDecl*
+kermlExpr }` shape but kept as its own dedicated category (`kermlLambdaBody`/
+`kermlLambdaParam` below) rather than reusing `kermlPredBody` directly: that
+category's own elaborator (`elabKermlPredBody`) is defined *after* this `mutual`
+block (needed by `predicate`/`function`/`behavior`'s own bodies, which in turn need
+`kermlExpr` first), so calling it from here would be a forward reference -- same
+layering constraint this file's own header already documents for `kermlBody`/
+`elabKermlBody` living in `Core.lean`. Untyped `in i;` (no `: T` at all, unlike
+every other `in`/`out`/`inout` parameter elsewhere in this grammar) reflects real
+KerML: a collection operation's block parameter type is inferred from the receiver,
+never re-stated. -/
+declare_syntax_cat kermlLambdaParam
+syntax "in " ident (" : " kermlQualName)? " ;" : kermlLambdaParam
+declare_syntax_cat kermlLambdaBody
+syntax " {" kermlLambdaParam* kermlExpr "}" : kermlLambdaBody
+syntax:90 kermlExpr:90 "->" kermlArrowIdent kermlLambdaBody : kermlExpr
 
 syntax:80 "-" kermlExpr:80 : kermlExpr
 syntax:80 "not " kermlExpr:80 : kermlExpr
@@ -910,12 +970,37 @@ syntax:60 kermlExpr:60 " <= " kermlExpr:61 : kermlExpr
 syntax:60 kermlExpr:60 " >= " kermlExpr:61 : kermlExpr
 syntax:55 kermlExpr:55 " == " kermlExpr:56 : kermlExpr
 syntax:55 kermlExpr:55 " != " kermlExpr:56 : kermlExpr
+/-- `===`/`!==` (KerML's identity comparison, as opposed to `==`/`!='`s value
+equality -- `DataFunctions.kerml`'s own real `'==='`/`'!=='`). Written in real
+smoke-test text as `===`/`!==` directly (a plain literal token, no quoting needed,
+unlike a *declared name* such as `'==='`'s own function-declaration position, which
+needs Lean's `«...»` guillemet syntax to spell a symbol as an `ident`). -/
+syntax:55 kermlExpr:55 " === " kermlExpr:56 : kermlExpr
+syntax:55 kermlExpr:55 " !== " kermlExpr:56 : kermlExpr
 syntax:50 kermlExpr:50 " and " kermlExpr:51 : kermlExpr
 syntax:45 kermlExpr:45 " xor " kermlExpr:46 : kermlExpr
 syntax:40 kermlExpr:40 " or " kermlExpr:41 : kermlExpr
 syntax:35 kermlExpr:35 " implies " kermlExpr:36 : kermlExpr
 
-syntax "(" kermlExpr ")" : kermlExpr
+/-- KerML's range-expression operator (`SequenceFunctions.kerml`'s own real `(1..
+size(x))->forAll {...}` / `(startIndex..endIndex)->collect {...}`): distinct from
+`Assert.lean`'s own `,,` interval literal (a different grammar entirely, for @Assert
+DSL formulas, not KerML concrete syntax) -- same "structure without semantics" trade
+as every other binary operator here, via the shared `elabBinOp` helper. -/
+syntax:58 kermlExpr:59 " .. " kermlExpr:58 : kermlExpr
+
+/-- Bare grouping `"(" kermlExpr ")"` and KerML's `SequenceExpression` (§7.4.6,
+comma-separated parenthesized operands, `SequenceFunctions.kerml`'s own real `(seq1,
+seq2)` / `(seq->subsequence(1, ...), values, seq->subsequence(...))`) share one
+production via `kermlExpr,*` -- a single element with no comma is exactly bare
+grouping, 2+ is a real `SequenceExpression`; a genuinely separate `("," kermlExpr)+`
+alternative was tried first and rejected, `,+` (unlike `,*`) doesn't work as a
+quotation-pattern antiquotation, confirmed via a real "unexpected token ',+'" error
+in isolation. Multi-element case tagged via the same generic `mkOperatorStub` stub
+pattern every other operator here uses (op name `","`, no dedicated
+`SequenceExpression` structure -- this project's usual "structure without semantics"
+trade). -/
+syntax "(" kermlExpr,* ")" : kermlExpr
 
 /-- KerML's own conditional-expression concrete syntax (§7.4.6, distinct from a
 C-style `cond ? a : b` ternary -- `if`/`else` keywords bracket a bare `?` in the
@@ -957,11 +1042,15 @@ partial def elabKermlExpr : TSyntax `kermlExpr → MacroM (Array (TSyntax `term)
     let eElems ← elabKermlExpr e
     pure (eElems ++ #[← `((mkFeatureReferenceStub $(quote (qualNameStr u))).elt)])
   | `(kermlExpr| $e:kermlExpr as $_ty:kermlQualName) => elabKermlExpr e
-  | `(kermlExpr| $e:kermlExpr -> $f:ident($args,*)) => do
+  | `(kermlExpr| $e:kermlExpr -> $f:kermlArrowIdent($args,*)) => do
     let eElems ← elabKermlExpr e
     let argElems ← args.getElems.mapM elabKermlExpr
-    pure (#[← `((mkInvocationStub $(quote ("arrow-" ++ f.getId.toString))).elt)] ++ eElems ++
+    pure (#[← `((mkInvocationStub $(quote ("arrow-" ++ kermlArrowIdentStr f))).elt)] ++ eElems ++
       argElems.foldl (· ++ ·) #[])
+  | `(kermlExpr| $e:kermlExpr -> $f:kermlArrowIdent $body:kermlLambdaBody) => do
+    let eElems ← elabKermlExpr e
+    let bodyElems ← elabKermlLambdaBody body
+    pure (#[← `((mkInvocationStub $(quote ("arrow-" ++ kermlArrowIdentStr f))).elt)] ++ eElems ++ bodyElems)
   | `(kermlExpr| -$e:kermlExpr) => do
     let eElems ← elabKermlExpr e
     pure (#[← `((mkOperatorStub "unary-minus" "-").elt)] ++ eElems)
@@ -981,11 +1070,19 @@ partial def elabKermlExpr : TSyntax `kermlExpr → MacroM (Array (TSyntax `term)
   | `(kermlExpr| $a:kermlExpr >= $b:kermlExpr) => elabBinOp ">=" a b
   | `(kermlExpr| $a:kermlExpr == $b:kermlExpr) => elabBinOp "==" a b
   | `(kermlExpr| $a:kermlExpr != $b:kermlExpr) => elabBinOp "!=" a b
+  | `(kermlExpr| $a:kermlExpr === $b:kermlExpr) => elabBinOp "===" a b
+  | `(kermlExpr| $a:kermlExpr !== $b:kermlExpr) => elabBinOp "!==" a b
   | `(kermlExpr| $a:kermlExpr and $b:kermlExpr) => elabBinOp "and" a b
   | `(kermlExpr| $a:kermlExpr xor $b:kermlExpr) => elabBinOp "xor" a b
   | `(kermlExpr| $a:kermlExpr or $b:kermlExpr) => elabBinOp "or" a b
   | `(kermlExpr| $a:kermlExpr implies $b:kermlExpr) => elabBinOp "implies" a b
-  | `(kermlExpr| ($e:kermlExpr)) => elabKermlExpr e
+  | `(kermlExpr| $a:kermlExpr .. $b:kermlExpr) => elabBinOp ".." a b
+  | `(kermlExpr| ($es,*)) => do
+    match es.getElems with
+    | #[e] => elabKermlExpr e
+    | es' => do
+      let esElems ← es'.mapM elabKermlExpr
+      pure (#[← `((mkOperatorStub "op-," ",").elt)] ++ esElems.foldl (· ++ ·) #[])
   | `(kermlExpr| if $c:kermlExpr ? $t:kermlExpr else $e:kermlExpr) => do
     let cElems ← elabKermlExpr c
     let tElems ← elabKermlExpr t
@@ -999,6 +1096,28 @@ partial def elabBinOp (op : String) (a b : TSyntax `kermlExpr) : MacroM (Array (
   let aElems ← elabKermlExpr a
   let bElems ← elabKermlExpr b
   pure (#[← `((mkOperatorStub $(quote ("op-" ++ op)) $(quote op)).elt)] ++ aElems ++ bElems)
+
+/-- `kermlLambdaBody`'s own untyped-or-typed `in i[: T];` parameter -- same
+`mkDirFeatureStub`/`mkFeatureTypingTerm` pattern `in`/`out`/`inout` (`Core.lean`)
+already use, just without a type when none is given. -/
+partial def elabKermlLambdaParam (p : TSyntax `kermlLambdaParam) : MacroM (Array (TSyntax `term)) := do
+  match p with
+  | `(kermlLambdaParam| in $a:ident $[: $t:kermlQualName]? ;) => do
+    let aT ← `(mkDirFeatureStub $(quote a.getId.toString) FeatureDirectionKind.inDir)
+    match t with
+    | some ty => do
+      let tT ← kTypeStubTermQ ty
+      let rel ← mkFeatureTypingTerm aT tT a.getId.toString (qualNameStr ty)
+      pure #[← `(($aT).elt), ← `(($rel).elt)]
+    | none => pure #[← `(($aT).elt)]
+  | _ => Macro.throwUnsupported
+
+partial def elabKermlLambdaBody : TSyntax `kermlLambdaBody → MacroM (Array (TSyntax `term))
+  | `(kermlLambdaBody| { $ps:kermlLambdaParam* $e:kermlExpr }) => do
+    let psElems ← ps.mapM elabKermlLambdaParam
+    let eElems ← elabKermlExpr e
+    pure (psElems.foldl (· ++ ·) #[] ++ eElems)
+  | _ => Macro.throwUnsupported
 
 end
 
@@ -1031,7 +1150,42 @@ syntax kermlDecl : kermlKDecl
 syntax kermlDirFlag "feature " kermlIdent (" : " kermlQualName,+)? (kermlMult)? (" :>> " kermlQualName)?
   (" = " kermlExpr)? kermlBody : kermlKDecl
 syntax "return " kermlIdent " : " kermlQualName (kermlMult)? (" = " kermlExpr)? kermlBody : kermlKDecl
-syntax "feature " kermlIdent " : " kermlQualName (kermlMult)? " = " kermlExpr kermlBody : kermlKDecl
+/-- `return`'s own form, with no name at all -- `SequenceFunctions.kerml`'s own real
+`return : Anything[0..1];` / `return : Anything[0..*] ordered nonunique = (seq1,
+seq2);` (`'#'`/`union`), distinct from the named form above (`return result : ...`):
+real KerML's `Identification` on a `ReturnParameterMember` is optional, same
+"anonymous but disambiguated by context" shape as the anonymous `feature :>> D`/
+`feature redefines G` forms elsewhere in this grammar. Synthesizes the name
+`"result"` (`kermlIdent`'s own dedicated keyword alternative for exactly this
+concept), matching the real semantics of an unnamed return -- not a fresh made-up
+label. -/
+syntax "return " " : " kermlQualName (kermlMult)? (kermlOrderedFlag)? (kermlNonuniqueFlag)?
+  (" = " kermlExpr)? kermlBody : kermlKDecl
+syntax (kermlVisibilityFlag)? "feature " kermlIdent " : " kermlQualName (kermlMult)? " = " kermlExpr kermlBody : kermlKDecl
+/-- `feature`'s own type-**inferred** mandatory-default form -- no `: T` at all,
+`SequenceFunctions.kerml`'s own real `private feature newSeq = seq->including
+(values);` (`add`/`addAt`/`remove`/`removeAt`, a private computed helper feature):
+per real KerML, a `Feature`'s `FeatureSpecializationPart` (the `: T` here) is
+optional whenever a `FeatureValue` (`= V`) is present, since the value expression's
+own type constrains the feature -- structurally the same optionality already
+exercised by `kermlDefaultVal`'s own callers elsewhere, just for the *type*
+half instead of the *value* half this time. Also accepts the leading
+`kermlVisibilityFlag` (`private`) real usage needs, same category `import`
+already uses. -/
+syntax (kermlVisibilityFlag)? "feature " kermlIdent " = " kermlExpr kermlBody : kermlKDecl
+/-- `in`/`out`/`inout`'s own richer-default alternative, needed for a `default` value
+that's a general expression rather than `Core.lean`'s own `kermlDefaultVal` (bare
+qualified name or numeric literal + unit bracket) -- `SequenceFunctions.kerml`'s own
+real `in endIndex: Positive[1] default size(seq) as Positive;` (`subsequence`), a
+function call plus a cast. Same "wrong dependency direction" reason `Core.lean`'s own
+`kermlDefaultVal` doc comment already gives for staying simple (`kermlExpr` isn't
+available there, only here in `Kernel.lean`) -- mirrors the existing `feature ... =
+kermlExpr` split above (`Core.lean`'s own simpler `default kermlDefaultVal` clause vs.
+this file's richer mandatory-`kermlExpr` form), same two-tier pattern, just for the
+three direction-prefixed short forms instead of `feature`. -/
+syntax "in " ident " : " kermlQualName (kermlMult)? " default " kermlExpr " ;" : kermlKDecl
+syntax "out " ident " : " kermlQualName (kermlMult)? " default " kermlExpr " ;" : kermlKDecl
+syntax "inout " ident " : " kermlQualName (kermlMult)? " default " kermlExpr " ;" : kermlKDecl
 /-- An **anonymous** direction-prefixed `Feature` -- no declared name at all, just a
 `:>>` (`redefines`) target and its own nested body, `Domain.kerml`'s own real
 `in feature :>> d { feature e : BooleanEvaluation[1] :>> f; }` (`GetBooleanChange`
@@ -1053,6 +1207,35 @@ category, so `inv{}` genuinely nests here, no sibling-`#check` workaround needed
 == region.frameOfReference } }` is the first real use of this. -/
 syntax "inv " "{" kermlExpr "}" : kermlKDecl
 
+/-- KerML §8.3.4.5 `BindingConnector`, shorthand `binding` keyword form (distinct from
+the standalone-relationship spelling every other `kermlDecl` relationship production
+here uses, e.g. `subset`/`redefinition`): `SequenceFunctions.kerml`'s own real
+`binding seq = newSeq;` (`add`/`addAt`/`remove`/`removeAt`'s own `feature redefines
+endShot: <name> { binding seq = newSeq; }` re-invocation idiom). Lives in `Kernel.
+lean`, not `Core.lean`, since `BindingConnector` (`Kernel.lean`'s own structure) isn't
+available there -- same layering reason `return`/`feature = expr` already live here.
+Both operands are existing feature *references*, not declarations -- reuses
+`mkFeatureReferenceStub`, the same stub `kermlExpr`'s own bare-identifier case uses,
+rather than declaring fresh features. -/
+syntax "binding " kermlQualName " = " kermlQualName " ;" : kermlKDecl
+
+/-- `feature redefines G : T { ... }`'s own Kernel-layer-only alternative, needed
+whenever its body contains real Kernel-only content like `binding` above --
+`Core.lean`'s own `feature redefines G [: T] {...}` (`kermlDecl`) only nests
+`kermlDecl*` inside (that category's own body type, `kermlBody`), so `binding`
+genuinely can't appear there; this mirrors the exact shape with `kermlKDecl*`
+instead, `SequenceFunctions.kerml`'s own real `feature redefines endShot: add {
+binding seq = newSeq; }` (`add`/`addAt`/`remove`/`removeAt`'s "performance
+re-invocation" idiom) being the first real use. Requires at least one `kermlKDecl`
+(`+`, not `*`) specifically so it never overlaps with `Core.lean`'s own empty-body
+`{}` case (which stays exclusively `kermlDecl*`'s, `*` allowing zero) -- a genuine
+ambiguity remains possible in principle for a body whose content happens to be valid
+under *both* categories (everything `kermlDecl` accepts is also valid `kermlKDecl`,
+via that category's own passthrough alternative), but no real file exercises that;
+`binding` itself is never plain-`kermlDecl`-valid, so every real use here is
+unambiguous, confirmed via a real build. -/
+syntax "feature " " redefines " kermlQualName (" : " kermlQualName)? "{" kermlKDecl+ "}" : kermlKDecl
+
 /-- Shared by the plain `feature ... = ...` production of `kermlKDecl` below (usable
 nested inside a `predicate`/`function`/`behavior` body) and the identically-shaped
 `kernelDecl` production declared further down (usable standalone/top-level, e.g.
@@ -1070,7 +1253,7 @@ def elabFeatureDefaultElems (an : String) (ty : TSyntax `kermlQualName)
   let bodyElems ← elabKermlBody body
   pure (#[← `(($aT).elt), ← `(($rel).elt), ← `((mkFeatureValueStub).elt)] ++ valElems ++ bodyElems)
 
-def elabKermlKDecl : TSyntax `kermlKDecl → MacroM (Array (TSyntax `term))
+partial def elabKermlKDecl : TSyntax `kermlKDecl → MacroM (Array (TSyntax `term))
   | `(kermlKDecl| $d:kermlDecl) => elabKermlDecl d
   | `(kermlKDecl| $dir:kermlDirFlag feature $a:kermlIdent $[: $tys,*]? $[$_mult:kermlMult]?
         $[:>> $redefT:kermlQualName]? $[= $val:kermlExpr]? $body:kermlBody) => do
@@ -1112,10 +1295,64 @@ def elabKermlKDecl : TSyntax `kermlKDecl → MacroM (Array (TSyntax `term))
       | none => pure #[]
     let bodyElems ← elabKermlBody body
     pure (#[← `(($aT).elt), ← `(($rel).elt)] ++ valElems ++ bodyElems)
-  | `(kermlKDecl| feature $a:kermlIdent : $ty:kermlQualName $[$_mult:kermlMult]? = $val:kermlExpr $body:kermlBody) =>
+  | `(kermlKDecl| return : $ty:kermlQualName $[$_mult:kermlMult]? $[$_ord:kermlOrderedFlag]?
+        $[$_nu:kermlNonuniqueFlag]? $[= $val:kermlExpr]? $body:kermlBody) => do
+    let an := "result"
+    let aT ← `(mkDirFeatureStub $(quote an) FeatureDirectionKind.outDir)
+    let tT ← kTypeStubTermQ ty
+    let rel ← mkFeatureTypingTerm aT tT an (qualNameStr ty)
+    let valElems ← match val with
+      | some v => do pure (#[← `((mkFeatureValueStub).elt)] ++ (← elabKermlExpr v))
+      | none => pure #[]
+    let bodyElems ← elabKermlBody body
+    pure (#[← `(($aT).elt), ← `(($rel).elt)] ++ valElems ++ bodyElems)
+  | `(kermlKDecl| $[$_vis0:kermlVisibilityFlag]? feature $a:kermlIdent : $ty:kermlQualName $[$_mult:kermlMult]? = $val:kermlExpr $body:kermlBody) =>
     elabFeatureDefaultElems (kermlIdentStr a) ty val body
+  | `(kermlKDecl| $[$_vis1:kermlVisibilityFlag]? feature $a:kermlIdent = $val:kermlExpr $body:kermlBody) => do
+    let an := kermlIdentStr a
+    let aT ← `(mkFeatureStub $(quote an))
+    let valElems ← elabKermlExpr val
+    let bodyElems ← elabKermlBody body
+    pure (#[← `(($aT).elt), ← `((mkFeatureValueStub).elt)] ++ valElems ++ bodyElems)
+  | `(kermlKDecl| in $a:ident : $t:kermlQualName $[$_mult:kermlMult]? default $val:kermlExpr ;) => do
+    let aT ← `(mkDirFeatureStub $(quote a.getId.toString) FeatureDirectionKind.inDir)
+    let tT ← kTypeStubTermQ t
+    let rel ← mkFeatureTypingTerm aT tT a.getId.toString (qualNameStr t)
+    let valElems ← elabKermlExpr val
+    pure (#[← `(($aT).elt), ← `(($rel).elt), ← `((mkFeatureValueStub).elt)] ++ valElems)
+  | `(kermlKDecl| out $a:ident : $t:kermlQualName $[$_mult:kermlMult]? default $val:kermlExpr ;) => do
+    let aT ← `(mkDirFeatureStub $(quote a.getId.toString) FeatureDirectionKind.outDir)
+    let tT ← kTypeStubTermQ t
+    let rel ← mkFeatureTypingTerm aT tT a.getId.toString (qualNameStr t)
+    let valElems ← elabKermlExpr val
+    pure (#[← `(($aT).elt), ← `(($rel).elt), ← `((mkFeatureValueStub).elt)] ++ valElems)
+  | `(kermlKDecl| inout $a:ident : $t:kermlQualName $[$_mult:kermlMult]? default $val:kermlExpr ;) => do
+    let aT ← `(mkDirFeatureStub $(quote a.getId.toString) FeatureDirectionKind.inoutDir)
+    let tT ← kTypeStubTermQ t
+    let rel ← mkFeatureTypingTerm aT tT a.getId.toString (qualNameStr t)
+    let valElems ← elabKermlExpr val
+    pure (#[← `(($aT).elt), ← `(($rel).elt), ← `((mkFeatureValueStub).elt)] ++ valElems)
   | `(kermlKDecl| inv { $e:kermlExpr }) => do
     pure (#[← `((mkInvariantStub).elt)] ++ (← elabKermlExpr e))
+  | `(kermlKDecl| binding $a:kermlQualName = $b:kermlQualName ;) => do
+    let elemId := "binding-" ++ qualNameStr a ++ "-" ++ qualNameStr b
+    pure #[← `((mkBindingConnectorStub $(quote elemId)).elt),
+      ← `((mkFeatureReferenceStub $(quote (qualNameStr a))).elt),
+      ← `((mkFeatureReferenceStub $(quote (qualNameStr b))).elt)]
+  | `(kermlKDecl| feature redefines $g:kermlQualName $[: $ty:kermlQualName]? { $decls:kermlKDecl* }) => do
+    let gN := qualNameStr g
+    let elemId := "redefines-" ++ gN
+    let aT ← `(mkAnonFeatureStub $(quote elemId))
+    let gT ← featureStubTermQ g
+    let rel ← mkRedefinitionTerm aT gT elemId gN
+    let tyElems ← match ty with
+      | some t => do
+        let tT ← kTypeStubTermQ t
+        let tyRel ← mkFeatureTypingTerm aT tT elemId (qualNameStr t)
+        pure #[← `(($tyRel).elt)]
+      | none => pure #[]
+    let declElems ← decls.mapM elabKermlKDecl
+    pure (#[← `(($aT).elt), ← `(($rel).elt)] ++ tyElems ++ declElems.foldl (· ++ ·) #[])
   | _ => Macro.throwUnsupported
 
 /-- `predicate`/`function`/`behavior`'s own body category (see its
@@ -1189,7 +1426,10 @@ def kermlMetaAttrPair : TSyntax `kermlMetaAttr → (String × String)
   | `(kermlMetaAttr| $k:ident = $v:kermlMetaAttrVal ;) => (k.getId.toString, kermlMetaAttrValStr v)
   | _ => ("", "")
 
-def elabKernelDecl : TSyntax `kernelDecl → MacroM (Array (TSyntax `term))
+mutual
+
+partial def elabKernelDecl : TSyntax `kernelDecl → MacroM (Array (TSyntax `term))
+  | `(kernelDecl| $d:kermlDecl) => elabKermlDecl d
   | `(kernelDecl| $[$_abs:kermlAbstractFlag]? datatype $a:ident $[specializes $specs,*]? $[conjugates $conj:kermlQualName]?
         $[disjoint from $disj,*]? $[unions $uni,*]? $[intersects $inter,*]? $[differences $diff,*]? $body:kermlBody) => do
     let declElems ← classifierLikeDeclElems dataTypeStubTerm a specs conj disj uni inter diff
@@ -1236,15 +1476,15 @@ def elabKernelDecl : TSyntax `kernelDecl → MacroM (Array (TSyntax `term))
         $[disjoint from $disj,*]? $[unions $uni,*]? $[intersects $inter,*]? $[differences $diff,*]? $body:kermlPredBody) => do
     let declElems ← classifierLikeDeclElems kFunctionStubTerm a specs conj disj uni inter diff
     pure (declElems ++ (← elabKermlPredBody body))
-  | `(kernelDecl| package $a:ident $body:kermlBody) => do
+  | `(kernelDecl| package $a:ident $body:kernelBody) => do
     let pT ← packageStubTerm a.getId.toString
-    pure (#[← `(($pT).elt)] ++ (← elabKermlBody body))
-  | `(kernelDecl| library package $a:ident $body:kermlBody) => do
+    pure (#[← `(($pT).elt)] ++ (← elabKernelBody body))
+  | `(kernelDecl| library package $a:ident $body:kernelBody) => do
     let pT ← libraryPackageStubTerm a.getId.toString Bool.false
-    pure (#[← `(($pT).elt)] ++ (← elabKermlBody body))
-  | `(kernelDecl| standard library package $a:ident $body:kermlBody) => do
+    pure (#[← `(($pT).elt)] ++ (← elabKernelBody body))
+  | `(kernelDecl| standard library package $a:ident $body:kernelBody) => do
     let pT ← libraryPackageStubTerm a.getId.toString Bool.true
-    pure (#[← `(($pT).elt)] ++ (← elabKermlBody body))
+    pure (#[← `(($pT).elt)] ++ (← elabKernelBody body))
   | `(kernelDecl| multiplicity $a:ident $_mult:kermlMult $body:kermlBody) => do
     let mT ← multiplicityRangeStubTerm a.getId.toString
     pure (#[← `(($mT).elt)] ++ (← elabKermlBody body))
@@ -1258,6 +1498,15 @@ def elabKernelDecl : TSyntax `kernelDecl → MacroM (Array (TSyntax `term))
     let elemId := nameVal.getD mc.getId.toString
     pure #[← `((mkMetadataFeatureStub $(quote elemId)).elt)]
   | _ => Macro.throwUnsupported
+
+partial def elabKernelBody : TSyntax `kernelBody → MacroM (Array (TSyntax `term))
+  | `(kernelBody| ;) => pure #[]
+  | `(kernelBody| { $decls:kernelDecl* }) => do
+    let declElems ← decls.mapM elabKernelDecl
+    pure (declElems.foldl (· ++ ·) #[])
+  | _ => Macro.throwUnsupported
+
+end
 
 /-- `@Assert{...}`'s `f="..."` string genuinely re-parsed against `Assert.lean`'s own
 `dslAssert` grammar and elaborated via its real `elabDslAssert`, forcing Lean to
@@ -2277,4 +2526,137 @@ end KerML.Kernel
 }
 #check kerml% abstract classifier Etherial :> Physical disjoint from Solid, Fluid {
   doc "medium for the transmission of radiation"
+}
+
+-- `SequenceFunctions.kerml` (Kernel Function Library, first file from that library
+-- applied via Kernel.lean rather than Assert.lean's own @Lean-metadata-only route):
+-- general operations on `Anything[0..*]`-typed sequences. Exercised (and fixed)
+-- ten real grammar gaps here, none seen by any prior "apply Kernel.lean" pass:
+-- `ordered`/`nonunique` flags on `in`/`out`/`inout` (`kermlOrderedFlag`/
+-- `kermlNonuniqueFlag`); anonymous `return : T ...;` (no name, synthesizes
+-- `"result"`); guillemets (`«#»`, `«===»`) as the real spelling of KerML's own
+-- single-quoted symbolic function names (`'#'`, `'==='`) -- plain Lean `ident`
+-- syntax already covers this, no grammar change needed; `===`/`!==` as new binary
+-- operators (identity, distinct from `==`/`!=`'s value equality); `..` range
+-- expressions and comma `SequenceExpression` tuples (`(a, b, ...)`, `()` doubling
+-- as the empty sequence/`null`); `->method {in x; ...}` block-argument invocation
+-- (`kermlLambdaBody`/`kermlLambdaParam`, untyped params); the `exists` keyword
+-- colliding with Lean's own reserved term (fixed via `kermlArrowIdent`, not a
+-- rename); `default` with a full expression on `in`/`out`/`inout` (Kernel-layer
+-- only, `Core.lean`'s own simpler `kermlDefaultVal` genuinely conflicts with a
+-- bare-identifier default like `default startIndex`); `private feature name =
+-- expr;` (type-inferred, visibility-flagged); `binding a = b;` (`BindingConnector`
+-- shorthand, new `mkBindingConnectorStub`) plus `feature redefines G: T {
+-- kermlKDecl* }` so it can nest inside the `add`/`addAt`/`remove`/`removeAt`
+-- "performance re-invocation" idiom; and `library package`/`package`/`standard
+-- library package` bodies widened from `kermlBody` (`kermlDecl*` only) to a new
+-- `kernelBody` (`kernelDecl*`, itself passing through `kermlDecl`) so `function`/
+-- `behavior` can nest inside a package wrapper at all -- confirmed via a real
+-- "unexpected token 'function'" error that no prior file's smoke tests had ever
+-- actually exercised this combination. `set_option maxRecDepth` below is needed
+-- purely because this one package elaborates ~20 members into a single flat
+-- term -- no other file in this project has needed it.
+set_option maxRecDepth 4096 in
+#check kernel% library package SequenceFunctions {
+  private import Base::Anything ;
+  private import Occurrences::SelfSameLifeLink ;
+
+  function «#» specializes BaseFunctions::«#» { in seq: Anything[0..*] ordered nonunique; in index: Positive[1] ;
+    return : Anything[0..1] ;
+  }
+
+  function equals { in x: Anything[0..*] ordered nonunique; in y: Anything[0..*] ordered nonunique ;
+    return : Boolean[1] =
+      size(x) == size(y) and
+      (1..size(x))->forAll {in i; x#(i) == y#(i)} ;
+  }
+
+  function same { in x: Anything[0..*] ordered nonunique; in y: Anything[0..*] ordered nonunique ;
+    return : Boolean[1] =
+      size(x) == size(y) and
+      (1..size(x))->forAll {in i; x#(i) === y#(i)} ;
+  }
+
+  function size { in seq: Anything[0..*] nonunique ;
+    return : Natural[1] = if isEmpty(seq)? 0 else size(tail(seq)) + 1 ;
+  }
+  function isEmpty { in seq: Anything[0..*] nonunique ;
+    return : Boolean[1] = seq == null ;
+  }
+  function notEmpty { in seq: Anything[0..*] nonunique ;
+    return : Boolean[1] = not isEmpty(seq) ;
+  }
+  function includes { in seq1: Anything[0..*] nonunique; in seq2: Anything[0..*] nonunique ;
+    return : Boolean[1] = seq2->forAll {in x; seq1->exists{in y; x == y}} ;
+  }
+  function includesOnly { in seq1: Anything[0..*] nonunique; in seq2: Anything[0..*] nonunique ;
+    return : Boolean[1] = seq1->includes(seq2) and seq2->includes(seq1) ;
+  }
+  function excludes { in seq1: Anything[0..*] nonunique; in seq2: Anything[0..*] nonunique ;
+    return : Boolean[1] = seq2->forAll {in x; seq1->excludes(x)} ;
+  }
+
+  function union { in seq1: Anything[0..*] ordered nonunique; in seq2: Anything[0..*] ordered nonunique ;
+    return : Anything[0..*] ordered nonunique = (seq1, seq2) ;
+  }
+  function intersection { in seq1: Anything[0..*] ordered nonunique; in seq2: Anything[0..*] ordered nonunique ;
+    return : Anything[0..*] ordered nonunique = seq1->select {in x; seq2->includes(x)} ;
+  }
+  function including { in seq: Anything[0..*] ordered nonunique; in values: Anything[0..*] ordered nonunique ;
+    return : Anything[0..*] ordered nonunique = union(seq, values) ;
+  }
+  function includingAt { in seq: Anything[0..*] ordered nonunique; in values: Anything[0..*] ordered nonunique;
+    in index: Positive[1] ;
+    return : Anything[0..*] ordered nonunique =
+      (seq->subsequence(1, (index - 1) as Positive), values, seq->subsequence(index + 1)) ;
+  }
+  function excluding { in seq: Anything[0..*] ordered nonunique; in values: Anything[0..*] ;
+    return : Anything[0..*] ordered nonunique = seq->reject {in x; values->includes(x)} ;
+  }
+  function excludingAt { in seq: Anything[0..*] ordered nonunique ;
+    in startIndex: Positive[1]; in endIndex: Positive[1] default startIndex ;
+    return : Anything[0..*] ordered nonunique =
+      (seq->subsequence(1, (startIndex - 1) as Positive), seq->subsequence(endIndex + 1)) ;
+  }
+
+  function subsequence { in seq: Anything[0..*] ordered nonunique ;
+    in startIndex: Positive[1]; in endIndex: Positive[1] default size(seq) as Positive ;
+    return : Anything[0..*] = (startIndex..endIndex)->collect {in i; seq#(i)} ;
+  }
+  function head { in seq: Anything[0..*] ordered nonunique ;
+    return : Anything[0..1] = seq#(1) ;
+  }
+  function tail { in seq: Anything[0..*] ordered nonunique ;
+    return : Anything[0..*] ordered nonunique = subsequence(seq, 2) ;
+  }
+  function last { in seq: Anything[0..*] ordered nonunique ;
+    return : Anything[0..1] = seq#(size(seq)) ;
+  }
+
+  behavior add { inout seq: Anything[0..*] ordered nonunique; in values: Anything[0..*] ordered nonunique ;
+    private feature newSeq = seq->including(values) ;
+    feature redefines endShot: add {
+      binding seq = newSeq ;
+    }
+  }
+  behavior addAt { inout seq: Anything[0..*] ordered nonunique; in values: Anything[0..*] ordered nonunique ;
+    in index: Positive[1] ;
+    private feature newSeq = seq->includingAt(values, index) ;
+    feature redefines endShot: addAt {
+      binding seq = newSeq ;
+    }
+  }
+  behavior remove { inout seq: Anything[0..*] ordered nonunique; in values: Anything[0..*] ;
+    private feature newSeq = seq->excluding(values) ;
+    feature redefines endShot: remove {
+      binding seq = newSeq ;
+    }
+  }
+  behavior removeAt { inout seq: Anything[0..*] ordered nonunique ;
+    in startIndex: Positive[1]; in endIndex: Positive[1] default startIndex ;
+    private feature newSeq = seq->excludingAt(startIndex, endIndex) ;
+    feature redefines endShot: removeAt {
+      binding seq = newSeq ;
+    }
+  }
 }
