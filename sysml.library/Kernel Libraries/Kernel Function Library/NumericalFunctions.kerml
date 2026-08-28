@@ -53,15 +53,17 @@ standard library package NumericalFunctions {
 	abstract function product { in collection: NumericalValue[0..*]; return : NumericalValue[1];
 		@Lean{l="List.prod";} }
 	
-	function sum0 { in collection: NumericalValue[0..*]; in zero: NumericalValue[1]; 
- 		inv { isZero(zero as NumericalValue) }		
-// 		inv { isZero(zero) }		
+	function sum0 { in collection: NumericalValue[0..*]; in zero: NumericalValue[1];
+ 		inv { isZero(zero as NumericalValue) }
+// 		inv { isZero(zero) }
         return : NumericalValue = collection->reduce '+' ?? zero;
+		@Lean{l="fun collection zero => collection.foldl Add.add zero";}
 	}
-	
-	function product1 { in collection: NumericalValue[0..*]; in one: NumericalValue[1]; 
-		inv { isUnit(one as NumericalValue) }		
-//		inv { isUnit(one) }		
+
+	function product1 { in collection: NumericalValue[0..*]; in one: NumericalValue[1];
+		inv { isUnit(one as NumericalValue) }
+//		inv { isUnit(one) }
         return : NumericalValue = collection->reduce '*' ?? one;
+		@Lean{l="fun collection one => collection.foldl Mul.mul one";}
 	}
 }
