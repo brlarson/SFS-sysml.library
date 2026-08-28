@@ -29,18 +29,18 @@ standard library package NumericalFunctions {
 	abstract function max specializes ScalarFunctions::max { in x: NumericalValue[1]; in y: NumericalValue[1]; return : NumericalValue[1]; }
 	abstract function min specializes ScalarFunctions::min { in x: NumericalValue[1]; in y: NumericalValue[1]; return : NumericalValue[1]; }
 	
-	abstract function sum { in collection: ScalarValue[0..*]; return : ScalarValue[1]; }	
-	abstract function product { in collection: ScalarValue[0..*]; return : ScalarValue[1]; }
+	abstract function sum { in collection: NumericalValue[0..*]; return : NumericalValue[1]; }	
+	abstract function product { in collection: NumericalValue[0..*]; return : NumericalValue[1]; }
 	
-	function sum0 { in collection: NumericalValue[0..*]; in zero: ScalarValue[1]; 
+	function sum0 { in collection: NumericalValue[0..*]; in zero: NumericalValue[1]; 
  		inv { isZero(zero as NumericalValue) }		
 // 		inv { isZero(zero) }		
-        return : ScalarValue = collection->reduce '+' ?? zero;
+        return : NumericalValue = collection->reduce '+' ?? zero;
 	}
 	
-	function product1 { in collection: ScalarValue[0..*]; in one: ScalarValue[1]; 
+	function product1 { in collection: NumericalValue[0..*]; in one: NumericalValue[1]; 
 		inv { isUnit(one as NumericalValue) }		
 //		inv { isUnit(one) }		
-        return : ScalarValue = collection->reduce '*' ?? one;
+        return : NumericalValue = collection->reduce '*' ?? one;
 	}
 }
