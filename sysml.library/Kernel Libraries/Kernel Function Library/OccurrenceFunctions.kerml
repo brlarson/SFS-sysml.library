@@ -18,9 +18,10 @@ standard library package OccurrenceFunctions {
 	private import ControlFunctions::forAll;
 
 //SFS:
-	private import Allen::during;	
-	 
-	function '==='  specializes BaseFunctions::'===' { 
+	private import Allen::during;
+	private import Assertion::Lean;
+
+	function '==='  specializes BaseFunctions::'===' {
 		doc
 		/*
 		 * Test whether two occurrences are portions of the same life. That is, whether they 
@@ -33,6 +34,10 @@ standard library package OccurrenceFunctions {
 		
 		return : Boolean[1] = x.getLife == y.getLife;
 //		return : Boolean[1] = x.portionOfLife == y.portionOfLife;
+		// No @Lean: SFS.lean's own `life : Occurrence -> Set Instant` computes an
+		// occurrence's own temporal extent, not this getLife's real semantics
+		// (climbing the containment chain to find the entity's persistent Life
+		// occurrence) -- no Lean4SFS function matches.
 	}
 	
 	function isDuring {
@@ -45,8 +50,9 @@ standard library package OccurrenceFunctions {
 		in occ: Occurrence[1];
 		return : Boolean[1] = during(this,occ);
 		// private connector all during: HappensDuring[0..1] from self to occ;
-		
+
 		// return : Boolean[1] = notEmpty(during);
+		@Lean{l="SFS.during";}
 	}
 	
 	function create {
@@ -58,9 +64,13 @@ standard library package OccurrenceFunctions {
 		
 		inout occ: Occurrence[1];
 			
-//		private connector : HappensDuring from occ.startShot to self;	
-		
+//		private connector : HappensDuring from occ.startShot to self;
+
 		return : Occurrence[1] = occ;
+		// No @Lean: the body currently just returns occ unchanged (its stated
+		// HappensDuring side effect is commented out, not yet implemented) -- an
+		// @Lean pointing at id would describe only that placeholder, not the
+		// function's actual intended purpose.
 	}
 	
 	function destroy {
@@ -73,8 +83,10 @@ standard library package OccurrenceFunctions {
 		inout occ: Occurrence[0..1];
 		
 //		private connector : HappensDuring from [0..1] occ.endShot to self;
-		
+
 		return : Occurrence[0..1] = occ;
+		// No @Lean: same reason as create above -- the body is a placeholder pending
+		// the commented-out HappensDuring connector.
 	}
 	
 	function addNew {
@@ -91,8 +103,12 @@ standard library package OccurrenceFunctions {
 			inout seq1 = group;
 			in seq2 = create(occ);
 		}
-		
+
 		return : Occurrence[1] = occ;
+		// No @Lean: composite state-mutating step (via SequenceFunctions::add), same
+		// category as this project's behaviors -- no behavior/mutation anywhere has
+		// gotten @Lean metadata, since the pure helper functions it invokes already
+		// carry their own.
 	}
 	
 	function addNewAt {
@@ -111,8 +127,9 @@ standard library package OccurrenceFunctions {
 			in values = create(occ);
 			in startIndex = index;
 		}
-		
+
 		return : Occurrence[1] = occ;
+		// No @Lean: same reason as addNew above.
 	}
 	
 	behavior removeOld {
