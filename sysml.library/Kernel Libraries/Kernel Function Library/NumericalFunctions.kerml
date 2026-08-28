@@ -6,31 +6,52 @@ standard library package NumericalFunctions {
 
 	public import ScalarValues::*;
 	private import ControlFunctions::reduce;
-	
-	abstract function isZero{ in x: NumericalValue[1]; return : Boolean; }
-	abstract function isUnit{ in x : NumericalValue[1]; return : Boolean; }
-	
-	abstract function abs{ in x: NumericalValue[1]; return : NumericalValue[1]; }
-		
-	abstract function '+' specializes ScalarFunctions::'+' { in x: NumericalValue[1]; in y: NumericalValue[0..1]; return : NumericalValue[1]; }
-	abstract function '-' specializes ScalarFunctions::'-' { in x: NumericalValue[1]; in y: NumericalValue[0..1]; return : NumericalValue[1]; }
-	abstract function '*' specializes ScalarFunctions::'*' { in x: NumericalValue[1]; in y: NumericalValue[1]; return : NumericalValue[1]; }
-	abstract function '/' specializes ScalarFunctions::'/' { in x: NumericalValue[1]; in y: NumericalValue[1]; return : NumericalValue[1]; }
-	abstract function '**' specializes ScalarFunctions::'**' { in x: NumericalValue[1]; in y: NumericalValue[1]; return : NumericalValue[1]; }
-	abstract function '^' specializes ScalarFunctions::'^' { in x: NumericalValue[1]; in y: NumericalValue[1]; return : NumericalValue[1]; }
-	abstract function '%' specializes ScalarFunctions::'%' { in x: NumericalValue[1]; in y: NumericalValue[1]; return : NumericalValue[1]; }
-	abstract function 'div' specializes ScalarFunctions::'div' { in x: NumericalValue[1]; in y: NumericalValue[1]; return : NumericalValue[1]; }
+	private import Assertion::Lean;
 
-	abstract function '<' specializes ScalarFunctions::'<' { in x: NumericalValue[1]; in y: NumericalValue[1]; return : Boolean[1]; }
-	abstract function '>' specializes ScalarFunctions::'>' { in x: NumericalValue[1]; in y: NumericalValue[1]; return : Boolean[1]; }
-	abstract function '<=' specializes ScalarFunctions::'<=' { in x: NumericalValue[1]; in y: NumericalValue[1]; return : Boolean[1]; }
-	abstract function '>=' specializes ScalarFunctions::'>=' { in x: NumericalValue[1]; in y: NumericalValue[1]; return : Boolean[1]; }
-	
-	abstract function max specializes ScalarFunctions::max { in x: NumericalValue[1]; in y: NumericalValue[1]; return : NumericalValue[1]; }
-	abstract function min specializes ScalarFunctions::min { in x: NumericalValue[1]; in y: NumericalValue[1]; return : NumericalValue[1]; }
-	
-	abstract function sum { in collection: NumericalValue[0..*]; return : NumericalValue[1]; }	
-	abstract function product { in collection: NumericalValue[0..*]; return : NumericalValue[1]; }
+
+	abstract function isZero{ in x: NumericalValue[1]; return : Boolean;
+		@Lean{l="fun x => x = Zero.zero";} }
+	abstract function isUnit{ in x : NumericalValue[1]; return : Boolean;
+		@Lean{l="fun x => x = One.one";} }
+
+	abstract function abs{ in x: NumericalValue[1]; return : NumericalValue[1];
+		@Lean{l="abs";} }
+
+	abstract function '+' specializes ScalarFunctions::'+' { in x: NumericalValue[1]; in y: NumericalValue[0..1]; return : NumericalValue[1];
+		@Lean{l="Add.add";} }
+	abstract function '-' specializes ScalarFunctions::'-' { in x: NumericalValue[1]; in y: NumericalValue[0..1]; return : NumericalValue[1];
+		@Lean{l="Sub.sub";} }
+	abstract function '*' specializes ScalarFunctions::'*' { in x: NumericalValue[1]; in y: NumericalValue[1]; return : NumericalValue[1];
+		@Lean{l="Mul.mul";} }
+	abstract function '/' specializes ScalarFunctions::'/' { in x: NumericalValue[1]; in y: NumericalValue[1]; return : NumericalValue[1];
+		@Lean{l="Div.div";} }
+	abstract function '**' specializes ScalarFunctions::'**' { in x: NumericalValue[1]; in y: NumericalValue[1]; return : NumericalValue[1];
+		@Lean{l="HPow.hPow";} }
+	abstract function '^' specializes ScalarFunctions::'^' { in x: NumericalValue[1]; in y: NumericalValue[1]; return : NumericalValue[1];
+		@Lean{l="HPow.hPow";} }
+	abstract function '%' specializes ScalarFunctions::'%' { in x: NumericalValue[1]; in y: NumericalValue[1]; return : NumericalValue[1];
+		@Lean{l="Mod.mod";} }
+	abstract function 'div' specializes ScalarFunctions::'div' { in x: NumericalValue[1]; in y: NumericalValue[1]; return : NumericalValue[1];
+		@Lean{l="Div.div";} }
+
+	abstract function '<' specializes ScalarFunctions::'<' { in x: NumericalValue[1]; in y: NumericalValue[1]; return : Boolean[1];
+		@Lean{l="fun x y => decide (x < y)";} }
+	abstract function '>' specializes ScalarFunctions::'>' { in x: NumericalValue[1]; in y: NumericalValue[1]; return : Boolean[1];
+		@Lean{l="fun x y => decide (y < x)";} }
+	abstract function '<=' specializes ScalarFunctions::'<=' { in x: NumericalValue[1]; in y: NumericalValue[1]; return : Boolean[1];
+		@Lean{l="fun x y => decide (x ≤ y)";} }
+	abstract function '>=' specializes ScalarFunctions::'>=' { in x: NumericalValue[1]; in y: NumericalValue[1]; return : Boolean[1];
+		@Lean{l="fun x y => decide (y ≤ x)";} }
+
+	abstract function max specializes ScalarFunctions::max { in x: NumericalValue[1]; in y: NumericalValue[1]; return : NumericalValue[1];
+		@Lean{l="max";} }
+	abstract function min specializes ScalarFunctions::min { in x: NumericalValue[1]; in y: NumericalValue[1]; return : NumericalValue[1];
+		@Lean{l="min";} }
+
+	abstract function sum { in collection: NumericalValue[0..*]; return : NumericalValue[1];
+		@Lean{l="List.sum";} }
+	abstract function product { in collection: NumericalValue[0..*]; return : NumericalValue[1];
+		@Lean{l="List.prod";} }
 	
 	function sum0 { in collection: NumericalValue[0..*]; in zero: NumericalValue[1]; 
  		inv { isZero(zero as NumericalValue) }		
