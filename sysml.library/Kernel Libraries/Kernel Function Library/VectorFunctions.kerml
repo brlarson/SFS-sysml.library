@@ -15,7 +15,8 @@ standard library package VectorFunctions {
 	private import TrigFunctions::arccos;
 	private import SequenceFunctions::size;
 	private import ControlFunctions::*;
-	
+	private import Assertion::Lean;
+
 	public import VectorValues::*;
 	
 	/* Generic arithmetic functions for all VectorValues. */
@@ -26,8 +27,9 @@ standard library package VectorFunctions {
 		 * Return whether a VectorValue is a zero vector.
 		 */
 		 
-		in v: VectorValue[1]; 
-		return : Boolean[1]; 
+		in v: VectorValue[1];
+		return : Boolean[1];
+		@Lean{l="fun v => v = Zero.zero";}
 	}
 	
 	abstract function '+' specializes DataFunctions::'+' {
@@ -41,6 +43,7 @@ standard library package VectorFunctions {
 		return u: VectorValue[1];
 		inv zeroAddition { w == null or isZeroVector(w) implies u == w }
 		inv commutivity { w != null implies u == w + v }
+		@Lean{l="Add.add";}
 	}
 	
 	abstract function '-' specializes DataFunctions::'-' {
@@ -56,6 +59,7 @@ standard library package VectorFunctions {
 		return u: VectorValue[1];
 		inv negation { w == null implies isZeroVector(v + u) }
 		inv difference { w != null implies v + u == w }
+		@Lean{l="Sub.sub";}
 	}
 	
 	abstract function sum0 {
@@ -68,6 +72,7 @@ standard library package VectorFunctions {
 		in zero: VectorValue[1]; 
 		inv precondition { isZeroVector(zero) }
 		return s: VectorValue[1] = coll->reduce '+' ?? zero;
+		@Lean{l="fun coll zero => coll.foldl Add.add zero";}
 	}
 
 	/* Functions specific to NumericalVectorValues. */
@@ -85,6 +90,9 @@ standard library package VectorFunctions {
 //			:>> dimension = size(components);
 			:>> elements = components;
 		}
+		// No @Lean: NumericalVectorValue isn't modeled as any concrete Mathlib type in
+		// Lean4SFS, and Mathlib itself has no single canonical "vector from list"
+		// constructor -- EuclideanSpace/Fin n -> R/Matrix each build differently.
 	}
 	
 	abstract function scalarVectorMult specializes DataFunctions::'*' {
@@ -98,6 +106,7 @@ standard library package VectorFunctions {
 		return w: NumericalVectorValue[1];
 		inv scaling { norm(w) == x * norm(v) }
 		inv zeroLength { isZeroVector(w) implies isZero(norm(w))}
+		@Lean{l="SMul.smul";}
 	}
 	alias '*' for scalarVectorMult;
 	
@@ -111,6 +120,7 @@ standard library package VectorFunctions {
 		in v: NumericalVectorValue[1]; 
 		in x: NumericalValue[1];
 		return w: NumericalVectorValue[1] default scalarVectorMult(x, v);
+		@Lean{l="fun v x => SMul.smul x v";}
 	}
 	
 	abstract function vectorScalarDiv specializes DataFunctions::'/' {
@@ -123,6 +133,7 @@ standard library package VectorFunctions {
 		in v: NumericalVectorValue[1]; 
 		in x: NumericalValue[1];
 		return w: NumericalVectorValue[1] = scalarVectorMult(1.0 / x, v);
+		@Lean{l="fun v x => (1 / x) • v";}
 	}
 
 	abstract function inner specializes DataFunctions::'*' {
@@ -136,6 +147,7 @@ standard library package VectorFunctions {
 		return x: NumericalValue[1];
 		inv commmutivity { x == inner(w, v) }
 		inv zeroInner { isZeroVector(v) or isZeroVector(w) implies isZero(x)}
+		@Lean{l="inner ℝ";}
 	}
 	
 	abstract function norm {
@@ -148,6 +160,7 @@ standard library package VectorFunctions {
 		return l : NumericalValue[1];
 		inv squareNorm { l * l == inner(v,v) }
 		inv lengthZero { isZero(l) == isZeroVector(v) }
+		@Lean{l="norm";}
 	}
 	
 	abstract function angle {
@@ -161,6 +174,7 @@ standard library package VectorFunctions {
 		return theta: NumericalValue[1];
 		inv commutivity { theta == angle(w, v) }
 		inv lengthInsensitive { theta == angle(w / norm(w), v / norm(v)) }
+		@Lean{l="InnerProductGeometry.angle";}
 	}
 	
 	/* Specialized functions with concrete definitions for CartesianVectorValues. */
@@ -178,13 +192,16 @@ standard library package VectorFunctions {
 //			:>> dimension = size(components);
 			:>> elements = components;
 		}
+		// No @Lean: same reason as VectorOf above -- no concrete Mathlib vector type
+		// modeled here, and no single canonical "vector from list" constructor exists.
 	}
-	function CartesianThreeVectorOf specializes CartesianVectorOf { 
+	function CartesianThreeVectorOf specializes CartesianVectorOf {
 		in components: Real[3] ordered nonunique;
 		return : CartesianThreeVectorValue[1] {
 		    feature :>> CartesianVectorOf::result::dimension, CartesianThreeVectorValue::dimension, VectorValues::ThreeVectorValue::dimension;
 //		    feature :>> CartesianVectorOf::result::dimension, CartesianThreeVectorValue::dimension;
 		}
+		// No @Lean: same reason as CartesianVectorOf above.
 	}
 	
 	feature cartesianZeroVector: CartesianVectorValue[3] =
@@ -197,9 +214,12 @@ standard library package VectorFunctions {
 		/*
 		 * Cartesian zero vectors of 1, 2 and 3 dimensions.
 		 */
+		@Lean{l="Zero.zero";}
 	}
 	feature cartesian3DZeroVector: CartesianThreeVectorValue[1] =
-		cartesianZeroVector#(3) as CartesianThreeVectorValue;
+		cartesianZeroVector#(3) as CartesianThreeVectorValue {
+		@Lean{l="Zero.zero";}
+	}
 //		cartesianZeroVector#(3);
 	
 	function isCartesianZeroVector specializes isZeroVector {
@@ -208,12 +228,13 @@ standard library package VectorFunctions {
 		 * A CartesianVectorValue is a zero vector if all its elements are zero.
 		 */
 	 
-		in v: CartesianVectorValue[1]; 
+		in v: CartesianVectorValue[1];
 		return : Boolean[1] = v.elements->forAll{in x; x == 0.0};
+		@Lean{l="fun v => v = Zero.zero";}
 	}
-	
-	function 'cartesian+' specializes '+' { 
-		in v: CartesianVectorValue[1]; 
+
+	function 'cartesian+' specializes '+' {
+		in v: CartesianVectorValue[1];
 		in w: CartesianVectorValue[0..1];
 		inv precondition { w != null implies v.dimension == w.dimension }
 		return u: CartesianVectorValue[1] =
@@ -222,10 +243,11 @@ standard library package VectorFunctions {
 				(1..w.dimension)->collect{in i : Positive; v#(i) + w#(i)} as Real
 //				(1..w.dimension)->collect{in i : Positive; v#(i) + w#(i)}
 			);
+		@Lean{l="Add.add";}
 	}
-	
-	function 'cartesian-' specializes '-' { 
-		in v: CartesianVectorValue[1]; 
+
+	function 'cartesian-' specializes '-' {
+		in v: CartesianVectorValue[1];
 		in w: CartesianVectorValue[0..1];
 		inv precondition { w != null implies v.dimension == w.dimension }
 		return u: CartesianVectorValue[1] =
@@ -237,45 +259,52 @@ standard library package VectorFunctions {
 //					(1..v.dimension)->collect{in i : Positive; v#(i) - w#(i)}
 				)
 			);
+		@Lean{l="Sub.sub";}
 	}
-	
-	function cartesianScalarVectorMult specializes scalarVectorMult { 
-		in x: Real[1]; 
+
+	function cartesianScalarVectorMult specializes scalarVectorMult {
+		in x: Real[1];
 		in v: CartesianVectorValue[1];
 		return w: CartesianVectorValue[1] =
 			CartesianVectorOf(
 				v.elements->collect{in y : Real; x * y}
 			);
+		@Lean{l="SMul.smul";}
 	}
-	function cartesianVectorScalarMult specializes vectorScalarMult { 
-		in v: CartesianVectorValue[1]; 
-		in x: Real[1]; 
+	function cartesianVectorScalarMult specializes vectorScalarMult {
+		in v: CartesianVectorValue[1];
+		in x: Real[1];
 		return w: CartesianVectorValue[1] = cartesianScalarVectorMult(x, v);
+		@Lean{l="fun v x => SMul.smul x v";}
 	}
-	
-	function cartesianInner specializes inner { 
-		in v: CartesianVectorValue[1]; 
+
+	function cartesianInner specializes inner {
+		in v: CartesianVectorValue[1];
 		in w : CartesianVectorValue[1];
 		inv precondition { v.dimension == w.dimension }
 		return x: Real[1] =
 			(1..v.dimension)->collect{in i : Positive; v#(i) * w#(i)}->reduce RealFunctions::'+';
+		@Lean{l="inner ℝ";}
 	}
 	
 	function cartesianNorm specializes norm { 
 		in v: CartesianVectorValue[1];
 		return l : NumericalValue[1] = sqrt(cartesianInner(v, v));
+		@Lean{l="norm";}
 	}
-	
-	function cartesianAngle specializes angle { 
+
+	function cartesianAngle specializes angle {
 		in v: CartesianVectorValue[1]; in w: CartesianVectorValue[1];
 		inv precondition { v.dimension == w.dimension }
 		return theta: Real[1] = arccos(cartesianInner(v, w) / (norm(v) * norm(w)) as TrigFunctions::UnitBoundedReal);
 //		return theta: Real[1] = arccos(cartesianInner(v, w) / (norm(v) * norm(w)));
+		@Lean{l="InnerProductGeometry.angle";}
 	}
-	
-	function sum { 
+
+	function sum {
 		in coll: CartesianThreeVectorValue[*];
 		return : CartesianThreeVectorValue[1] = sum0(coll, cartesian3DZeroVector);
+		@Lean{l="List.sum";}
 	}
-	
+
 }
