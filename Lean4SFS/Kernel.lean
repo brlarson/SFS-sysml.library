@@ -2249,3 +2249,32 @@ private def _testMetaFeature : MetadataFeature :=
 #check kernel% @Assert{f="<< forall ep~Performance in enactedPerformances are during(ep,self) >>";}
 
 end KerML.Kernel
+
+-- `Tangibility.kerml` (SFS library, net-new): whether something is virtual or
+-- physical, and if physical, solid, liquid, or etherial. Exercises two grammar
+-- gaps newly closed for this file: `:>` symbolic `specializes` on `classifier`
+-- (previously `behavior`-only) and multiplicity-before-`default` on `feature`
+-- (`VolumeValue[1] default 0 [L]`), plus the earlier multiplicity-before-type
+-- support (`allocatedTo : Physical[1]`, canonical position; `[1] : Physical`,
+-- the position `Tangibility.kerml` itself originally used, is also accepted by
+-- the grammar but the real file was edited to the canonical order).
+#check kernel% library package Tangibility {
+  private import Regions::Region ;
+  private import ISQ::VolumeValue ;
+  private import SI::L ;
+}
+#check kerml% abstract classifier Virtual {
+  feature allocatedTo : Physical[1] ;
+}
+#check kerml% abstract classifier Physical disjoint from Virtual {
+  feature location : Region[1] ;
+}
+#check kerml% abstract classifier Solid :> Physical {
+  doc "something that might bend or deform, but not flow"
+}
+#check kerml% abstract classifier Fluid :> Physical disjoint from Solid {
+  feature amount : VolumeValue[1] default 0 [L] ;
+}
+#check kerml% abstract classifier Etherial :> Physical disjoint from Solid, Fluid {
+  doc "medium for the transmission of radiation"
+}

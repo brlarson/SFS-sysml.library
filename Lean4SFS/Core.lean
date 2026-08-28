@@ -1083,9 +1083,15 @@ syntax (name := kermlType) (kermlAbstractFlag)? "type " ident
 
 /-- KerML §8.2.4.2.1 `Classifier`, same shape as `Type` above except `specializes`
 produces `Subclassification` (not generic `Specialization`), per
-`SuperclassingPart : OwnedSubclassification`. -/
+`SuperclassingPart : OwnedSubclassification`. Also accepts the symbolic `:>`
+alternate spelling of `specializes` (`Tangibility.kerml`'s own real `abstract
+classifier Solid :> Physical {...}`) -- same general "specialize-or-subset" `:>`
+symbol `Kernel.lean`'s `behavior` production already accepts, feeding the same
+`Subclassification` elaboration as the keyword form (see that production's own
+doc comment for why only specific keywords gain this, added as needed). -/
 syntax (name := kermlClassifier) (kermlAbstractFlag)? "classifier " ident
   (" specializes " kermlQualName,+)?
+  (" :> " kermlQualName,+)?
   (" conjugates " kermlQualName)?
   (" disjoint" " from " kermlQualName,+)?
   (" unions " kermlQualName,+)?
@@ -1093,8 +1099,18 @@ syntax (name := kermlClassifier) (kermlAbstractFlag)? "classifier " ident
   (" differences " kermlQualName,+)?
   kermlBody : kermlDecl
 
+/-- `default`'s value: either a bare `kermlQualName` (`Regions.kerml`'s own real
+`feature clock : Clock default universalClock;`) or a numeric literal with an
+optional unit-bracket suffix (`Tangibility.kerml`'s own real `feature amount :
+VolumeValue[1] default 0 [L] {...}`) -- same "structure without semantics" trade
+`kermlMult`/unit brackets already make, still parsed-but-not-stored either way (no
+`kermlExpr` needed, keeping this in `Core.lean`, not `Kernel.lean`). -/
+declare_syntax_cat kermlDefaultVal
+syntax kermlQualName : kermlDefaultVal
+syntax num ("[" kermlQualName "]")? : kermlDefaultVal
+
 /-- KerML §8.2.4.3.1 `Feature`, relationship-part subset: `[abstract] feature f
-([typed by T,+] | [: T,+]) [default V] [mult] [subsets S,+] [references R] [crosses
+([typed by T,+] | [: T,+]) [mult] [default V] [subsets S,+] [references R] [crosses
 X] [redefines D,+ | :>> D,+] [chains C] [inverse of V] [featured by F,+] ;`. Bare `: T,+`
 is an alternate spelling of `typed by T,+` (KerML's `TYPED_BY = ':' | 'typed' 'by'`,
 only the keyword form was covered before) -- both feed the same `FeatureTyping`
@@ -1103,17 +1119,27 @@ elaboration; `:>> D,+` is likewise the symbolic alternate spelling of `redefines
 BooleanEvaluation[1] :>> f;`), both feeding the same `Redefinition` elaboration.
 `[mult]` (`kermlMult` above) is parsed but not stored, matching that category's own
 note. `default V` (KerML's `FeatureValue`'s own bare-`default`-keyword spelling, no
-`=`/`:=` at all -- `Regions.kerml`'s own real `feature clock : Clock default
-universalClock;`) is likewise parsed but not stored: a real `FeatureValue` element
-would need `Kernel.lean`'s own type (not available here, wrong dependency direction,
-same reason `inv`/`Invariant` can't live in `Core.lean` either), and `V` is always a
-bare qualified name in every real use of this clause in this repo, never a general
-expression that would additionally need `kermlExpr`. -/
+`=`/`:=` at all) is likewise parsed but not stored (see `kermlDefaultVal` just above
+for `V`'s own shape): a real `FeatureValue` element would need `Kernel.lean`'s own
+type (not available here, wrong dependency direction, same reason `inv`/`Invariant`
+can't live in `Core.lean` either). `[mult]` also appears a *second* time here, right
+after the name, ahead of `: T` -- `Tangibility.kerml`'s own real `feature
+allocatedTo[1] : Physical;` puts multiplicity *before* the type, unlike every other
+real file so far (`feature d : Occurrence[1]`, mult after); both positions are
+genuine KerML, so both are accepted (confirmed via a real build error before adding
+the earlier slot) -- still parsed-but-not-stored either way, whichever one actually
+matches. This slot sits right after the type and *before* `default` (not after, as
+an earlier version of this grammar had it) -- every real `[mult] default V` usage in
+this repo (`Transfers.kerml`'s `DurationValue[1] default 0 [SI::s]`, `Occurrences.
+kerml`'s `Boolean[1] default false`, `Tangibility.kerml`'s own `VolumeValue[1]
+default 0 [L]`, ...) puts multiplicity there, confirmed via a real build error before
+moving it. -/
 syntax (name := kermlFeature) (kermlEndFlag)? (kermlCompositeFlag)? (kermlAbstractFlag)? "feature " ident
+  (kermlMult)?
   (" typed" " by " kermlQualName,+)?
   (" : " kermlQualName,+)?
-  (" default " kermlQualName)?
   (kermlMult)?
+  (" default " kermlDefaultVal)?
   (" subsets " kermlQualName,+)?
   (" references " kermlQualName)?
   (" crosses " kermlQualName)?
@@ -1280,6 +1306,7 @@ partial def elabKermlDecl : TSyntax `kermlDecl → MacroM (Array (TSyntax `term)
     pure (#[← `(($aT).elt)] ++ specElems ++ conjElems ++ disjElems ++ uniElems ++ interElems ++ diffElems ++ bodyElems)
   | `(kermlDecl| $[$_abs:kermlAbstractFlag]? classifier $a:ident
         $[specializes $specs,*]?
+        $[:> $symSpecs,*]?
         $[conjugates $conj:kermlQualName]?
         $[disjoint from $disj,*]?
         $[unions $uni,*]?
@@ -1289,6 +1316,12 @@ partial def elabKermlDecl : TSyntax `kermlDecl → MacroM (Array (TSyntax `term)
     let an := a.getId.toString
     let aT ← classifierStubTerm a
     let specElems ← match specs with
+      | some ss => ss.getElems.mapM (fun g => do
+          let gT ← classifierStubTermQ g
+          let rel ← mkSubclassificationTerm aT gT an (qualNameStr g)
+          `(($rel).elt))
+      | none => pure #[]
+    let symSpecElems ← match symSpecs with
       | some ss => ss.getElems.mapM (fun g => do
           let gT ← classifierStubTermQ g
           let rel ← mkSubclassificationTerm aT gT an (qualNameStr g)
@@ -1325,12 +1358,13 @@ partial def elabKermlDecl : TSyntax `kermlDecl → MacroM (Array (TSyntax `term)
           `(($rel).elt))
       | none => pure #[]
     let bodyElems ← elabKermlBody body
-    pure (#[← `(($aT).elt)] ++ specElems ++ conjElems ++ disjElems ++ uniElems ++ interElems ++ diffElems ++ bodyElems)
+    pure (#[← `(($aT).elt)] ++ specElems ++ symSpecElems ++ conjElems ++ disjElems ++ uniElems ++ interElems ++ diffElems ++ bodyElems)
   | `(kermlDecl| $[$_end:kermlEndFlag]? $[$_comp:kermlCompositeFlag]? $[$_abs:kermlAbstractFlag]? feature $a:ident
+        $[$_mult0:kermlMult]?
         $[typed by $tys,*]?
         $[: $tys2,*]?
-        $[default $_defV:kermlQualName]?
         $[$_mult:kermlMult]?
+        $[default $_defV:kermlDefaultVal]?
         $[subsets $subs,*]?
         $[references $refF:kermlQualName]?
         $[crosses $crossF:kermlQualName]?

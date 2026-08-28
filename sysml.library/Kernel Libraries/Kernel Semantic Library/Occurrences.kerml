@@ -151,7 +151,7 @@ standard library package Occurrences {
 			 */
 
       @Assert{f="<< forall s~Occurrence in suboccurrences are during(s,self)"+
-			  " and PartOf(s,self) >>";}
+			  " and ContainedBy(s,self) >>";}
 
 			 feature redefines localClock default (that as Occurrence).localClock {
 			 	doc
@@ -165,7 +165,10 @@ standard library package Occurrences {
 		}
 		
 		/* Occurrences may be suboccurrences of no more than one other occurrence. */		
-		feature superoccurrence: Occurrence[0..1] subsets occurrences inverse of suboccurrences;
+		feature superoccurrence: Occurrence[0..1] subsets occurrences inverse of suboccurrences {
+			@Assert{f="<<ContainedBy(self,superoccurrence)>>";}
+		}
+		 
 
 //SFS:  use withoutOccurrence bool instead of withoutOccurrences feature
 		// feature withoutOccurrences: Occurrence[0..*] unions successors, predecessors, outsideOfOccurrences
