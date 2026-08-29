@@ -723,6 +723,16 @@ spirit to `function` among the four already-modeled classifier-like keywords. -/
 syntax (kermlAbstractFlag)? "expr " ident (" specializes " kermlQualName,+)? (" conjugates " kermlQualName)?
   (" disjoint" " from " kermlQualName,+)? (" unions " kermlQualName,+)? (" intersects " kermlQualName,+)?
   (" differences " kermlQualName,+)? kermlPredBody : kernelDecl
+/-- `bool`, KerML's shorthand Boolean-valued declaration keyword -- same shape as
+`expr` right above (`Occurrences.kerml`'s own real `bool sameLife {...}`,
+`withoutOccurrence`, `predecessor`, and ~17 more, none previously run through this
+grammar at all: `bool` had simply never been added as a keyword here, confirmed via a
+real "unexpected identifier" error attempting `sameLife`'s own new `@Assert`).
+Elaborated the same way `expr` is, reusing `kFunctionStubTerm` -- same "structure
+without semantics" trade, no dedicated metaclass. -/
+syntax (kermlAbstractFlag)? "bool " ident (" specializes " kermlQualName,+)? (" conjugates " kermlQualName)?
+  (" disjoint" " from " kermlQualName,+)? (" unions " kermlQualName,+)? (" intersects " kermlQualName,+)?
+  (" differences " kermlQualName,+)? kermlPredBody : kernelDecl
 /-- KerML §8.2.5.13 `Package`/`LibraryPackage`: `package Name { ... }` (`Base.kerml`'s
 own package could have been written this way, though the real file's top level isn't
 itself parsed here -- see the `library`/`standard library` forms just below, which
@@ -1473,6 +1483,10 @@ partial def elabKernelDecl : TSyntax `kernelDecl → MacroM (Array (TSyntax `ter
     let declElems ← classifierLikeDeclElems interactionStubTerm a specs conj disj uni inter diff
     pure (declElems ++ (← elabKermlBody body))
   | `(kernelDecl| $[$_abs:kermlAbstractFlag]? expr $a:ident $[specializes $specs,*]? $[conjugates $conj:kermlQualName]?
+        $[disjoint from $disj,*]? $[unions $uni,*]? $[intersects $inter,*]? $[differences $diff,*]? $body:kermlPredBody) => do
+    let declElems ← classifierLikeDeclElems kFunctionStubTerm a specs conj disj uni inter diff
+    pure (declElems ++ (← elabKermlPredBody body))
+  | `(kernelDecl| $[$_abs:kermlAbstractFlag]? bool $a:ident $[specializes $specs,*]? $[conjugates $conj:kermlQualName]?
         $[disjoint from $disj,*]? $[unions $uni,*]? $[intersects $inter,*]? $[differences $diff,*]? $body:kermlPredBody) => do
     let declElems ← classifierLikeDeclElems kFunctionStubTerm a specs conj disj uni inter diff
     pure (declElems ++ (← elabKermlPredBody body))
@@ -2318,11 +2332,22 @@ elab "kernel% " d:kernelDecl : term => do
 -- o~Occurrence in o<>this that during(o,result)," doesn't say what the doc comment
 -- promises ("Life is top-level Occurrence, suboccurrence of no other") -- it says no
 -- occurrence *other than `this`* happens during `result`, not that `result` itself
--- has no superoccurrence. Fixed to `not exists p~Occurrence that PartOf(result,p)`
--- -- `PartOf`, not a fresh primitive: `suboccurrences`' own real formula above
--- already establishes `s in suboccurrences ⟹ ... PartOf(s,self)` (a suboccurrence is
--- `PartOf` its container), so symmetrically a *super*occurrence of `result` is any
--- `p` with `PartOf(result,p)`, and "no superoccurrence" is that existential negated.
+-- has no superoccurrence. First fixed to `not exists p~Occurrence that
+-- PartOf(result,p)` -- reusing `PartOf` rather than a fresh primitive.
+--
+-- That fix was itself found to be too strong (2026-08-28, caught and fixed again at
+-- direct request, "does @Assert on line 111 conform to the result of getLife?"):
+-- `PartOf` (`SFS.lean`'s `class Mereology`) is characterized only by irreflexivity/
+-- transitivity/`pch`, otherwise unconstrained -- `ContainedBy -> PartOf` is a
+-- one-way implication (`Containment`'s own `containment` field), so "no
+-- superoccurrence" (empty by construction in `getLife`'s base case) does NOT entail
+-- "no PartOf-parent at all," which is what the formula actually claimed. Re-fixed to
+-- `not exists p~Occurrence that ContainedBy(result,p)` -- `suboccurrences`' own real
+-- formula establishes `s in suboccurrences ⟹ ContainedBy(s,self)`, so symmetrically
+-- a *super*occurrence of `result` is any `p` with `ContainedBy(result,p)`, and "no
+-- superoccurrence" is exactly that existential negated -- matching the doc comment's
+-- own words ("suboccurrence of no other") precisely this time, not a strengthening.
+--
 -- As a bare, headerless `@Assert{f="...";}` probe (matching every other
 -- Occurrences.kerml formula's own treatment here) this still fails on `result`
 -- alone -- nothing to bind it against outside a real `return result : T` context,
@@ -2331,7 +2356,61 @@ elab "kernel% " d:kernelDecl : term => do
 -- context directly -- `Life` itself has no `SFS.lean` counterpart (nothing here
 -- models it as distinct from `Occurrence`), so `result~Occurrence` stands in.
 #check kernel% @Assert{n="getLife"; f="<<getLife : this~Occurrence := result~Occurrence | "+
-    "during(this,result) and not exists p~Occurrence that PartOf(result,p)>>";}
+    "during(this,result) and not exists p~Occurrence that ContainedBy(result,p)>>";}
+
+-- `sameLife`'s own real `bool sameLife {...}` (2026-08-28, at direct request:
+-- "create @Assert for sameLife"): `bool` -- KerML's shorthand Boolean-valued
+-- declaration keyword, used ~17 times across this file (`withoutOccurrence`,
+-- `predecessor`, `successor`, ...) -- had never actually been added to this grammar
+-- at all, confirmed via a real "unexpected identifier; expected ..." error the first
+-- time any `bool`-declared element was tried; added above (mirrors `expr`'s own
+-- production exactly). Structural body checked bare first (`@Assert` is a
+-- `kernelDecl`-only production, so it can't nest inside `kermlPredBody`'s
+-- `kermlKDecl*` any more than it can nest inside `kermlBody`'s `kermlDecl*` --
+-- same two-check split `suboccurrences`/`getLife` above already use, not new).
+#check kernel% bool sameLife {
+  in o : Occurrence;
+  this.getLife == o.getLife
+}
+
+-- `sameLife`'s own `@Assert` formula, `<<sameLife(this,o) iff this.getLife =
+-- o.getLife>>`: caught two real DSL-syntax mistakes fixing this (both confirmed via
+-- real "malformed formula"/misparse errors, not guessed) -- `<->` isn't valid here
+-- at all (the DSL spells biconditional `iff`, not `<->`), and `==` isn't valid
+-- either (the DSL's own equality operator is bare `=`, `==` is KerML expression
+-- syntax bleeding into the wrong grammar -- easy to do since `sameLife`'s own KerML
+-- *body* genuinely does use `==`, correctly, a few lines below). Unlike `getLife`
+-- above, this one is deliberately **not** given its own permanent `#check`: like
+-- `getLife`, `sameLife`/`getLife` themselves have no `SFS.lean` counterpart, but
+-- `getLife`'s own smoke test sidesteps that by substituting `result~Occurrence`
+-- (a real bound variable) for the recursive `getLife` call; that trick isn't
+-- available here since the formula is defined *in terms of* `getLife` itself, so a
+-- real `#check` of it hits genuine `error: Unknown identifier` (not just `info`,
+-- confirmed by actually trying it -- this would fail `lake build`), the same
+-- ceiling every other Occurrences.kerml formula avoided by only ever citing
+-- already-modeled `SFS.lean` primitives. Verified syntax-valid via a scratch probe
+-- instead (parses cleanly once `<->`/`==` were fixed, only unknown-identifier
+-- errors remain) -- not a permanent build artifact.
+
+-- `withoutOccurrence`'s own real `bool withoutOccurrence {...}` (2026-08-28, at
+-- direct request: "add @Assert to withoutOccurrence"). Structural body checked bare
+-- first, same two-check split as `sameLife` above.
+#check kernel% bool withoutOccurrence {
+  in o : Occurrence;
+  nonoverlaps(o,this) or not RegionOverlap(Location(o),Location(this))
+}
+
+-- `withoutOccurrence`'s own `@Assert` formula, `<<withoutOccurrence(this,o) iff
+-- nonoverlaps(o,this) or not RegionOverlap(Location(o),Location(this))>>`: unlike
+-- `sameLife`, every identifier here *except* the self-referential
+-- `withoutOccurrence(this,o)` call is real (`nonoverlaps`/`RegionOverlap`/`Location`
+-- all resolve cleanly, confirmed by actually trying it -- only one `Unknown
+-- identifier` error, not several) -- but that one gap is enough to keep this out of
+-- a permanent `#check` too, same reasoning as `sameLife`'s own formula just above
+-- (a predicate asserting itself via `iff` has no `SFS.lean` binding to close the
+-- loop with, confirmed via a real `error: Unknown identifier` that would fail `lake
+-- build` if kept). Verified syntax-valid via a scratch probe instead, not committed
+-- here.
 
 -- `suboccurrences`/`immediatePredecessors`/`immediateSuccessors`: their real
 -- top-level shape (plain/`composite`-flagged `feature ... : Occurrence[m]

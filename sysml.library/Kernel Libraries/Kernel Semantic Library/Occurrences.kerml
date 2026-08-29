@@ -109,7 +109,7 @@ standard library package Occurrences {
 		expr getLife {
 			doc /* Life is top-level Occurrence, suboccurrence of no other */
 			@Assert{f="<< during(this,result) and"+
-			   " not exists p~Occurrence that PartOf(result,p) >>";}
+			   " not exists p~Occurrence that ContainedBy(result,p) >>";}
 			return result : Life[1];
 			if superoccurrence->isEmpty() ? this as Life
 			  else superoccurrence->head().getLife	
@@ -120,6 +120,7 @@ standard library package Occurrences {
 //SFS new		
 		bool sameLife {
 			doc /* SFS: o has the same Life as this */
+			@Assert{f="<<sameLife(this,o) iff this.getLife = o.getLife>>";}
 			in o : Occurrence;
 			this.getLife == o.getLife
 		}
@@ -182,10 +183,12 @@ standard library package Occurrences {
 		// 	inv { (that as Occurrence) != (that.that as Occurrence) }
 		// }
 //SFS new
-    bool withoutOccurrence {  
+    bool withoutOccurrence {
       doc /* SFS: true when o is separated in either time or space */
+      @Assert{f="<<withoutOccurrence(this,o) iff nonoverlaps(o,this)"+
+        " or not RegionOverlap(Location(o),Location(this))>>";}
       in o : Occurrence;
-      nonoverlaps(o,this) or not RegionOverlap(Location(o),Location(this)) 
+      nonoverlaps(o,this) or not RegionOverlap(Location(o),Location(this))
     }
 
 //SFS:  use precessor bool instead of predecessors feature
