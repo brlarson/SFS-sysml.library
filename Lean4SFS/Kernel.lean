@@ -2400,17 +2400,48 @@ elab "kernel% " d:kernelDecl : term => do
   nonoverlaps(o,this) or not RegionOverlap(Location(o),Location(this))
 }
 
--- `withoutOccurrence`'s own `@Assert` formula, `<<withoutOccurrence(this,o) iff
--- nonoverlaps(o,this) or not RegionOverlap(Location(o),Location(this))>>`: unlike
+-- `withoutOccurrence`'s own `@Assert` formula, `<<withoutOccurrence(o) iff
+-- nonoverlaps(o,this) or not RegionOverlap(Location(o),Location(this))>>` (single
+-- explicit parameter `o`, `this` implicit -- matching `withoutOccurrence`'s own
+-- real one-parameter declaration, corrected directly in the source): unlike
 -- `sameLife`, every identifier here *except* the self-referential
--- `withoutOccurrence(this,o)` call is real (`nonoverlaps`/`RegionOverlap`/`Location`
--- all resolve cleanly, confirmed by actually trying it -- only one `Unknown
--- identifier` error, not several) -- but that one gap is enough to keep this out of
--- a permanent `#check` too, same reasoning as `sameLife`'s own formula just above
--- (a predicate asserting itself via `iff` has no `SFS.lean` binding to close the
--- loop with, confirmed via a real `error: Unknown identifier` that would fail `lake
--- build` if kept). Verified syntax-valid via a scratch probe instead, not committed
--- here.
+-- `withoutOccurrence(o)` call is real (`nonoverlaps`/`RegionOverlap`/`Location` all
+-- resolve cleanly, confirmed by actually trying it -- only one `Unknown identifier`
+-- error, not several) -- but that one gap is enough to keep this out of a permanent
+-- `#check` too, same reasoning as `sameLife`'s own formula just above (a predicate
+-- asserting itself via `iff` has no `SFS.lean` binding to close the loop with,
+-- confirmed via a real `error: Unknown identifier` that would fail `lake build` if
+-- kept). Verified syntax-valid via a scratch probe instead, not committed here.
+
+-- `predecessor`'s own real `bool predecessor {...}` (2026-08-28, at direct request:
+-- "add @Assert to predecessor"). Structural body checked bare first, same two-check
+-- split as `sameLife`/`withoutOccurrence` above.
+#check kernel% bool predecessor {
+  in o : Occurrence;
+  precedes(o,this)
+}
+
+-- `predecessor`'s own `@Assert` formula, `<<predecessor(o) iff precedes(o,this)>>`
+-- (single explicit parameter `o`, same one-parameter correction as
+-- `withoutOccurrence` above): `precedes` is real (resolves cleanly, confirmed the
+-- same way `withoutOccurrence`'s own non-self-referential identifiers were) -- only
+-- the self-referential `predecessor(o)` call itself is unresolvable, same reason
+-- `sameLife`/`withoutOccurrence` above are also excluded from a permanent `#check`.
+
+-- `successor`'s own real `bool successor {...}` (2026-08-28, at direct request: "add
+-- @Assert to successor"). Structural body checked bare first, same two-check split
+-- as `sameLife`/`withoutOccurrence`/`predecessor` above.
+#check kernel% bool successor {
+  in o : Occurrence;
+  precedes(this,o)
+}
+
+-- `successor`'s own `@Assert` formula, `<<successor(o) iff precedes(this,o)>>`
+-- (single explicit parameter `o`, same convention as `predecessor`/
+-- `withoutOccurrence`): `precedes` is real (resolves cleanly) -- only the
+-- self-referential `successor(o)` call itself is unresolvable, same reason
+-- `sameLife`/`withoutOccurrence`/`predecessor` above are also excluded from a
+-- permanent `#check`.
 
 -- `suboccurrences`/`immediatePredecessors`/`immediateSuccessors`: their real
 -- top-level shape (plain/`composite`-flagged `feature ... : Occurrence[m]

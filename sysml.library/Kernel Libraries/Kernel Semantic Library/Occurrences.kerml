@@ -53,13 +53,15 @@ standard library package Occurrences {
 
 //SFS: all time shots become instants
 //		portion 
-		feature startShot: Instant[1] subsets snapshots :>> lowerBound {
+		feature startShot: Instant[1] //subsets snapshots 
+			:>> lowerBound {
 			doc
 			/* The snapshot representing the start of the occurrence in time. */
 		}
 
 //		portion 
-		feature endShot: Instant[0..1] subsets snapshots  :>> upperBound {
+		feature endShot: Instant[0..1] //subsets snapshots  
+			:>> upperBound {
 			doc
 			/* The snapshot at the end of the occurrence in time.
 			 * The Occurrence may not have ended at time now. */
@@ -185,7 +187,7 @@ standard library package Occurrences {
 //SFS new
     bool withoutOccurrence {
       doc /* SFS: true when o is separated in either time or space */
-      @Assert{f="<<withoutOccurrence(this,o) iff nonoverlaps(o,this)"+
+      @Assert{f="<<withoutOccurrence(o) iff nonoverlaps(o,this)"+
         " or not RegionOverlap(Location(o),Location(this))>>";}
       in o : Occurrence;
       nonoverlaps(o,this) or not RegionOverlap(Location(o),Location(this))
@@ -199,8 +201,9 @@ standard library package Occurrences {
 		// 	 */
 		// }
 //SFS new
-    bool predecessor { 
+    bool predecessor {
       doc /* SFS:  true when o precedes this */
+      @Assert{f="<<predecessor(o) iff precedes(o,this)>>";}
       in o : Occurrence;
       precedes(o,this)
     }
@@ -220,6 +223,7 @@ standard library package Occurrences {
 //SFS new
     bool successor {
       doc /* SFS:  true when self precedes o */
+      @Assert{f="<<successor(o) iff precedes(this,o)>>";}
       in o : Occurrence;
       precedes(this,o)
     }
@@ -285,6 +289,7 @@ standard library package Occurrences {
 			/* timeEnclosedOccurrences is transitive. */
 			subset shorterOccurrence.timeEnclosedOccurrences subsets longerOccurrence.timeEnclosedOccurrences;
 		}
+
 //SFS new
     bool timeEnclosedOccurrence {
       doc /* SFS:  true when o during self */
@@ -546,7 +551,7 @@ standard library package Occurrences {
 		// }
 
 //SFS:  snapshots replaced by instants, has at least startShot and endShot
-		feature snapshots : Instant[2..*] subsets snapShots;
+//		feature snapshots : Instant[2..*] subsets snapShots;
 
 		// portion feature all snapshots: Occurrence[1..*] subsets timeSlices {
 		// 	doc
