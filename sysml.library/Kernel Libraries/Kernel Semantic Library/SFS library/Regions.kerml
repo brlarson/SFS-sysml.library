@@ -12,6 +12,9 @@ library package Regions {
     private import Performances::BooleanEvaluation;
     private import Clocks::Clock;
     private import Clocks::universalClock;
+    private import Tangibility::Virtual;
+    private import Tangibility::Physical;
+    private import SequenceFunctions::notEmpty;
 
     type FrameOfReference specializes Base::Anything {
         doc
@@ -77,12 +80,16 @@ library package Regions {
         */
 //SFS:  Assert.lean gets confused with the "L" notation
 //        @Assert{n="Location"; f="<< Location : o~Occurrence := result~Region | o L result >>";}
-        in o : Occurrence;
-        return result : Region;
         inv { o.isClosed and o.innerSpaceDimension == 3 and o.outerSpaceDimension == 3
             and o.frameOfReference == (result as Region).frameOfReference 
             }
-    }
+        in o : Occurrence;
+        return result : Region;
+        if o istype Physical ? (o as Physical).location 
+          else if o istype Virtual and notEmpty((o as Virtual).allocatedTo) ? Location((o as Virtual).allocatedTo)
+            else if o istype Virtual and notEmpty((o as Virtual).delegatedTo) ? Location((o as Virtual).delegatedTo)
+                else Regions::nowhere
+   }
 
      // SFS:  Two things having the same location are the same thing (df-lfu)
     @Assert{n="locational functionality"; 
@@ -220,6 +227,10 @@ library package Regions {
         in r1 : Region;
         in r2 : Region;
         inv { r1.frameOfReference == r2.frameOfReference }
+    }
+
+    feature nowhere : Region {
+        /* things which have no location are no where */
     }
    
 }
