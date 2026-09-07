@@ -11,11 +11,30 @@ library package Domain {
 
 //  datatype Time specializes Real;
   
-  type Instant specializes TimeValue {
+//SFS new:  the admissibility constraint for succession ends.
+  abstract classifier Temporal {
+    doc /* Anything bearing a temporal extent, and therefore admissible at either end
+      * of a HappensBefore (i.e. of a "first _ then _" succession).
+      *
+      * KerML states WHICH arguments are admissible; the Lean model (Temporal.lean,
+      * classes HasStart/HasEnd) states HOW the predicate reads them.
+      *
+      * Must be `classifier`, not `type`: `classifier Interval specializes Temporal`
+      * below is rejected against a `type` with
+      *   error (reference-error): Expected Classifier element but found Type
+      */
+  }
+
+//SFS:  Instant is now admissible at a succession end -- the degenerate extent,
+//SFS:  starting and ending at itself.  This is what lets Actions::Action::start
+//SFS:  (an Instant since 9df1741) sit in `first start then putIt`.
+  type Instant specializes TimeValue, Temporal {
     doc /* an instant of time */
   }
   
-  classifier Interval  
+//SFS:  Interval :> Temporal, hence Occurrence :> Interval :> Temporal -- every
+//SFS:  Occurrence stays admissible exactly as before.
+  classifier Interval specializes Temporal
   {
     doc /* an interval is a duration between two instants */
     feature lowerBound : Instant;
