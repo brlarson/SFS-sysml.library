@@ -28,7 +28,7 @@ library package Domain {
 //SFS:  Instant is now admissible at a succession end -- the degenerate extent,
 //SFS:  starting and ending at itself.  This is what lets Actions::Action::start
 //SFS:  (an Instant since 9df1741) sit in `first start then putIt`.
-  type Instant specializes TimeValue, Temporal {
+  classifier Instant specializes TimeValue, Temporal {
     doc /* an instant of time */
   }
   
