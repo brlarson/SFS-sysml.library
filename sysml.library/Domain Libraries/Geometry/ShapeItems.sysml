@@ -70,7 +70,7 @@ standard library package ShapeItems {
 
 		assert constraint { isClosed == vertices->forAll{in p1 : Point;
 					vertices->exists{p2 : Point; p1 != p2 and
-							 includes(p1.matingOccurrences, p2) } } }
+							 p1.matesWithOccurrence(p2) } } }
 	}
 
 	attribute semiMajorAxis : LengthValue [0..*] :> scalarQuantities;
@@ -150,8 +150,16 @@ standard library package ShapeItems {
 
 		attribute :>> isClosed = true;
 
+//SFS:  matingOccurrences no longer exists (Occurrences.kerml replaced it with the bool
+//SFS:  matesWithOccurrence(o) predicate) -- not mechanically renamed here because the receiver is
+//SFS:  an indexed/cast expression (edges#(i).vertices#(2) as Item), and Syside's parser rejects
+//SFS:  `.methodCall(...)` chained onto anything but a bare name (confirmed via several isolated
+//SFS:  probes: indexing, casting, and even a plain parenthesized group all break as a receiver;
+//SFS:  only a plain forAll/exists-bound variable, as used at Path's own matingOccurrences call
+//SFS:  above, works). Fixing this for real needs restructuring to route the indexed vertex
+//SFS:  through a bound variable the same way, not a mechanical rename.
 		assert constraint { (1..size(edges))->forAll {in i;
-					edges#(i).vertices->equals((vertices#((2*i)-1), vertices#(2*i))) and  
+					edges#(i).vertices->equals((vertices#((2*i)-1), vertices#(2*i))) and
 					includes((edges#(i).vertices#(2) as Item).matingOccurrences,
 						 edges#(if i==size(edges) ? 1 else i+1).vertices#(1)) } }
 	}
@@ -853,6 +861,9 @@ standard library package ShapeItems {
 		assert constraint { size(apex) == wallNumber }
 
 		/* Base to wall and wall to wall edge mating. */
+//SFS:  matingOccurrences no longer exists (see the same note at Polygon's own assert constraint
+//SFS:  above, ~line 153) -- both includes(...) calls here have the identical indexed/cast-receiver
+//SFS:  problem blocking a mechanical rename to matesWithOccurrence(o).
 		assert constraint { (1..wallNumber)->forAll {in i;
 					includes(wall#(i).base.matingOccurrences,
 							 Pyramid::base.edges#(i)) and
