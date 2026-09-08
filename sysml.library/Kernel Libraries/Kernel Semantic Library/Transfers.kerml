@@ -20,6 +20,7 @@ standard library package Transfers {
     private import Performances::BooleanEvaluation;
     private import ISQBase::DurationValue;
     private import ControlFunctions::select;
+    private import Tangibility::Physical;
    
     
     interaction Transfer specializes Performance, BinaryLink {
@@ -63,13 +64,22 @@ standard library package Transfers {
              */
         }   
 
-//SFS:  make payload multiplicity 1        
+//SFS:  make payload multiplicity 1
         var feature payload: Anything[1] {
             doc
             /*
              * The thing that is to be transferred.
              */
         }
+
+//SFS:  only Virtual payloads can be multicast -- a Physical payload cannot be in two places at
+//SFS:  once, so if payload is Physical, source may feed at most this one outgoing transfer.
+//SFS:  OutBuffer's own non-destructive get would technically allow more than one reader; this is
+//SFS:  what actually forbids it when what's flowing through it is Physical. Keyed on payload's own
+//SFS:  type, not source's -- source (the port/item feature acting as the output slot) and payload
+//SFS:  (the value actually flowing through it) are different occurrences, and it's payload that a
+//SFS:  second reader would duplicate.
+        inv { payload istype Physical implies size(source.outgoingTransfersFromSelf) <= 1 }
 
         succession first getPayloadFromSource then delay;
         succession first delay then putPayloadToTarget;

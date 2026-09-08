@@ -6,7 +6,6 @@ library package Tangibility {
   private import SI::L;
   private import Occurrences::Occurrence;
   private import Base::noValue;
-  private import SequenceFunctions::size;
 
   abstract classifier Virtual :> Occurrence {
     doc /* something without physical existence itself, and can only exist if allocated to something physical */
@@ -35,12 +34,6 @@ library package Tangibility {
     var feature allocations[0..*] : Virtual {
       doc /* the virtual things this physical thing hosts or performs */
     }
-
-//SFS:  only Virtual payloads can be multicast -- a Physical occurrence cannot be in two places at
-//SFS:  once, so at most one outgoing transfer (flow) may ever be sourced from it. OutBuffer's own
-//SFS:  non-destructive get would technically allow more than one reader; this invariant is what
-//SFS:  actually forbids it for anything Physical.
-    inv { size(outgoingTransfersFromSelf) <= 1 }
   }
 
   abstract classifier Solid :> Physical {
