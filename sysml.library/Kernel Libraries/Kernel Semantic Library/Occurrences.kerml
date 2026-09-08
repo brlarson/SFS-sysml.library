@@ -1009,8 +1009,15 @@ standard library package Occurrences {
 		 * LinkObject.
 		 */
 		
-		end feature sourceOccurrence: Occurrence redefines BinaryLink::source;
-		end feature targetOccurrence: Occurrence redefines BinaryLink::target;
+//SFS:  Occurrence -> Domain::Temporal.  This is the level at which `Occurrence` is
+//SFS:  imposed on every temporal link.  Widening HappensBefore alone is NOT enough:
+//SFS:  redefinition may only narrow, so the whole chain must move together --
+//SFS:    BinaryLink::source : Anything[1]
+//SFS:      <- HappensLink::sourceOccurrence        redefines BinaryLink::source
+//SFS:        <- HappensBefore::earlierOccurrence   redefines sourceOccurrence
+//SFS:          <- happensBeforeLinks::earlierOccurrence  redefines both
+		end feature sourceOccurrence: Domain::Temporal redefines BinaryLink::source;
+		end feature targetOccurrence: Domain::Temporal redefines BinaryLink::target;
 	}
 
 //SFS:  remove "all" and cross-multiplicity, add Allen interval
@@ -1201,9 +1208,13 @@ standard library package Occurrences {
 		 * itself.
 		 */
 		@Assert{f="<< precedes(earlierOccurrence, laterOccurrence) >>";}
-		end feature earlierOccurrence: Occurrence redefines sourceOccurrence; //, separateOccurrenceToo; 
+//SFS:  Occurrence -> Domain::Temporal (level 2 of 3; see HappensLink above).
+//SFS:  The @Assert just above reads precedes(earlierOccurrence, laterOccurrence);
+//SFS:  Allen::precedes must be generalized to match -- see Temporal.lean, which
+//SFS:  splits the requirement into HasEnd (left argument) and HasStart (right).
+		end feature earlierOccurrence: Domain::Temporal redefines sourceOccurrence; //, separateOccurrenceToo; 
 //			crosses laterOccurrence.predecessors;
-		end feature laterOccurrence: Occurrence redefines targetOccurrence; //, separateOccurrence; 
+		end feature laterOccurrence: Domain::Temporal redefines targetOccurrence; //, separateOccurrence; 
 //			crosses earlierOccurrence.successors;
 	}
 
@@ -1229,8 +1240,11 @@ standard library package Occurrences {
 		 * It is the default subsetting for succession connectors.
 		 */
 
-		end feature earlierOccurrence: Occurrence redefines HappensBefore::earlierOccurrence, binaryLinks::source;
-		end feature laterOccurrence: Occurrence redefines HappensBefore::laterOccurrence, binaryLinks::target;
+//SFS:  Occurrence -> Domain::Temporal (level 3 of 3).  happensBeforeLinks is the
+//SFS:  default subsetting for succession connectors, so this pair is what
+//SFS:  `first _ then _` is actually checked against by related-feature-conformance.
+		end feature earlierOccurrence: Domain::Temporal redefines HappensBefore::earlierOccurrence, binaryLinks::source;
+		end feature laterOccurrence: Domain::Temporal redefines HappensBefore::laterOccurrence, binaryLinks::target;
 	 }
 
 //SFS:  remove "all", add spatial relationship

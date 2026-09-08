@@ -131,7 +131,11 @@ standard library package StatePerformances {
 		}
 		private succession [*] transitionLinkSource.nonDoMiddle then [1] Performance::self;
 
-		private feature transitionLinkTarget [0..1] : Occurrence = transitionLink.laterOccurrence {
+//SFS:  Occurrence -> Domain::Temporal, forced by widening HappensBefore's ends: once
+//SFS:  laterOccurrence may be an Instant, this feature can no longer be declared
+//SFS:  Occurrence.  The inv below is already guarded by `istype StatePerformance`, so
+//SFS:  it needs no change.  This is the ONLY site in the library the widening forces.
+		private feature transitionLinkTarget [0..1] : Domain::Temporal = transitionLink.laterOccurrence {
 			inv { (that istype StatePerformance) implies
 			      (that as StatePerformance).incomingTransitionTrigger == trigger }
 		}
