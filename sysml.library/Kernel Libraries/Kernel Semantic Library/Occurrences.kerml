@@ -858,7 +858,10 @@ standard library package Occurrences {
 //SFS:  use buffers rather than transfers for incoming and outgoing relationships between occurrences
 		var feature incomingBuffer : Buffer;
 
-		var feature outgoingBuffer : Buffer;
+//SFS:  OutBuffer (not Buffer): outgoing never queues more than one pending value, and a
+//SFS:  non-destructive get lets one send fan out to every flow reading it (multicast) -- see
+//SFS:  RunTimeServices::OutBuffer's own doc for why this is Virtual-payload-only in practice.
+		var feature outgoingBuffer : OutBuffer;
 
 		var feature incomingTransfers: Transfers::Transfer[0..*] subsets Transfers::transfers {
 			doc

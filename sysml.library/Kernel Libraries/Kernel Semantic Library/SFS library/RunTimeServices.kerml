@@ -73,5 +73,53 @@
 
   }
 
+  struct OutBuffer {
+    doc /* an outgoing buffer never needs to hold more than one pending value -- unlike Buffer (a
+     * destructive FIFO, sized for a queue of pending incoming transfers), OutBuffer holds at most
+     * one element, and get() does not remove it. That makes get() idempotent and safe for multiple
+     * independent readers: a single put fans the same value out to every flow that reads it, until
+     * the next put overwrites it. This is what lets one outgoing port feed several connected flows
+     * (multicast) from a single send.
+     *
+     * Duplicating a value to more than one reader this way is only meaningful for Virtual payloads
+     * (see Tangibility::Virtual) -- a Physical occurrence cannot actually be in two places at once,
+     * so a Physical payload's outgoingBuffer must not be read by more than one flow even though
+     * this struct's own get() would technically allow it.
+     */
+    private var feature element[0..1] : Anything := ();
+
+    bool isEmpty {
+      return : Boolean[1] = element == null;
+    }
+
+    @Assert{ doc /* any get returns was put previously */
+      n="OutGetWhatsPut"; f="<< OutGetWhatsPut : : forall v~Anything, t1~Instant are get(v)@t1 <> null "+
+        " implies exists t2~Instant in t2<=t1 that put(v)@t2 >>"; }
+
+    @Assert{ doc /* get is non-destructive: repeated gets with no intervening put return the same value */
+      n="OutGetIdempotent"; f="<< OutGetIdempotent : : forall v1,v2~Anything, t1,t2~Instant in t1<t2 are "+
+        " (get(v1)@t1 and get(v2)@t2 and not exists t3~Instant in (t1<t3 and t3<=t2) that put(v3~Anything)@t3) "+
+        " implies v1=v2 >>"; }
+
+    step put {
+      doc /* replaces whatever is currently held, rather than queueing alongside it */
+      in value : Anything[1];
+      step clearOld : remove {
+        inout seq = element;
+        in values = element;
+      }
+      step addNew : add {
+        inout seq = element;
+        in values = value;
+      }
+      succession clearOld then addNew;
+    }
+
+    step get {
+      doc /* non-destructive: does not remove the element, so every connected reader sees it */
+      out value : Anything[0..1] default if isEmpty()? null else head(element);
+    }
+
+  }
 
 }
