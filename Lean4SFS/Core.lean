@@ -1077,19 +1077,36 @@ declare_syntax_cat kermlBody
 syntax " ;" : kermlBody
 syntax " {" kermlDecl* "}" : kermlBody
 
+/-- KerML §8.2.4.1.1 `Type`'s `TypeRelationshipPart`: `disjoint from D,+` / `unions U,+`
+/ `intersects I,+` / `differences Df,+`, as a repeatable, freely-orderable category
+rather than four fixed optional slots -- real KerML concrete syntax accepts any number
+of these in any order after the required `SpecializationPart` (`Chapter/
+CoreSemanticsChapter.tex` §2.2.2's own citation), and that section's three
+`type A specializes B ... ;` listings are worked examples of exactly this: the same
+five clauses in three different orders, each composing to a genuinely different
+`Set Element` expression (`typeOperatorCompositionOrderMatters` at the end of this
+file). The previous grammar (one fixed optional slot per kind, always in the same
+sequence) could only parse ONE of any three differently-ordered listings like that --
+whichever happened to match its own hardcoded order -- silently rejecting the other
+two as parse errors instead of accepting them as the differently-ordered-but-equally-
+valid declarations they are. -/
+declare_syntax_cat kermlTypeRelPart
+syntax " disjoint" " from " kermlQualName,+ : kermlTypeRelPart
+syntax " unions " kermlQualName,+ : kermlTypeRelPart
+syntax " intersects " kermlQualName,+ : kermlTypeRelPart
+syntax " differences " kermlQualName,+ : kermlTypeRelPart
+
 /-- KerML §8.2.4.1.1 `Type`, relationship-part subset (see scope note above): `[abstract]
-type A [specializes B,+] [conjugates C] [disjoint from D,+] [unions U,+] [intersects
-I,+] [differences Df,+] ;`. `abstract` is parsed (see `kermlAbstractFlag` above) but
-not yet threaded into `KType.isAbstract` -- still not a *stored* field from this
+type A [specializes B,+] [conjugates C] TypeRelationshipPart* ;`, the relationship
+parts now `kermlTypeRelPart*` (see its own doc comment) rather than four fixed-order
+optional slots. `abstract` is parsed (see `kermlAbstractFlag` above) but not yet
+threaded into `KType.isAbstract` -- still not a *stored* field from this
 concrete-syntax layer's own text, same status as before, just no longer a token that
 blocks parsing real `abstract`-prefixed declarations like `Base.kerml`'s. -/
 syntax (name := kermlType) (kermlAbstractFlag)? "type " ident
   (" specializes " kermlQualName,+)?
   (" conjugates " kermlQualName)?
-  (" disjoint" " from " kermlQualName,+)?
-  (" unions " kermlQualName,+)?
-  (" intersects " kermlQualName,+)?
-  (" differences " kermlQualName,+)?
+  (kermlTypeRelPart)*
   kermlBody : kermlDecl
 
 /-- KerML §8.2.4.2.1 `Classifier`, same shape as `Type` above except `specializes`
@@ -1104,10 +1121,7 @@ syntax (name := kermlClassifier) (kermlAbstractFlag)? "classifier " ident
   (" specializes " kermlQualName,+)?
   (" :> " kermlQualName,+)?
   (" conjugates " kermlQualName)?
-  (" disjoint" " from " kermlQualName,+)?
-  (" unions " kermlQualName,+)?
-  (" intersects " kermlQualName,+)?
-  (" differences " kermlQualName,+)?
+  (kermlTypeRelPart)*
   kermlBody : kermlDecl
 
 /-- `default`'s value: either a bare `kermlQualName` (`Regions.kerml`'s own real
@@ -1269,6 +1283,36 @@ stub regardless of what's been imported, same as before this addition.) Visibili
 syntax (kermlVisibilityFlag)? "import " kermlQualName "::" "*" " ;" : kermlDecl
 syntax (kermlVisibilityFlag)? "import " kermlQualName " ;" : kermlDecl
 
+/-- One `kermlTypeRelPart` (see its own doc comment above), elaborated with the
+enclosing `type`/`classifier`'s own stub type (`aT`) and name (`an`) already in scope
+-- only the `disjoint from` alternative actually uses them (`mkDisjoiningTerm`'s own
+signature); `unions`/`intersects`/`differences` don't reference the owning type at all
+(matching their pre-existing `mkUnioningTerm`/`mkIntersectingTerm`/`mkDifferencingTerm`
+signatures, unchanged). Called once per relationship part, **in the order they appear
+in the source** (`elabKermlDecl`'s own `type`/`classifier` cases fold over the parsed
+`kermlTypeRelPart*` array positionally) -- this is what actually makes the abstract
+syntax preserve concrete-syntax ordering: the resulting flat `Element` list is built
+in source order, not bucketed by relationship kind first. -/
+def elabKermlTypeRelPart (aT : TSyntax `term) (an : String) :
+    TSyntax `kermlTypeRelPart → MacroM (Array (TSyntax `term))
+  | `(kermlTypeRelPart| disjoint from $ds,*) => ds.getElems.mapM (fun g => do
+      let gT ← kTypeStubTermQ g
+      let rel ← mkDisjoiningTerm aT gT an (qualNameStr g)
+      `(($rel).elt))
+  | `(kermlTypeRelPart| unions $us,*) => us.getElems.mapM (fun g => do
+      let gT ← kTypeStubTermQ g
+      let rel ← mkUnioningTerm gT (qualNameStr g)
+      `(($rel).elt))
+  | `(kermlTypeRelPart| intersects $is',*) => is'.getElems.mapM (fun g => do
+      let gT ← kTypeStubTermQ g
+      let rel ← mkIntersectingTerm gT (qualNameStr g)
+      `(($rel).elt))
+  | `(kermlTypeRelPart| differences $ds,*) => ds.getElems.mapM (fun g => do
+      let gT ← kTypeStubTermQ g
+      let rel ← mkDifferencingTerm gT (qualNameStr g)
+      `(($rel).elt))
+  | _ => Macro.throwUnsupported
+
 mutual
 
 /-- `kermlDecl` → `Array (TSyntax term)`, one entry per implied `Element` (see the
@@ -1281,10 +1325,7 @@ partial def elabKermlDecl : TSyntax `kermlDecl → MacroM (Array (TSyntax `term)
   | `(kermlDecl| $[$_abs:kermlAbstractFlag]? type $a:ident
         $[specializes $specs,*]?
         $[conjugates $conj:kermlQualName]?
-        $[disjoint from $disj,*]?
-        $[unions $uni,*]?
-        $[intersects $inter,*]?
-        $[differences $diff,*]?
+        $rels:kermlTypeRelPart*
         $body:kermlBody) => do
     let an := a.getId.toString
     let aT ← kTypeStubTerm a
@@ -1300,40 +1341,17 @@ partial def elabKermlDecl : TSyntax `kermlDecl → MacroM (Array (TSyntax `term)
           let rel ← mkConjugationTerm aT cT an (qualNameStr c)
           pure #[← `(($rel).elt)]
       | none => pure #[]
-    let disjElems ← match disj with
-      | some ds => ds.getElems.mapM (fun g => do
-          let gT ← kTypeStubTermQ g
-          let rel ← mkDisjoiningTerm aT gT an (qualNameStr g)
-          `(($rel).elt))
-      | none => pure #[]
-    let uniElems ← match uni with
-      | some us => us.getElems.mapM (fun g => do
-          let gT ← kTypeStubTermQ g
-          let rel ← mkUnioningTerm gT (qualNameStr g)
-          `(($rel).elt))
-      | none => pure #[]
-    let interElems ← match inter with
-      | some is' => is'.getElems.mapM (fun g => do
-          let gT ← kTypeStubTermQ g
-          let rel ← mkIntersectingTerm gT (qualNameStr g)
-          `(($rel).elt))
-      | none => pure #[]
-    let diffElems ← match diff with
-      | some ds => ds.getElems.mapM (fun g => do
-          let gT ← kTypeStubTermQ g
-          let rel ← mkDifferencingTerm gT (qualNameStr g)
-          `(($rel).elt))
-      | none => pure #[]
+    -- Elaborated in source order, not bucketed by kind -- see elabKermlTypeRelPart's
+    -- own doc comment for why this is what actually preserves concrete-syntax order.
+    let relElems ← rels.foldlM (init := (#[] : Array (TSyntax `term)))
+      (fun acc r => do pure (acc ++ (← elabKermlTypeRelPart aT an r)))
     let bodyElems ← elabKermlBody body
-    pure (#[← `(($aT).elt)] ++ specElems ++ conjElems ++ disjElems ++ uniElems ++ interElems ++ diffElems ++ bodyElems)
+    pure (#[← `(($aT).elt)] ++ specElems ++ conjElems ++ relElems ++ bodyElems)
   | `(kermlDecl| $[$_abs:kermlAbstractFlag]? classifier $a:ident
         $[specializes $specs,*]?
         $[:> $symSpecs,*]?
         $[conjugates $conj:kermlQualName]?
-        $[disjoint from $disj,*]?
-        $[unions $uni,*]?
-        $[intersects $inter,*]?
-        $[differences $diff,*]?
+        $rels:kermlTypeRelPart*
         $body:kermlBody) => do
     let an := a.getId.toString
     let aT ← classifierStubTerm a
@@ -1355,32 +1373,11 @@ partial def elabKermlDecl : TSyntax `kermlDecl → MacroM (Array (TSyntax `term)
           let rel ← mkConjugationTerm (← `(($aT).toKType)) cT an (qualNameStr c)
           pure #[← `(($rel).elt)]
       | none => pure #[]
-    let disjElems ← match disj with
-      | some ds => ds.getElems.mapM (fun g => do
-          let gT ← kTypeStubTermQ g
-          let rel ← mkDisjoiningTerm (← `(($aT).toKType)) gT an (qualNameStr g)
-          `(($rel).elt))
-      | none => pure #[]
-    let uniElems ← match uni with
-      | some us => us.getElems.mapM (fun g => do
-          let gT ← kTypeStubTermQ g
-          let rel ← mkUnioningTerm gT (qualNameStr g)
-          `(($rel).elt))
-      | none => pure #[]
-    let interElems ← match inter with
-      | some is' => is'.getElems.mapM (fun g => do
-          let gT ← kTypeStubTermQ g
-          let rel ← mkIntersectingTerm gT (qualNameStr g)
-          `(($rel).elt))
-      | none => pure #[]
-    let diffElems ← match diff with
-      | some ds => ds.getElems.mapM (fun g => do
-          let gT ← kTypeStubTermQ g
-          let rel ← mkDifferencingTerm gT (qualNameStr g)
-          `(($rel).elt))
-      | none => pure #[]
+    let aKT ← `(($aT).toKType)
+    let relElems ← rels.foldlM (init := (#[] : Array (TSyntax `term)))
+      (fun acc r => do pure (acc ++ (← elabKermlTypeRelPart aKT an r)))
     let bodyElems ← elabKermlBody body
-    pure (#[← `(($aT).elt)] ++ specElems ++ symSpecElems ++ conjElems ++ disjElems ++ uniElems ++ interElems ++ diffElems ++ bodyElems)
+    pure (#[← `(($aT).elt)] ++ specElems ++ symSpecElems ++ conjElems ++ relElems ++ bodyElems)
   | `(kermlDecl| $[$_end:kermlEndFlag]? $[$_comp:kermlCompositeFlag]? $[$_abs:kermlAbstractFlag]? feature $a:ident
         $[$_mult0:kermlMult]?
         $[typed by $tys,*]?
@@ -1552,6 +1549,14 @@ elab "kerml% " d:kermlDecl : term => do
 #check kerml% type Occurrence specializes Anything ;
 #check kerml% type Vehicle specializes Car, Truck conjugates VehicleMirror
   disjoint from Boat unions LandVehicle intersects PoweredThing differences Toy ;
+-- `Chapter/CoreSemanticsChapter.tex` §2.2.2's own three listings, verbatim: the same
+-- five clauses in three different orders, none of which matched the old fixed-order
+-- grammar (only the very first one, coincidentally the closest to that order, could
+-- have -- and even it didn't, since the old order put `disjoint from` third, not
+-- last). All three now parse -- see `kermlTypeRelPart`'s own doc comment.
+#check kerml% type A specializes B unions C intersects D differences E disjoint from F ;
+#check kerml% type A specializes B intersects D differences E unions C disjoint from F ;
+#check kerml% type A specializes B differences E disjoint from F unions C intersects D ;
 #check kerml% classifier Car specializes Vehicle ;
 #check kerml% feature mass typed by Real ;
 #check kerml% feature wheelCount subsets partCount references sharedWheel
@@ -1627,5 +1632,64 @@ elab "kerml% " d:kermlDecl : term => do
 -- anonymous feature).
 #check kerml% feature clock : Clock default universalClock ;
 #check kerml% feature :>> clock = universalClock ;
+
+/-- `Chapter/CoreSemanticsChapter.tex` §2.2.2 "Type Operator Composition": the section's
+three `type A specializes B ... ;` listings apply `unions`/`intersects`/`differences`/
+`disjoint from` to `B` in three different orders, each giving a different `Set Element`
+expression for what `A` is asserted to be a subset of (reading each listing strictly
+left to right):
+
+  R₁ = (((B ∪ C) ∩ D) \ E) \ F   -- `unions C intersects D differences E disjoint from F`
+  R₂ = (((B ∩ D) \ E) ∪ C) \ F   -- `intersects D differences E unions C disjoint from F`
+  R₃ = (((B \ E) \ F) ∪ C) ∩ D   -- `differences E disjoint from F unions C intersects D`
+
+`kermlType`'s own grammar above originally hardcoded clause order (`specializes`,
+`conjugates`, `disjoint from`, `unions`, `intersects`, `differences`, always in that
+sequence), so none of the three listings actually parsed as a `kerml%` `type`
+declaration -- exactly the "abstract syntax must preserve concrete-syntax ordering"
+gap the book section itself is about. Fixed the same day: `kermlTypeRelPart` (see its
+own doc comment) makes the relationship parts freely orderable and repeatable, and the
+elaboration now builds its flat `Element` list in the order the parts actually appear
+in the source, not bucketed by kind -- all three listings parse now (`#check`s just
+above the `type`/`classifier` smoke tests). This theorem is the formal version of that
+section's own "Certainly not", independent of that grammar fix: a concrete witness
+where R₁/R₂/R₃ are pairwise distinct, proving operator order is genuinely load-bearing
+at the level of what these declarations actually *mean* (`Set Element` composition),
+not just that the grammar now happens to accept all three spellings. `p`/`q` are two
+freshly-named `Element`s used only as set-membership probes, not modeling anything
+from a real KerML text. -/
+theorem typeOperatorCompositionOrderMatters :
+    ∃ B C D E F : Set Element,
+      (((B ∪ C) ∩ D) \ E) \ F ≠ (((B ∩ D) \ E) ∪ C) \ F ∧
+      (((B ∪ C) ∩ D) \ E) \ F ≠ (((B \ E) \ F) ∪ C) ∩ D ∧
+      (((B ∩ D) \ E) ∪ C) \ F ≠ (((B \ E) \ F) ∪ C) ∩ D := by
+  let p : Element := { elementId := "p" }
+  let q : Element := { elementId := "q" }
+  have hpq : p ≠ q := by simp [p, q]
+  refine ⟨∅, {p, q}, {q}, {q}, ∅, ?_, ?_, ?_⟩
+  · have hR1 : (((∅ ∪ ({p, q} : Set Element)) ∩ {q}) \ {q}) \ ∅ = ∅ := by
+      ext x; simp
+    have hR2 : (((∅ ∩ ({q} : Set Element)) \ {q}) ∪ {p, q}) \ ∅ = {p, q} := by
+      ext x; simp
+    rw [hR1, hR2]
+    intro h
+    have hpmem : p ∈ (∅ : Set Element) := h ▸ (Set.mem_insert p {q})
+    exact hpmem
+  · have hR1 : (((∅ ∪ ({p, q} : Set Element)) ∩ {q}) \ {q}) \ ∅ = ∅ := by
+      ext x; simp
+    have hR3 : (((∅ \ ({q} : Set Element)) \ ∅) ∪ {p, q}) ∩ {q} = {q} := by
+      ext x; simp
+    rw [hR1, hR3]
+    intro h
+    have hqmem : q ∈ (∅ : Set Element) := h ▸ (Set.mem_singleton q)
+    exact hqmem
+  · have hR2 : (((∅ ∩ ({q} : Set Element)) \ {q}) ∪ {p, q}) \ ∅ = {p, q} := by
+      ext x; simp
+    have hR3 : (((∅ \ ({q} : Set Element)) \ ∅) ∪ {p, q}) ∩ {q} = {q} := by
+      ext x; simp
+    rw [hR2, hR3]
+    intro h
+    have hpmem : p ∈ ({q} : Set Element) := h ▸ (Set.mem_insert p {q})
+    exact hpq (Set.mem_singleton_iff.mp hpmem)
 
 end KerML.Core
