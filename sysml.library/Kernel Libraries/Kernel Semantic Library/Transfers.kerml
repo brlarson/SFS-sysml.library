@@ -115,22 +115,23 @@ standard library package Transfers {
          * to pick up a payload and an input feature of the target to which to drop it off. They can
          * start when the payload is available at the source and move or copy it to the target.
          */
-         
-        feature isMove: Boolean[1] default true {
-            doc
-            /*
-             * If isMove is true, then the entire payload leaves the source at the start
-             * of the transfer.
-             */
-        }
+
+// SFS:  remove isMove and isPush         
+        // feature isMove: Boolean[1] default true {
+        //     doc
+        //     /*
+        //      * If isMove is true, then the entire payload leaves the source at the start
+        //      * of the transfer.
+        //      */
+        // }
         
-        feature isPush: Boolean[1] default true {
-            doc
-            /*
-             * If isPush is true, then the transfer begins when the payload is available
-             * at the source.
-             */
-        }
+        // feature isPush: Boolean[1] default true {
+        //     doc
+        //     /*
+        //      * If isPush is true, then the transfer begins when the payload is available
+        //      * at the source.
+        //      */
+        // }
 
 //SFS:  remove payloadNum        
         connector sourceOutputLink: BinaryLinkObject[1] {
