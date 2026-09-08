@@ -32,6 +32,7 @@ standard library package Actions {
 
 //SFS
 	private import Domain::SetNow;	
+	private import Domain::Instant;
 	
 	abstract action def Action :> Performance {
 		doc
@@ -44,7 +45,7 @@ standard library package Actions {
 		ref action incomingTransfers :>> Performance::incomingTransfers;
 		
 		//SFS:  keep start and done Instants
-		start :>> startShot {
+		start : Instant :>> startShot {
 //		action start: Action :>> startShot {
 			doc
 			/*
@@ -52,7 +53,7 @@ standard library package Actions {
 			 */
 		}
 		
-		done :>> endShot {
+		done : Instant :>> endShot {
 //		action done: Action :>> endShot {
 			doc
 			/*

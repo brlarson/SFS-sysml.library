@@ -19,11 +19,15 @@ standard library package Performances {
 	private import Transfers::transfersBefore;
 	private import ScalarValues::*;
 	private import SequenceFunctions::includes;
+
+// SFS:
+	private import Tangibility::Virtual;
 	
-	abstract behavior Performance specializes Occurrence disjoint from Object {
+	abstract behavior Performance specializes Occurrence, Virtual disjoint from Object {
 		doc
 		/*
 		 * Performance is the most general class of behavioral Occurrences that may be performed over time.
+		 * SFS:  Performance is Virtual
 		 */
 
 		feature self: Performance redefines Occurrence::self;

@@ -5,6 +5,7 @@ library package Tangibility {
   private import ISQ::VolumeValue;
   private import SI::L;
   private import Occurrences::Occurrence;
+  private import Base::noValue;
 
   abstract classifier Virtual :> Occurrence {
     doc /* something without physical existence itself, and can only exist if allocated to something physical */
@@ -26,8 +27,8 @@ library package Tangibility {
   abstract classifier Physical :> Occurrence disjoint from Virtual {
     doc /* something which occupies a 3D region in some frame-of-reference*/
 
-    var feature location[1] : Region {
-      doc /* where this thing exists */
+    var feature location[1] : Region default noValue as Region {
+      doc /* where this thing exists, default no where */
     }
 
     var feature allocations[0..*] : Virtual {
@@ -52,26 +53,15 @@ library package Tangibility {
   }
 
   assoc Allocation {
-    doc /* association of a virutal thing to the physical thing to which it's allocated */
+    doc /* association of a virtual thing to the physical thing to which it's allocated */
     end feature virtualThing : Virtual crosses physicalThing.allocations;
     end feature physicalThing : Physical crosses virtualThing.allocatedTo;
   }
 
   assoc Delegation {
-    doc /* delegation of existance from one virtual thing to another virtual thing */
+    doc /* delegation of existence from one virtual thing to another virtual thing */
     end feature delegator : Virtual crosses delegatee.delegations;
     end feature delegatee : Virtual crosses delegator.delegatedTo;
-  }
-
-  function Location :> Regions::Location {
-    doc /* */
-    // in o : Occurrence :>> o;
-    // return result : Region :>> result;
-    if (o istype Physical) ? (o as Physical).location else
-      if o istype Virtual ?
-        if not (o as Virtual).allocatedTo.isEmpty ? Location((o as Virtual).allocatedTo)
-          else if not (o as Virtual).delegatedTo.isEmpty ? Location((o as Virtual).delegatedTo)
-          else Regions::nowhere;
   }
 
 }

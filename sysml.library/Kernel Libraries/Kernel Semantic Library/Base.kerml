@@ -20,7 +20,10 @@ standard library package Base {
 			 */
 		}
 	}
-	
+
+//SFS:
+	feature noValue[1] :> things;
+		
 	abstract datatype DataValue specializes Anything {
 		doc
 		/*
