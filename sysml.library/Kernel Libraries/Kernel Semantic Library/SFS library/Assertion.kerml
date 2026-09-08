@@ -17,7 +17,7 @@ metaclass Lean specializes Metaobject {
 	doc 
 	/*
 	 * Lean attaches formulas in the Lean language to define formal semantics.
-	 * Most formulas invoke "mathlib", a proved-correct library of theorems.
+	 * Most formulas invoke "MathLib", a proved-correct library of theorems.
 	 */
 	feature l : String; 
 }
