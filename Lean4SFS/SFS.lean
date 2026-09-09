@@ -1775,6 +1775,20 @@ noncomputable def nearlyMeets (A B : Occurrence) : Prop :=
 -- the `next` disjunct is no longer dead weight, so there is no longer a genuine
 -- simplification to state here -- unfolding the `def` above is the whole story.
 
+/-- KerML `succession first f1 then f2;` (§8.4.4.6.3): book-original, not ported
+from a real `.kerml` file's `@Assert` -- unlike every other `df-`/`ax-` above,
+`succession` is KerML's own concrete syntax (a connector subsetting
+`Occurrences::happensBeforeLinks`), not a domain predicate a modeler writes into a
+`.kerml` file, so there is nothing to port *from*. Defined directly as `precedes`,
+matching `Supplemental-Semantics`'s own `df-succession`: `succession first f1 then
+f2; ⇒ ⊢ precedes(f1,f2)`. -/
+def Succession (f1 f2 : Occurrence) : Prop := precedes f1 f2
+
+/-- `Supplemental-Semantics`'s own `df-succession` biconditional, trivial by
+unfolding `Succession` -- same "df-X defines a derived symbol purely in terms of
+already-introduced primitives" treatment as every real SFS.mm `df-` above. -/
+theorem df_succession (f1 f2 : Occurrence) : Succession f1 f2 ↔ precedes f1 f2 := Iff.rfl
+
 /-! ### KerML Element Representation and Type Definition (SFS.mm lines 3246-3324) -/
 
 /-- SFS.mm `cci`/`cuid`: `CI`/`UI` (Class Identifiers / Unique Identifiers) are both
