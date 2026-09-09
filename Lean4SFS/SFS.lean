@@ -875,6 +875,51 @@ noncomputable instance mereologyModel : Mereology where
   containment := (Classical.choose_spec mereology_exists).2.2.2.1
   uniqueContainer := (Classical.choose_spec mereology_exists).2.2.2.2
 
+/-- `Tangibility.kerml`'s own `Physical`/`Virtual` (2026-09-09, new SFS library --
+no `SFS.mm` counterpart yet, confirmed absent by grep): every `Occurrence` may be
+classified `Physical`, `Virtual`, or neither -- `abstract classifier Virtual :>
+Occurrence` and `abstract classifier Physical :> Occurrence disjoint from
+Virtual` are both partial subclassifiers of `Occurrence`, not a two-way
+partition, so "neither" is simply `¬ Physical x ∧ ¬ Virtual x`, not a third
+predicate. `physicalVirtualDisjoint` is `Tangibility.kerml`'s own `disjoint from
+Virtual` clause on `Physical`'s declaration. `physicalPartsPhysical`/
+`virtualPartsVirtual` are the mereology closure this library is *for* (the
+2026-09-08 "Physical and Virtual" presentation's "Mereology" section: "Physical
+things can only have physical parts. Virtual things can have only virtual
+parts."), stated over `PartOf` (the general, possibly-indirect relation) rather
+than `ContainedBy` (direct containment only) so the closure holds for every
+part, not just immediate ones -- composes through `ptr`-chained `PartOf` calls
+for free, no induction needed. Occurrences that are neither `Physical` nor
+`Virtual` get no closure constraint at all here, matching the presentation's
+"things that are neither physical, nor virtual, can contain either, or both."
+Same class-based, `Classical.choose`-proven treatment as `Mereology` above. -/
+class Tangibility where
+  Physical : Occurrence → Prop
+  Virtual : Occurrence → Prop
+  physicalVirtualDisjoint : ∀ x, ¬ (Physical x ∧ Virtual x)
+  physicalPartsPhysical : ∀ x y, Physical y → PartOf x y → Physical x
+  virtualPartsVirtual : ∀ x y, Virtual y → PartOf x y → Virtual x
+
+export Tangibility (Physical Virtual physicalVirtualDisjoint physicalPartsPhysical
+  virtualPartsVirtual)
+
+/-- The consistency certificate's existence half, same trick as
+`mereology_exists`: "nothing is ever Physical or Virtual" satisfies all three
+laws vacuously. -/
+theorem tangibility_exists :
+    ∃ PV : (Occurrence → Prop) × (Occurrence → Prop),
+      (∀ x, ¬ (PV.1 x ∧ PV.2 x)) ∧
+      (∀ x y, PV.1 y → PartOf x y → PV.1 x) ∧
+      (∀ x y, PV.2 y → PartOf x y → PV.2 x) :=
+  ⟨(fun _ => False, fun _ => False), fun _ h => h.1, fun _ _ h _ => h, fun _ _ h _ => h⟩
+
+noncomputable instance tangibilityModel : Tangibility where
+  Physical := (Classical.choose tangibility_exists).1
+  Virtual := (Classical.choose tangibility_exists).2
+  physicalVirtualDisjoint := (Classical.choose_spec tangibility_exists).1
+  physicalPartsPhysical := (Classical.choose_spec tangibility_exists).2.1
+  virtualPartsVirtual := (Classical.choose_spec tangibility_exists).2.2
+
 /-- SFS.mm `df-pov`. -/
 def Overlap (x y : Occurrence) : Prop := ∃ z, PartOf z x ∧ PartOf z y
 
