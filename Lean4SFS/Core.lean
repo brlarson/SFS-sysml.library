@@ -799,13 +799,55 @@ theorem REPL {T U f V W X g a : Element} {Ct Cu Cw : Set Element}
     a ∈ Ct ∧ (DesignKind.type, relabel T f g, Ct) ∈ Design :=
   ⟨SUBS hW hT hspecWT ha, df_relabel hT⟩
 
-/-- `Chapter/CoreSemanticsChapter.tex` §2.2.1 `df-multspec`: proved directly from
-`df_specializes` applied to each generalization independently. -/
+/-- `Chapter/CoreSemanticsChapter.tex` §2.2.1 `df-multspec`, the two-generalization
+case: proved directly from `df_specializes` applied to each generalization
+independently. Kept alongside `df_multspec_n` below (its true n-ary generalization,
+added 2026-09-09) since the book's own §2.2.1 entry already cites this exact two-`Element`
+signature. -/
 theorem df_multspec {ts tg th : Element} {Cs Cg Ch : Set Element}
     (hs : (DesignKind.type, ts, Cs) ∈ Design) (hg : (DesignKind.type, tg, Cg) ∈ Design)
     (hh : (DesignKind.type, th, Ch) ∈ Design)
     (hsg : Specializes ts tg) (hsh : Specializes ts th) : Cs ⊆ Cg ∩ Ch :=
   fun _ hx => ⟨df_specializes hs hg hsg hx, df_specializes hs hh hsh hx⟩
+
+/-- `Chapter/CoreSemanticsChapter.tex` §2.2.1 `df-multspec`'s own formula already
+claims full n-ary generality (`type t_s specializes t_g,...,t_j → t_s ⊆ t_g ∩ ... ∩
+t_j`), but `df_multspec` above only ever implemented the two-generalization case --
+this genuinely generalizes it, indexed over `Fin n` rather than a fixed pair, proved
+by the identical one-line argument (`df_specializes` applied to each generalization
+independently) now closed under `Set.mem_iInter` instead of manual pairing. -/
+theorem df_multspec_n {n : ℕ} {ts : Element} {Cs : Set Element}
+    {tg : Fin n → Element} {Cg : Fin n → Set Element}
+    (hs : (DesignKind.type, ts, Cs) ∈ Design)
+    (hg : ∀ i, (DesignKind.type, tg i, Cg i) ∈ Design)
+    (hspec : ∀ i, Specializes ts (tg i)) :
+    Cs ⊆ ⋂ i, Cg i := by
+  intro x hx
+  simp only [Set.mem_iInter]
+  intro i
+  exact df_specializes hs (hg i) (hspec i) hx
+
+/-- `Chapter/KerMLTypeInferencing.tex` §4.5 `MULTI`: the `df_multspec`/`MULTN` pattern
+restated elementwise for exactly two generalizations, matching how the book presents
+`MULTI` before its own n-ary generalization `MULTN` right below. -/
+theorem MULTI {T U V a : Element} {Ct Cu Cv : Set Element}
+    (hT : (DesignKind.type, T, Ct) ∈ Design) (hU : (DesignKind.type, U, Cu) ∈ Design)
+    (hV : (DesignKind.type, V, Cv) ∈ Design)
+    (hspecU : Specializes T U) (hspecV : Specializes T V) (ha : a ∈ Ct) :
+    a ∈ Cu ∧ a ∈ Cv :=
+  Set.mem_inter_iff .. |>.mp (df_multspec hT hU hV hspecU hspecV ha)
+
+/-- `Chapter/KerMLTypeInferencing.tex` §4.5 `MULTN`: if `T` specializes each of
+`U_1,...,U_n` and `a` has type `T`, then `a` has each `U_i` too -- proved directly
+from `df_specializes` applied pointwise, same as `df_multspec_n` (whose conclusion
+this is the elementwise unfolding of, via `Set.mem_iInter`). -/
+theorem MULTN {n : ℕ} {ts a : Element} {Cs : Set Element}
+    {tg : Fin n → Element} {Cg : Fin n → Set Element}
+    (hs : (DesignKind.type, ts, Cs) ∈ Design)
+    (hg : ∀ i, (DesignKind.type, tg i, Cg i) ∈ Design)
+    (hspec : ∀ i, Specializes ts (tg i)) (ha : a ∈ Cs) :
+    ∀ i, a ∈ Cg i :=
+  fun i => df_specializes hs (hg i) (hspec i) ha
 
 /-- `Chapter/CoreSemanticsChapter.tex` §2.4 "Feature Member" ordering: pairs sharing
 the same first component are ordered by their second component's own (`Y`-relative)
