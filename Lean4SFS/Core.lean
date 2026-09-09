@@ -530,6 +530,14 @@ class CoreDesignModel where
   df_specializes : ∀ {ts tg : Element} {Cs Cg : Set Element},
       (DesignKind.type, ts, Cs) ∈ Design → (DesignKind.type, tg, Cg) ∈ Design →
       Specializes ts tg → Cs ⊆ Cg
+  /-- `Chapter/KerMLTypeInferencing.tex` §4.1 `TRANS`: specialization is transitive --
+  `T :> U ∧ U :> V → T :> V`. A law about `Specializes` itself (unlike `df_specializes`,
+  which is about the *extensions* `Specializes` implies), so it needs its own field
+  rather than following from `df_specializes` -- `Cs ⊆ Cg` and `Cg ⊆ Ch` compose into
+  `Cs ⊆ Ch` for free, but that says nothing about whether `Specializes ts th` itself
+  holds, since `Specializes` is not *defined* as extension-subset here, only related to
+  it by `df_specializes`'s one-way implication. -/
+  TRANS : ∀ {T U V : Element}, Specializes T U → Specializes U V → Specializes T V
   /-- `Chapter/CoreSemanticsChapter.tex` §2.2.1 `df-unions`. -/
   df_unions : ∀ {ta tb tc : Element} {Ca Cb Cc : Set Element},
       (DesignKind.type, ta, Ca) ∈ Design → (DesignKind.type, tb, Cb) ∈ Design →
@@ -639,7 +647,7 @@ export CoreDesignModel (Design VT Specializes Unions Intersects Differences Disj
   DomainlessDecl FeatureMemberOf OwnedFeatureTypedBy OwnedFeatureTypedByExact
   OwnedFeatureTypedByStar OwnedFeatureTypedByRange OwnedFeatureTypedByRangeStar
   MemberOf OwnedFeatures OrderedOn OrderedDecl ChainsDecl VC
-  df_specializes df_unions df_intersects df_differences df_disjoint
+  df_specializes TRANS df_unions df_intersects df_differences df_disjoint
   df_typemultiplicity df_typemultiplicityrange df_types df_feature df_featuredby
   df_domainless df_featuremember df_featureoffeature df_fixedfeaturemultiplicity
   df_undefinedfeaturemultiplicity df_featuremultiplicityrange
@@ -684,6 +692,7 @@ theorem coreDesignModel_nonempty : Nonempty CoreDesignModel :=
      ChainsDecl := fun _ _ _ => False
      VC := ∅
      df_specializes := by intro _ _ _ _ hs _ _; exact absurd hs (by simp)
+     TRANS := by intro _ _ _ hTU _; exact absurd hTU (by simp)
      df_unions := by intro _ _ _ _ _ _ ha _ _ _ _; exact absurd ha (by simp)
      df_intersects := by intro _ _ _ _ _ _ ha _ _ _ _; exact absurd ha (by simp)
      df_differences := by intro _ _ _ _ _ _ ha _ _ _ _; exact absurd ha (by simp)
