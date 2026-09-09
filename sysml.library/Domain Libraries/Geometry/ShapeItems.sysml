@@ -22,7 +22,14 @@ standard library package ShapeItems {
 	private import ControlFunctions::exists;
 	private import Quantities::scalarQuantities;
 
-	item def PlanarCurve :> Curve {
+//SFS:  specializes StructuredSpaceObject::StructuredCurve, not plain Objects::Curve -- Path's own
+//SFS:  edges is StructuredSpaceObject::edges : StructuredCurve[0..*], and Polygon narrows it to
+//SFS:  Line (a PlanarCurve), so PlanarCurve/Line must themselves conform to StructuredCurve for
+//SFS:  that narrowing, and any value assigned into edges (e.g. Triangle's base/e2/e3), to
+//SFS:  type-check. Plain Curve alone (missing the StructuredSpaceObject half of StructuredCurve)
+//SFS:  is not enough; this went undetected because it only surfaces under Syside's broader
+//SFS:  "-d all" diagnostics, not the default scope.
+	item def PlanarCurve :> StructuredSpaceObject::StructuredCurve {
 		doc
 		/*
 		 * A PlanarCurve is a Curve with a given length embeddable in a plane.
@@ -151,17 +158,16 @@ standard library package ShapeItems {
 		attribute :>> isClosed = true;
 
 //SFS:  matingOccurrences no longer exists (Occurrences.kerml replaced it with the bool
-//SFS:  matesWithOccurrence(o) predicate) -- not mechanically renamed here because the receiver is
-//SFS:  an indexed/cast expression (edges#(i).vertices#(2) as Item), and Syside's parser rejects
-//SFS:  `.methodCall(...)` chained onto anything but a bare name (confirmed via several isolated
-//SFS:  probes: indexing, casting, and even a plain parenthesized group all break as a receiver;
-//SFS:  only a plain forAll/exists-bound variable, as used at Path's own matingOccurrences call
-//SFS:  above, works). Fixing this for real needs restructuring to route the indexed vertex
-//SFS:  through a bound variable the same way, not a mechanical rename.
+//SFS:  matesWithOccurrence(o) predicate); routed the indexed/cast vertex through a plain
+//SFS:  forAll-bound variable (same idiom as SpatialFrames.kerml's spacePositionConstraint,
+//SFS:  `(frame.spaceShots as Point)->forAll{in p : Point; p.somePredicate(...) }`), since
+//SFS:  Syside's parser rejects `.methodCall(...)` chained onto an indexed/cast expression
+//SFS:  directly.
 		assert constraint { (1..size(edges))->forAll {in i;
 					edges#(i).vertices->equals((vertices#((2*i)-1), vertices#(2*i))) and
-					includes((edges#(i).vertices#(2) as Item).matingOccurrences,
-						 edges#(if i==size(edges) ? 1 else i+1).vertices#(1)) } }
+					(edges#(i).vertices#(2) as Item)->forAll{in v2 : Item;
+						v2.matesWithOccurrence(edges#(if i==size(edges) ? 1 else i+1).vertices#(1))
+					} } }
 	}
 
 	item def Triangle :> Polygon {
@@ -174,11 +180,14 @@ standard library package ShapeItems {
 		attribute :>> length [1];
 		attribute :>> width [1];
 		attribute :>> xoffset [1];
-//don't know how to fix this error
+//SFS:  base/e2/e3 must be explicitly typed Line (edges' own element type); left untyped, Syside's
+//SFS:  broader "-d all" diagnostics reject the (base, e2, e3) value assignment to edges [3] with
+//SFS:  "does not conform to ShapeItems::Line" (the default "project" scope check does not catch
+//SFS:  this, but it is a real type error).
 		item :>> edges [3] = (base, e2, e3);
-		item base [1] { length = Triangle::length; }
-		item e2 [1];
-		item e3 [1];
+		item base : Line [1] { attribute :>> length = Triangle::length; }
+		item e2 : Line [1];
+		item e3 : Line [1];
 
 		item :>> vertices [6];
 		item v12  [2] ordered = (vertices#(2), vertices#(3));
@@ -207,11 +216,13 @@ standard library package ShapeItems {
 		 * A Quadrilateral is a four-sided Polygon.
 		 */
 	
+//SFS:  e1..e4 must be explicitly typed Line (edges' own element type); same issue and fix as
+//SFS:  Triangle's base/e2/e3 above.
 		item :>> edges [4] = (e1, e2, e3, e4);
-		item e1 [1];
-		item e2 [1];
-		item e3 [1];
-		item e4 [1];
+		item e1 : Line [1];
+		item e2 : Line [1];
+		item e3 : Line [1];
+		item e4 : Line [1];
 
 		item :>> vertices [8];
 		item v12 [2] ordered = (vertices#(2), vertices#(3));
@@ -861,14 +872,16 @@ standard library package ShapeItems {
 		assert constraint { size(apex) == wallNumber }
 
 		/* Base to wall and wall to wall edge mating. */
-//SFS:  matingOccurrences no longer exists (see the same note at Polygon's own assert constraint
-//SFS:  above, ~line 153) -- both includes(...) calls here have the identical indexed/cast-receiver
-//SFS:  problem blocking a mechanical rename to matesWithOccurrence(o).
+//SFS:  matingOccurrences no longer exists (Occurrences.kerml replaced it with the bool
+//SFS:  matesWithOccurrence(o) predicate); routed both indexed/cast receivers through plain
+//SFS:  forAll-bound variables, same idiom as Polygon's own assert constraint above (~line 161).
 		assert constraint { (1..wallNumber)->forAll {in i;
-					includes(wall#(i).base.matingOccurrences,
-							 Pyramid::base.edges#(i)) and
-					includes((wall#(i).edges#(3) as Item).matingOccurrences,
-							 wall#(if i==wallNumber ? 1 else i+1).edges#(2)) } }
+					(wall#(i).base as Item)->forAll{in v1 : Item;
+						v1.matesWithOccurrence(Pyramid::base.edges#(i))
+					} and
+					(wall#(i).edges#(3) as Item)->forAll{in v2 : Item;
+						v2.matesWithOccurrence(wall#(if i==wallNumber ? 1 else i+1).edges#(2))
+					} } }
 
 		/* Meeting apices. */
 		connection :MatesWith connect [wallNumber] apex to [wallNumber] apex;
