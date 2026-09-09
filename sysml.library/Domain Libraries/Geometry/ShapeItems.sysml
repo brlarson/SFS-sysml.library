@@ -6,6 +6,7 @@ standard library package ShapeItems {
 
 	private import ScalarValues::Boolean;
 	private import ScalarValues::Positive;
+	private import ScalarValues::Natural;
 	private import ISQSpaceTime::*;
 	private import ISQBase::*;
 	private import SI::m;
@@ -861,7 +862,7 @@ standard library package ShapeItems {
             ref :>> Triangle::edges, ConeOrCylinder::faces::edges, Polyhedron::faces::edges;
             ref :>> Triangle::vertices, ConeOrCylinder::faces::vertices, Polyhedron::faces::vertices;
         }
-		attribute wallNumber : Positive = size(wall);
+		attribute wallNumber : Natural = size(wall);
 
 		assert constraint { size(faces) == wallNumber + 1 }
 		assert constraint { size(wall) == size(base.edges) }
