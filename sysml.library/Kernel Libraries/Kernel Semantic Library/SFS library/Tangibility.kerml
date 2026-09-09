@@ -6,6 +6,8 @@ library package Tangibility {
   private import SI::L;
   private import Occurrences::Occurrence;
   private import Base::noValue;
+  private import Assertion::Assert;
+  private import SequenceFunctions::notEmpty;
 
   abstract classifier Virtual :> Occurrence {
     doc /* something without physical existence itself, and can only exist if allocated to something physical */
@@ -22,6 +24,11 @@ library package Tangibility {
     var feature delegations[0..*] : Virtual {
       doc /* other virtual things which delegate their existence to this virtual thing */
     }
+
+    inv { notEmpty(allocatedTo) != notEmpty(delegatedTo) }
+
+    @Assert{n="Virtual location"; f="<< (notEmpty(allocatedTo) implies Location(self) = Location(allocatedTo)) and"+
+      " (notEmpty(delegatedTo) implies Location(self) = Location(delegatedTo)) >>";}
   }
 
   abstract classifier Physical :> Occurrence disjoint from Virtual {
@@ -30,6 +37,7 @@ library package Tangibility {
     var feature location[1] : Region default noValue as Region {
       doc /* where this thing exists, default no where */
     }
+    @Assert{n="Physical location"; f="<< Location(self) = location >>";}
 
     var feature allocations[0..*] : Virtual {
       doc /* the virtual things this physical thing hosts or performs */
