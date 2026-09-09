@@ -431,6 +431,14 @@ theorem encodePair_inj {a b c d : Element} (h : encodePair a b = encodePair c d)
   obtain ⟨h1, h2⟩ := Nat.pair_eq_pair.mp hlen
   exact ⟨elementToNat_inj h1, elementToNat_inj h2⟩
 
+/-- `Chapter/KerMLTypeInferencing.tex` §4.4 `REPL`'s own `T(f ↓ g)` (`T` with feature
+label `f` replaced by `g`): a fresh `Element` naming the relabeled type, built by
+nesting `encodePair` twice (`(T, f), g`) rather than a new primitive -- `encodePair`
+already proved injective, so this needs no axiom of its own either. Its semantic
+content (that relabeling doesn't change which elements are instances) is `df_relabel`
+below, not this `def`, which is pure naming. -/
+def relabel (T f g : Element) : Element := encodePair (encodePair T f) g
+
 /-- **Class-based (2026-08-26, at direct request, following a full audit of this
 section's ~45-axiom cluster): `Design`/`VT`/`Specializes`/`Unions`/`Intersects`/
 `Differences`/`Disjoint`/`TypeMultiplicityExact`/`TypeMultiplicityRange`/`VF`/
@@ -641,6 +649,13 @@ class CoreDesignModel where
   not discharged by the `Design := ∅` trick, but still trivial (`VC := ∅` makes
   `VC ⊆ VT` hold for any `VT` whatsoever). -/
   df_classifier2 : VC ⊆ VT
+  /-- `Chapter/KerMLTypeInferencing.tex` §4.4 `REPL`'s own semantic content: purely
+  renaming a feature label doesn't change which elements are instances of a type, so
+  `T(f ↓ g)` (`relabel T f g`) shares `T`'s own extension. Needed as its own field,
+  same reason as `TRANS` above -- a genuine new modeling commitment about `relabel`,
+  not derivable from anything already in this class. -/
+  df_relabel : ∀ {T f g : Element} {Ct : Set Element},
+      (DesignKind.type, T, Ct) ∈ Design → (DesignKind.type, relabel T f g, Ct) ∈ Design
 
 export CoreDesignModel (Design VT Specializes Unions Intersects Differences Disjoint
   TypeMultiplicityExact TypeMultiplicityRange VF FeatureContent FeaturedByDecl
@@ -652,7 +667,7 @@ export CoreDesignModel (Design VT Specializes Unions Intersects Differences Disj
   df_domainless df_featuremember df_featureoffeature df_fixedfeaturemultiplicity
   df_undefinedfeaturemultiplicity df_featuremultiplicityrange
   df_featuremultiplicityrangestar df_typebody df_featurechaining df_classifier
-  df_classifier2)
+  df_classifier2 df_relabel)
 
 /-- The consistency certificate: `Design := ∅` and `FeatureContent := fun _ _ => False`
 make every `df_*` constraint field above provable by contradiction on its own
@@ -718,7 +733,8 @@ theorem coreDesignModel_nonempty : Nonempty CoreDesignModel :=
      df_typebody := by intro _ _ _ hz _; exact absurd hz (by simp)
      df_featurechaining := by intro _ _ _ _ _ hb _ _; exact hb.elim
      df_classifier := by intro _ h; obtain ⟨_, hC⟩ := h; exact absurd hC (by simp)
-     df_classifier2 := Set.empty_subset _ }⟩
+     df_classifier2 := Set.empty_subset _
+     df_relabel := by intro _ _ _ _ h; exact absurd h (by simp) }⟩
 
 noncomputable instance coreDesignModelInstance : CoreDesignModel :=
   Classical.choice coreDesignModel_nonempty
@@ -737,14 +753,51 @@ theorem SUBS {T V a : Element} {Ct Cv : Set Element}
 feature `f` typed by `V`, and `a` has type `T`, then `a` also has type `U`. The
 `OwnedFeatureTypedBy` hypothesis (the "adds feature `f`" half of the premise) plays no
 role in this particular conclusion -- it doesn't mention `f`/`V` at all -- so `FEAT`
-reduces to `SUBS` exactly, unlike `REDEF`/`REPL` in §4.4, whose conclusions genuinely
-depend on the added feature. Kept as its own theorem, with the unused hypothesis still
-named (`_hf`), to state the book's actual compound premise faithfully rather than
-silently dropping to `SUBS`. -/
+reduces to `SUBS` exactly, same as `REDEF` right below (though `REPL` in §4.4, whose
+conclusion is parametrized by a feature-relabeling operation, genuinely does depend on
+its own added feature). Kept as its own theorem, with the unused hypothesis still named
+(`_hf`), to state the book's actual compound premise faithfully rather than silently
+dropping to `SUBS`. -/
 theorem FEAT {T U f V a : Element} {Ct Cu : Set Element}
     (hT : (DesignKind.type, T, Ct) ∈ Design) (hU : (DesignKind.type, U, Cu) ∈ Design)
     (hspec : Specializes T U) (_hf : OwnedFeatureTypedBy T f V) (ha : a ∈ Ct) : a ∈ Cu :=
   SUBS hT hU hspec ha
+
+/-- `Chapter/KerMLTypeInferencing.tex` §4.4 `REDEF`: if `T` specializes `U` by adding
+feature `f` typed by `V`, and `W` specializes `T` by redefining feature `f` to be typed
+by `X` which specializes `V`, and `a` has type `W`, then `a` also has type `T`. Even more
+of the premise goes unused than in `FEAT`: only `Specializes W T` and `a ∈ Cw` matter for
+this conclusion -- `T`'s own relationship to `U`/`f`/`V`, `W`'s redefinition of `f` to
+`X`, and `X`'s relationship to `V`, are all inert. Kept as its own theorem, with every
+unused hypothesis still named, for the same faithfulness reason as `FEAT`. -/
+theorem REDEF {T U f V W X a : Element} {Ct Cu Cw : Set Element}
+    (hT : (DesignKind.type, T, Ct) ∈ Design) (_hU : (DesignKind.type, U, Cu) ∈ Design)
+    (hW : (DesignKind.type, W, Cw) ∈ Design)
+    (_hspecTU : Specializes T U) (_hfTU : OwnedFeatureTypedBy T f V)
+    (hspecWT : Specializes W T) (_hfWT : OwnedFeatureTypedBy W f X)
+    (_hspecXV : Specializes X V) (ha : a ∈ Cw) : a ∈ Ct :=
+  SUBS hW hT hspecWT ha
+
+/-- `Chapter/KerMLTypeInferencing.tex` §4.4 `REPL`: same setup as `REDEF` (`W`
+specializes `T`, redefining `f`), except `W`'s own feature is labeled `g`, not `f`, and
+the conclusion is about `T(f ↓ g)` (`relabel T f g`), not `T` itself -- the one rule in
+this section whose conclusion genuinely depends on the redefinition, since `relabel`
+names a different `Element` than `T`. `CoreDesignModel`'s `Design` triples carry no
+notion of "type identity beyond extension" (nothing here distinguishes `T` from a
+relabeled variant except by literally constructing a different name for it, which
+`relabel` does), and `Design` is a general relation, not asserted functional -- a
+`Element` could in principle have more than one associated extension -- so instead of
+claiming `T(f ↓ g)`'s extension definitionally *equals* `T`'s, the conclusion pairs the
+same `a ∈ Ct` fact `REDEF` proves with `df_relabel`'s own witness that `Ct` genuinely is
+one of `relabel T f g`'s extensions. -/
+theorem REPL {T U f V W X g a : Element} {Ct Cu Cw : Set Element}
+    (hT : (DesignKind.type, T, Ct) ∈ Design) (_hU : (DesignKind.type, U, Cu) ∈ Design)
+    (hW : (DesignKind.type, W, Cw) ∈ Design)
+    (_hspecTU : Specializes T U) (_hfTU : OwnedFeatureTypedBy T f V)
+    (hspecWT : Specializes W T) (_hfWT : OwnedFeatureTypedBy W g X)
+    (_hspecXV : Specializes X V) (ha : a ∈ Cw) :
+    a ∈ Ct ∧ (DesignKind.type, relabel T f g, Ct) ∈ Design :=
+  ⟨SUBS hW hT hspecWT ha, df_relabel hT⟩
 
 /-- `Chapter/CoreSemanticsChapter.tex` §2.2.1 `df-multspec`: proved directly from
 `df_specializes` applied to each generalization independently. -/
