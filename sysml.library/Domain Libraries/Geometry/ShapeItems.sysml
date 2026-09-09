@@ -262,7 +262,7 @@ standard library package ShapeItems {
 		attribute :>> semiMajorAxis [1];
 		attribute :>> semiMinorAxis [1];
 
-		item :>> shape : Ellipse [1] {
+		item :>> PlanarSurface::shape, Items::Item::shape : Ellipse [1] {
 			attribute :>> semiMajorAxis = Disc::semiMajorAxis;
 			attribute :>> semiMinorAxis = Disc::semiMinorAxis;
 		}
@@ -394,8 +394,8 @@ standard library package ShapeItems {
 		attribute rectangleWidth  : LengthValue [1] :> scalarQuantities;
 
 		item :>> revolvedCurve: Rectangle [1] {
-			attribute :>> length = rectangleLength;
-			attribute :>> width  = rectangleWidth;
+			attribute :>> revolvedCurve::length, Rectangle::length = rectangleLength;
+			attribute :>> revolvedCurve::width, Rectangle::width  = rectangleWidth;
 			attribute :>> revolvedCurve::isClosed, Rectangle::isClosed;
 		}
 	}
@@ -586,22 +586,22 @@ standard library package ShapeItems {
 
 		item :>> faces [5..6];
 		item tf	 : Quadrilateral [1] :> faces {        
-            ref :>> Quadrilateral::edges, ConeOrCylinder::faces::edges;
-            ref :>> Quadrilateral::vertices, ConeOrCylinder::faces::vertices;            
+            ref :>> Quadrilateral::edges, ConeOrCylinder::faces::edges, Polyhedron::faces::edges;
+            ref :>> Quadrilateral::vertices, ConeOrCylinder::faces::vertices, Polyhedron::faces::vertices;            
         }
 		item bf	 : Quadrilateral [1] :> faces {        
-            ref :>> Quadrilateral::edges, ConeOrCylinder::faces::edges;
-            ref :>> Quadrilateral::vertices, ConeOrCylinder::faces::vertices;            
+            ref :>> Quadrilateral::edges, ConeOrCylinder::faces::edges, Polyhedron::faces::edges;
+            ref :>> Quadrilateral::vertices, ConeOrCylinder::faces::vertices, Polyhedron::faces::vertices;            
         }
-		item ff	 : Polygon [1] :> faces { item :>> Polygon::edges, faces::edges [3..4]; }
-		item rf	 : Polygon [1] :> faces { item :>> Polygon::edges, faces::edges [3..4]; }
+		item ff	 : Polygon [1] :> faces { item :>> Polygon::edges, faces::edges, Polyhedron::faces::edges [3..4]; }
+		item rf	 : Polygon [1] :> faces { item :>> Polygon::edges, faces::edges, Polyhedron::faces::edges [3..4]; }
 		item slf : Quadrilateral [1] :> faces {        
-            ref :>> Quadrilateral::edges, ConeOrCylinder::faces::edges;
-            ref :>> Quadrilateral::vertices, ConeOrCylinder::faces::vertices;            
+            ref :>> Quadrilateral::edges, ConeOrCylinder::faces::edges, Polyhedron::faces::edges;
+            ref :>> Quadrilateral::vertices, ConeOrCylinder::faces::vertices, Polyhedron::faces::vertices;            
         }
 		item srf : Quadrilateral [0..1] :> faces {        
-            ref :>> Quadrilateral::edges, ConeOrCylinder::faces::edges;
-            ref :>> Quadrilateral::vertices, ConeOrCylinder::faces::vertices;            
+            ref :>> Quadrilateral::edges, ConeOrCylinder::faces::edges, Polyhedron::faces::edges;
+            ref :>> Quadrilateral::vertices, ConeOrCylinder::faces::vertices, Polyhedron::faces::vertices;            
         }
 
 		item :>> edges;
@@ -706,12 +706,14 @@ standard library package ShapeItems {
 
 		item :>> faces [5];
 		item :>> ff : Triangle {        
-            ref :>> Triangle::edges, ConeOrCylinder::faces::edges;
-            ref :>> Triangle::vertices, ConeOrCylinder::faces::vertices;            
+            ref :>> Triangle::edges, ConeOrCylinder::faces::edges, CuboidOrTriangularPrism::ff::edges;
+            ref :>> Triangle::vertices, ConeOrCylinder::faces::vertices, Path::vertices,
+              Polyhedron::faces::vertices;            
         }
 		item :>> rf : Triangle {        
-            ref :>> Triangle::edges, ConeOrCylinder::faces::edges;
-            ref :>> Triangle::vertices, ConeOrCylinder::faces::vertices;            
+            ref :>> Triangle::edges, ConeOrCylinder::faces::edges, CuboidOrTriangularPrism::rf::edges;
+            ref :>> Triangle::vertices, ConeOrCylinder::faces::vertices, Path::vertices,
+              Polyhedron::faces::vertices;            
         }
 
 		item :>> edges [18];
@@ -740,12 +742,12 @@ standard library package ShapeItems {
 		item :>> tf  : Rectangle;
 		item :>> bf  : Rectangle;
 		item :>> ff : RightTriangle {
-			attribute :>> length = RightTriangularPrism::length;
-			attribute :>> width = RightTriangularPrism::width;
+			attribute :>> ff::length, Triangle::length = RightTriangularPrism::length;
+			attribute :>> ff::width, Triangle::width = RightTriangularPrism::width;
 		}
 		item :>> rf : RightTriangle {
-			attribute :>> length = ff.length;
-			attribute :>> width = rf.width;
+			attribute :>> rf::length, Triangle::length = ff.length;
+			attribute :>> rf::width, Triangle::width = rf.width;
 		}
 		item :>> slf : Rectangle;
 		item :>> srf : Rectangle;
@@ -770,12 +772,14 @@ standard library package ShapeItems {
 
 		item :>> faces [6];
 		item :>> ff : Quadrilateral {        
-            ref :>> Quadrilateral::edges, ConeOrCylinder::faces::edges;
-            ref :>> Quadrilateral::vertices, ConeOrCylinder::faces::vertices;            
+            ref :>> Quadrilateral::edges, ConeOrCylinder::faces::edges, CuboidOrTriangularPrism::ff::edges;
+            ref :>> Quadrilateral::vertices, ConeOrCylinder::faces::vertices, Path::vertices,
+              Polyhedron::faces::vertices;            
         }
 		item :>> rf : Quadrilateral {        
-            ref :>> Quadrilateral::edges, ConeOrCylinder::faces::edges;
-            ref :>> Quadrilateral::vertices, ConeOrCylinder::faces::vertices;            
+            ref :>> Quadrilateral::edges, ConeOrCylinder::faces::edges, CuboidOrTriangularPrism::rf::edges;
+            ref :>> Quadrilateral::vertices, ConeOrCylinder::faces::vertices, Path::vertices,
+              Polyhedron::faces::vertices;            
         }
 
 		item :>> edges [24];
@@ -824,18 +828,18 @@ standard library package ShapeItems {
 		attribute :>> width [1];
 		attribute :>> height [1];
 	
-		item :>> tf  : Rectangle { attribute :>> length = RectangularCuboid::length;
-								   attribute :>> width	= RectangularCuboid::height; }
-		item :>> bf  : Rectangle { attribute :>> length = RectangularCuboid::length;
-								   attribute :>> width	= RectangularCuboid::height; }
-		item :>> ff  : Rectangle { attribute :>> length = RectangularCuboid::length;
-								   attribute :>> width	= RectangularCuboid::width; }
-		item :>> rf  : Rectangle { attribute :>> length = RectangularCuboid::length;
-								   attribute :>> width	= RectangularCuboid::width; }
-		item :>> slf : Rectangle { attribute :>> length = RectangularCuboid::height;
-								   attribute :>> width	= RectangularCuboid::width; }
-		item :>> srf : Rectangle { attribute :>> length = RectangularCuboid::height;
-								   attribute :>> width	= RectangularCuboid::width; }
+		item :>> tf  : Rectangle { attribute :>> tf::length, Rectangle::length = RectangularCuboid::length;
+								   attribute :>> tf::width, Rectangle::width	= RectangularCuboid::height; }
+		item :>> bf  : Rectangle { attribute :>> bf::length, Rectangle::length = RectangularCuboid::length;
+								   attribute :>> bf::width, Rectangle::width	= RectangularCuboid::height; }
+		item :>> ff  : Rectangle { attribute :>> ff::length, Rectangle::length = RectangularCuboid::length;
+								   attribute :>> ff::width, Rectangle::width	= RectangularCuboid::width; }
+		item :>> rf  : Rectangle { attribute :>> rf::length, Rectangle::length = RectangularCuboid::length;
+								   attribute :>> rf::width, Rectangle::width	= RectangularCuboid::width; }
+		item :>> slf : Rectangle { attribute :>> slf::length, Rectangle::length = RectangularCuboid::height;
+								   attribute :>> slf::width, Rectangle::width	= RectangularCuboid::width; }
+		item :>> srf : Rectangle { attribute :>> srf::length, Rectangle::length = RectangularCuboid::height;
+								   attribute :>> srf::width, Rectangle::width	= RectangularCuboid::width; }
 	}
 	alias Box for RectangularCuboid;
 
@@ -853,9 +857,9 @@ standard library package ShapeItems {
 
 		item :>> faces;
 		item base [1] :> faces;
-		item wall : Triangle :> faces {        
-            ref :>> Triangle::edges, ConeOrCylinder::faces::edges;
-            ref :>> Triangle::vertices, ConeOrCylinder::faces::vertices;            
+		item wall : Triangle :> faces {
+            ref :>> Triangle::edges, ConeOrCylinder::faces::edges, Polyhedron::faces::edges;
+            ref :>> Triangle::vertices, ConeOrCylinder::faces::vertices, Polyhedron::faces::vertices;
         }
 		attribute wallNumber : Positive = size(wall);
 
@@ -897,9 +901,9 @@ standard library package ShapeItems {
 		attribute :>> baseWidth [1];
 
 		item :>> base : Triangle {
-            ref :>> Triangle::edges, ConeOrCylinder::faces::edges;
-            ref :>> Triangle::vertices, ConeOrCylinder::faces::vertices;            
-			attribute :>> length = Tetrahedron::baseLength;
+            ref :>> Triangle::edges, ConeOrCylinder::faces::edges, Polyhedron::faces::edges;
+            ref :>> Triangle::vertices, ConeOrCylinder::faces::vertices, Polyhedron::faces::vertices;
+			attribute :>> Triangle::length, PlanarCurve::length = Tetrahedron::baseLength;
 			attribute :>> width  = Tetrahedron::baseWidth;
 		}
 	}
@@ -914,10 +918,10 @@ standard library package ShapeItems {
 		attribute :>> baseWidth [1];
 
 		item :>> base : Rectangle {
-            ref :>> Rectangle::edges, ConeOrCylinder::faces::edges;
-            ref :>> Rectangle::vertices, ConeOrCylinder::faces::vertices;            
-			attribute :>> length = RectangularPyramid::baseLength;
-			attribute :>> width = RectangularPyramid::baseWidth;
+            ref :>> Rectangle::edges, ConeOrCylinder::faces::edges, Polyhedron::faces::edges;
+            ref :>> Rectangle::vertices, ConeOrCylinder::faces::vertices, Polyhedron::faces::vertices;
+			attribute :>> base::length, Rectangle::length = RectangularPyramid::baseLength;
+			attribute :>> base::width, Rectangle::width = RectangularPyramid::baseWidth;
 		}
 	}
 }
