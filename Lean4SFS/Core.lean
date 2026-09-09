@@ -439,6 +439,13 @@ content (that relabeling doesn't change which elements are instances) is `df_rel
 below, not this `def`, which is pure naming. -/
 def relabel (T f g : Element) : Element := encodePair (encodePair T f) g
 
+/-- `Chapter/KerMLTypeInferencing.tex` §4.8 `CONTRA`'s own `I → R` (an expression or
+function type with input `I` and result `R`): a fresh `Element` naming the arrow
+type, built from `encodePair` rather than a new primitive, same treatment as
+`relabel` above. Its semantic content (contravariant specialization) is `CONTRA`
+itself, a field of `CoreDesignModel` below, not this `def`, which is pure naming. -/
+def arrow (I R : Element) : Element := encodePair I R
+
 /-- **Class-based (2026-08-26, at direct request, following a full audit of this
 section's ~45-axiom cluster): `Design`/`VT`/`Specializes`/`Unions`/`Intersects`/
 `Differences`/`Disjoint`/`TypeMultiplicityExact`/`TypeMultiplicityRange`/`VF`/
@@ -666,6 +673,34 @@ class CoreDesignModel where
   already in this class. -/
   df_feature_inherit : ∀ {Z W f X : Element},
       Specializes Z W → OwnedFeatureTypedBy W f X → OwnedFeatureTypedBy Z f X
+  /-- `Chapter/KerMLTypeInferencing.tex` §4.7 `MULTM`'s own semantic content: when the
+  same feature label `f` is inherited from two different ancestors, each with a
+  multiplicity given as a range (per direct request, multiplicities here are always
+  ranges, not the book's fully general "single number or range" -- an exact multiplicity
+  `k` is the degenerate range `[k,k]`, so this loses no generality this class already
+  has), the two ranges intersect. Unlike `df_feature_inherit` above (simple
+  single-path propagation), this is a genuine *merge* of two facts, not derivable from
+  it -- a different new modeling commitment, same status as `TRANS`/`df_relabel`/
+  `df_feature_inherit`. `max l1 l2 ≤ min u1 u2` (the intersection is nonempty) is a
+  hypothesis, not something the rule derives -- matching the book's own note that an
+  empty intersection must be a type error, not multiplicity `[0]`; a rule that produced
+  a value regardless would be silently accepting exactly what the book says must be
+  rejected. -/
+  df_feature_inherit_range_merge : ∀ {Z W1 W2 f X1 X2 : Element} {l1 u1 l2 u2 : ℕ},
+      Specializes Z W1 → OwnedFeatureTypedByRange W1 f X1 l1 u1 →
+      Specializes Z W2 → OwnedFeatureTypedByRange W2 f X2 l2 u2 →
+      max l1 l2 ≤ min u1 u2 →
+      OwnedFeatureTypedByRange Z f X1 (max l1 l2) (min u1 u2) ∧
+      OwnedFeatureTypedByRange Z f X2 (max l1 l2) (min u1 u2)
+  /-- `Chapter/KerMLTypeInferencing.tex` §4.8 `CONTRA`: specialization of arrow
+  (expression/function) types is contravariant in the input, covariant in the result
+  -- if `S1` specializes `T1` and `T2` specializes `S2`, then `T1 → T2` specializes
+  `S1 → S2`. A genuine new modeling commitment, same status as `TRANS` above --
+  `CoreDesignModel` has no notion of function/expression types otherwise, and nothing
+  about plain `Specializes` on the components could ever derive a fact about
+  `Specializes` on the constructed `arrow` types without one. -/
+  CONTRA : ∀ {S1 T1 T2 S2 : Element},
+      Specializes S1 T1 → Specializes T2 S2 → Specializes (arrow T1 T2) (arrow S1 S2)
 
 export CoreDesignModel (Design VT Specializes Unions Intersects Differences Disjoint
   TypeMultiplicityExact TypeMultiplicityRange VF FeatureContent FeaturedByDecl
@@ -677,7 +712,7 @@ export CoreDesignModel (Design VT Specializes Unions Intersects Differences Disj
   df_domainless df_featuremember df_featureoffeature df_fixedfeaturemultiplicity
   df_undefinedfeaturemultiplicity df_featuremultiplicityrange
   df_featuremultiplicityrangestar df_typebody df_featurechaining df_classifier
-  df_classifier2 df_relabel df_feature_inherit)
+  df_classifier2 df_relabel df_feature_inherit df_feature_inherit_range_merge CONTRA)
 
 /-- The consistency certificate: `Design := ∅` and `FeatureContent := fun _ _ => False`
 make every `df_*` constraint field above provable by contradiction on its own
@@ -745,7 +780,10 @@ theorem coreDesignModel_nonempty : Nonempty CoreDesignModel :=
      df_classifier := by intro _ h; obtain ⟨_, hC⟩ := h; exact absurd hC (by simp)
      df_classifier2 := Set.empty_subset _
      df_relabel := by intro _ _ _ _ h; exact absurd h (by simp)
-     df_feature_inherit := by intro _ _ _ _ h _; exact absurd h (by simp) }⟩
+     df_feature_inherit := by intro _ _ _ _ h _; exact absurd h (by simp)
+     df_feature_inherit_range_merge := by
+       intro _ _ _ _ _ _ _ _ _ _ h _ _ _ _; exact absurd h (by simp)
+     CONTRA := by intro _ _ _ _ h _; exact absurd h (by simp) }⟩
 
 noncomputable instance coreDesignModelInstance : CoreDesignModel :=
   Classical.choice coreDesignModel_nonempty
@@ -891,6 +929,25 @@ theorem MULTS {T U1 U2 U3 V1 V2 V3 f : Element}
       OwnedFeatureTypedBy T f U3 ∧ OwnedFeatureTypedBy T f V3 :=
   ⟨TRANS hspecTU1 hspecU1U2, TRANS hspecTV1 hspecV1V2,
    df_feature_inherit hspecTU1 hfU1, df_feature_inherit hspecTV1 hfV1⟩
+
+/-- `Chapter/KerMLTypeInferencing.tex` §4.7 `MULTM`: same setup as `MULTS`, except the
+inherited feature's multiplicity is a range on both branches, and the conclusion's
+multiplicity is their intersection. The `Specializes`/feature-typing halves are the
+same `TRANS`/`df_feature_inherit_range_merge` combination as `MULTS`'s
+`TRANS`/`df_feature_inherit`; `hoverlap` is required, not derived, matching the book's
+own note that an empty intersection is a type error rather than a valid conclusion. -/
+theorem MULTM {T U1 U2 U3 V1 V2 V3 f : Element} {lu uu lv uv : ℕ}
+    (hspecTU1 : Specializes T U1) (hspecU1U2 : Specializes U1 U2)
+    (hfU1 : OwnedFeatureTypedByRange U1 f U3 lu uu)
+    (hspecTV1 : Specializes T V1) (hspecV1V2 : Specializes V1 V2)
+    (hfV1 : OwnedFeatureTypedByRange V1 f V3 lv uv)
+    (hoverlap : max lu lv ≤ min uu uv) :
+    Specializes T U2 ∧ Specializes T V2 ∧
+      OwnedFeatureTypedByRange T f U3 (max lu lv) (min uu uv) ∧
+      OwnedFeatureTypedByRange T f V3 (max lu lv) (min uu uv) :=
+  ⟨TRANS hspecTU1 hspecU1U2, TRANS hspecTV1 hspecV1V2,
+   (df_feature_inherit_range_merge hspecTU1 hfU1 hspecTV1 hfV1 hoverlap).1,
+   (df_feature_inherit_range_merge hspecTU1 hfU1 hspecTV1 hfV1 hoverlap).2⟩
 
 /-- `Chapter/CoreSemanticsChapter.tex` §2.4 "Feature Member" ordering: pairs sharing
 the same first component are ordered by their second component's own (`Y`-relative)
