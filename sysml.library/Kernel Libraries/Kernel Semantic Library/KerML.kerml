@@ -345,10 +345,9 @@ standard library package KerML {
 		}		
 
 //SFS:  Expression specializes Feature, added 'parameter'		
-		metaclass Expression specializes Feature { //Step {
-			derived var feature isModelLevelEvaluable : Boolean[1..1];
+		metaclass Expression specializes Feature { 
 			derived var feature parameter : Feature[0..*] subsets input;
-			derived var feature 'function' : Function[0..1];  // redefines 'behavior';
+			derived var feature 'function' : Function[0..1]; 
 			derived var feature result : Feature[1..1] subsets output, parameter;
 		}		
 		
