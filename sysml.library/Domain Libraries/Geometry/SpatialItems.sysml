@@ -60,7 +60,7 @@ standard library package SpatialItems {
 		}
 
         item subSpatialItems : SpatialItem[1..*] :> subitems {
-            ref item :>> SpatialItem::localClock, subitems::localClock;
+            ref item :>> SpatialItem::localClock, subitems::localClock, suboccurrences::localClock;
         }
         
         part subSpatialParts : SpatialItem[1..*] :> subSpatialItems, subparts {
