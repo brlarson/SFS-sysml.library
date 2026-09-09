@@ -2339,7 +2339,7 @@ elab "kernel% " d:kernelDecl : term => do
 -- direct request, "does @Assert on line 111 conform to the result of getLife?"):
 -- `PartOf` (`SFS.lean`'s `class Mereology`) is characterized only by irreflexivity/
 -- transitivity/`pch`, otherwise unconstrained -- `ContainedBy -> PartOf` is a
--- one-way implication (`Containment`'s own `containment` field), so "no
+-- one-way implication (`Mereology`'s own `containment` field), so "no
 -- superoccurrence" (empty by construction in `getLife`'s base case) does NOT entail
 -- "no PartOf-parent at all," which is what the formula actually claimed. Re-fixed to
 -- `not exists p~Occurrence that ContainedBy(result,p)` -- `suboccurrences`' own real

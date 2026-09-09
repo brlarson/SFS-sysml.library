@@ -815,46 +815,24 @@ just a trivial existence witness for `PartOf`'s own type. `pch`'s `PartDisjoint 
 conjunct is inlined here as `¬ ∃ z, PartOf z x ∧ PartOf z y` (its unfolding) rather
 than calling the `PartDisjoint`/`Overlap` `def`s below, since those are defined
 *in terms of* this class's own exported `PartOf` and so can't be referenced from
-inside the class that produces it -- definitionally identical either way. -/
+inside the class that produces it -- definitionally identical either way.
+
+`ContainedBy`/`containment`/`uniqueContainer` (2026-08-27, `Mereology.kerml`'s own
+new relation, added directly in the KerML source, then ported here and to SFS.mm's
+own new `df-containment`/`df-uniquecontainer`) are bundled into this same class too
+(2026-09-09, folded in from a formerly-separate `Containment` class) -- the real
+KerML package declares `PartOf` and `ContainedBy` as siblings in the single
+`Mereology` package (`Mereology::PartOf`, `Mereology::ContainedBy`), not as two
+separate concepts, so this Lean class now mirrors that flat structure. `containment`/
+`uniqueContainer` refer to `PartOf` by its plain field name (the class's own
+telescope, not the exported top-level name), same as `par`/`ptr`/`pch` already do,
+so there's no forward-reference problem bundling them here. -/
 class Mereology where
   PartOf : Occurrence → Occurrence → Prop
   par : ∀ x, ¬ PartOf x x
   ptr : ∀ {x y z}, PartOf x y → PartOf y z → PartOf x z
   pch : ∀ x y, ((PartOf x y ∨ PartOf y x) ∨ (x = y ∨ ¬ ∃ z, PartOf z x ∧ PartOf z y)) ∧
       ¬ (PartOf x y ∧ PartOf y x)
-
-export Mereology (PartOf par ptr pch)
-
-/-- The consistency certificate's existence half: the "nothing is ever part of
-anything" relation genuinely satisfies `par`/`ptr`/`pch` all three at once --
-`ptr`/`par` vacuously (their hypotheses are always `False`), and `pch`'s only real
-content (comparability) holds because an always-`False` `PartOf` makes `Overlap`
-always `False` too, so every pair is unconditionally `PartDisjoint`, satisfying
-`pch`'s fourth disjunct unconditionally. This doesn't commit `PartOf` itself to
-this trivial relation (`mereologyModel` below goes through `Classical.choose`, same
-as `Lifetimes`/`Now`, so the actual witness stays opaque) -- it only certifies *a*
-model exists, which is what turns `par`/`ptr`/`pch` from assumed to proven. -/
-theorem mereology_exists :
-    ∃ R : Occurrence → Occurrence → Prop,
-      (∀ x, ¬ R x x) ∧
-      (∀ x y z, R x y → R y z → R x z) ∧
-      (∀ x y, ((R x y ∨ R y x) ∨ (x = y ∨ ¬ ∃ z, R z x ∧ R z y)) ∧ ¬ (R x y ∧ R y x)) := by
-  refine ⟨fun _ _ => False, fun _ h => h, fun _ _ _ h _ => h, fun _ _ => ?_⟩
-  simp
-
-noncomputable instance mereologyModel : Mereology where
-  PartOf := Classical.choose mereology_exists
-  par := (Classical.choose_spec mereology_exists).1
-  ptr {x y z} := (Classical.choose_spec mereology_exists).2.1 x y z
-  pch := (Classical.choose_spec mereology_exists).2.2
-
-/-- `Mereology.kerml`'s own new `ContainedBy` (2026-08-27, user-added directly in
-the KerML source, then ported here and to SFS.mm's own new `df-containment`/
-`df-uniquecontainer`): the direct (one-level) proper part relation, distinct from
-`PartOf` (the general, possibly-transitive parthood relation). `Containment`/
-`UniqueContainer` below are real laws about it, not a definition -- same
-class-based, `Classical.choose`-proven treatment as `Mereology` above. -/
-class Containment where
   ContainedBy : Occurrence → Occurrence → Prop
   /-- Mereology.kerml's own `Containment`: every direct container is also a
   (general) part. -/
@@ -863,21 +841,39 @@ class Containment where
   direct container. -/
   uniqueContainer : ∀ x y z, ContainedBy x y → ContainedBy x z → y = z
 
-export Containment (ContainedBy containment uniqueContainer)
+export Mereology (PartOf par ptr pch ContainedBy containment uniqueContainer)
 
-/-- The consistency certificate's existence half, same trick as
-`mereology_exists`: the always-`False` relation satisfies both laws vacuously
-(`False → PartOf x y` and `False → False → y = z` both hold by `ex falso`, no
-constraint on `PartOf` itself needed). -/
-theorem containment_exists :
-    ∃ R : Occurrence → Occurrence → Prop,
-      (∀ x y, R x y → PartOf x y) ∧ (∀ x y z, R x y → R x z → y = z) :=
-  ⟨fun _ _ => False, fun _ _ h => h.elim, fun _ _ _ h _ => h.elim⟩
+/-- The consistency certificate's existence half: the "nothing is ever part of,
+or directly contained by, anything" relation pair genuinely satisfies all five
+laws at once -- `ptr`/`par` vacuously (their hypotheses are always `False`),
+`pch`'s only real content (comparability) holds because an always-`False`
+`PartOf` makes `Overlap` always `False` too, so every pair is unconditionally
+`PartDisjoint`, satisfying `pch`'s fourth disjunct unconditionally, and
+`containment`/`uniqueContainer` hold vacuously the same way `ptr`/`par` do. This
+doesn't commit `PartOf`/`ContainedBy` themselves to this trivial relation
+(`mereologyModel` below goes through `Classical.choose`, same as `Lifetimes`/
+`Now`, so the actual witness stays opaque) -- it only certifies *a* model
+exists, which is what turns these five laws from assumed to proven. -/
+theorem mereology_exists :
+    ∃ PC : (Occurrence → Occurrence → Prop) × (Occurrence → Occurrence → Prop),
+      (∀ x, ¬ PC.1 x x) ∧
+      (∀ x y z, PC.1 x y → PC.1 y z → PC.1 x z) ∧
+      (∀ x y, ((PC.1 x y ∨ PC.1 y x) ∨ (x = y ∨ ¬ ∃ z, PC.1 z x ∧ PC.1 z y)) ∧
+        ¬ (PC.1 x y ∧ PC.1 y x)) ∧
+      (∀ x y, PC.2 x y → PC.1 x y) ∧
+      (∀ x y z, PC.2 x y → PC.2 x z → y = z) := by
+  refine ⟨(fun _ _ => False, fun _ _ => False), fun _ h => h, fun _ _ _ h _ => h, fun _ _ => ?_,
+    fun _ _ h => h.elim, fun _ _ _ h _ => h.elim⟩
+  simp
 
-noncomputable instance containmentModel : Containment where
-  ContainedBy := Classical.choose containment_exists
-  containment := (Classical.choose_spec containment_exists).1
-  uniqueContainer := (Classical.choose_spec containment_exists).2
+noncomputable instance mereologyModel : Mereology where
+  PartOf := (Classical.choose mereology_exists).1
+  par := (Classical.choose_spec mereology_exists).1
+  ptr {x y z} := (Classical.choose_spec mereology_exists).2.1 x y z
+  pch := (Classical.choose_spec mereology_exists).2.2.1
+  ContainedBy := (Classical.choose mereology_exists).2
+  containment := (Classical.choose_spec mereology_exists).2.2.2.1
+  uniqueContainer := (Classical.choose_spec mereology_exists).2.2.2.2
 
 /-- SFS.mm `df-pov`. -/
 def Overlap (x y : Occurrence) : Prop := ∃ z, PartOf z x ∧ PartOf z y

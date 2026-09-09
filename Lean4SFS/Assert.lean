@@ -926,7 +926,7 @@ elab "domain% " a:dslAssert : term => do
 
 -- Mereology.kerml `Containment` (2026-08-27, user-added directly in the KerML
 -- source, nested inside `ContainedBy`'s own predicate declaration -- see
--- `SFS.lean`'s new `Containment` class).
+-- `SFS.lean`'s `Mereology` class, which `ContainedBy` was folded into 2026-09-09).
 #check domain% <<Containment : : ContainedBy(x,y) implies PartOf(x,y)>>
 
 -- Mereology.kerml `UniqueContainer`, same top-level-law shape as `PAR`/`PTR`.
