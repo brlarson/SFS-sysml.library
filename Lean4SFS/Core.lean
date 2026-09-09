@@ -733,6 +733,19 @@ theorem SUBS {T V a : Element} {Ct Cv : Set Element}
     (hspec : Specializes T V) (ha : a ∈ Ct) : a ∈ Cv :=
   df_specializes hT hV hspec ha
 
+/-- `Chapter/KerMLTypeInferencing.tex` §4.3 `FEAT`: if `T` specializes `U` by adding
+feature `f` typed by `V`, and `a` has type `T`, then `a` also has type `U`. The
+`OwnedFeatureTypedBy` hypothesis (the "adds feature `f`" half of the premise) plays no
+role in this particular conclusion -- it doesn't mention `f`/`V` at all -- so `FEAT`
+reduces to `SUBS` exactly, unlike `REDEF`/`REPL` in §4.4, whose conclusions genuinely
+depend on the added feature. Kept as its own theorem, with the unused hypothesis still
+named (`_hf`), to state the book's actual compound premise faithfully rather than
+silently dropping to `SUBS`. -/
+theorem FEAT {T U f V a : Element} {Ct Cu : Set Element}
+    (hT : (DesignKind.type, T, Ct) ∈ Design) (hU : (DesignKind.type, U, Cu) ∈ Design)
+    (hspec : Specializes T U) (_hf : OwnedFeatureTypedBy T f V) (ha : a ∈ Ct) : a ∈ Cu :=
+  SUBS hT hU hspec ha
+
 /-- `Chapter/CoreSemanticsChapter.tex` §2.2.1 `df-multspec`: proved directly from
 `df_specializes` applied to each generalization independently. -/
 theorem df_multspec {ts tg th : Element} {Cs Cg Ch : Set Element}
