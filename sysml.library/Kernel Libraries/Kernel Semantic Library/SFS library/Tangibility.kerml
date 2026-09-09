@@ -17,7 +17,7 @@ library package Tangibility {
     }
 
     var feature delegatedTo[0..1] : Virtual {
-      doc /* may be delegated to another virtual thing, but must everntually be allocated to 
+      doc /* may be delegated to another virtual thing, but must eventually be allocated to 
        * something physical to exist */
     }
 
@@ -27,7 +27,8 @@ library package Tangibility {
 
     inv { notEmpty(allocatedTo) != notEmpty(delegatedTo) }
 
-    @Assert{n="Virtual location"; f="<< (notEmpty(allocatedTo) implies Location(self) = Location(allocatedTo)) and"+
+    @Assert{n="Virtual location"; f="<< (notEmpty(allocatedTo) implies "+
+      " Location(self) = Location(allocatedTo)) and"+
       " (notEmpty(delegatedTo) implies Location(self) = Location(delegatedTo)) >>";}
   }
 
