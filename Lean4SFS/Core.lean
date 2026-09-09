@@ -723,6 +723,16 @@ theorem coreDesignModel_nonempty : Nonempty CoreDesignModel :=
 noncomputable instance coreDesignModelInstance : CoreDesignModel :=
   Classical.choice coreDesignModel_nonempty
 
+/-- `Chapter/KerMLTypeInferencing.tex` §4.2 `SUBS`: if `a` has type `T` and `T`
+specializes `V`, then `a` also has type `V` -- proved directly from `df_specializes`,
+unlike `TRANS` above (which needed its own field): `df_specializes` already gives
+`Ct ⊆ Cv`, and plain subset-membership (`a ∈ Ct → a ∈ Cv`) finishes it, no extra
+primitive needed. -/
+theorem SUBS {T V a : Element} {Ct Cv : Set Element}
+    (hT : (DesignKind.type, T, Ct) ∈ Design) (hV : (DesignKind.type, V, Cv) ∈ Design)
+    (hspec : Specializes T V) (ha : a ∈ Ct) : a ∈ Cv :=
+  df_specializes hT hV hspec ha
+
 /-- `Chapter/CoreSemanticsChapter.tex` §2.2.1 `df-multspec`: proved directly from
 `df_specializes` applied to each generalization independently. -/
 theorem df_multspec {ts tg th : Element} {Cs Cg Ch : Set Element}
