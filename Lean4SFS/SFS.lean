@@ -1789,6 +1789,22 @@ unfolding `Succession` -- same "df-X defines a derived symbol purely in terms of
 already-introduced primitives" treatment as every real SFS.mm `df-` above. -/
 theorem df_succession (f1 f2 : Occurrence) : Succession f1 f2 ↔ precedes f1 f2 := Iff.rfl
 
+/-- KerML `binding f1 = f2;` (§8.4.4.6.2, the book's own `df-bind`): book-original,
+same reason as `Succession` above -- `binding` is KerML's own concrete syntax (a
+connector subsetting `Links::selfLinks`), not a domain predicate a modeler writes
+into a `.kerml` file. Its real semantic content is exactly `Links::SelfLink`'s own
+`@Assert{f="<< thisThing = sameThing >>";}`: declares identity, not mere equality
+-- "the same thing, not equal things" (`Supplemental-Semantics`'s own words). Lean's
+`Eq` already *is* identity of terms (Leibniz equality), so `Binding` needs no extra
+apparatus beyond it. Polymorphic (`Sort*`, matching `Eq`'s own generality), since
+`SelfLink`'s `thisThing`/`sameThing` are `Anything`-typed, not tied to `Occurrence`. -/
+def Binding {α : Sort*} (f1 f2 : α) : Prop := f1 = f2
+
+/-- `Supplemental-Semantics`'s own `df-bind` biconditional, trivial by unfolding
+`Binding` -- and, since `Binding` literally is `Eq`, definitionally the same fact
+as `Links::SelfLink`'s own real `@Assert` too. -/
+theorem df_bind {α : Sort*} (f1 f2 : α) : Binding f1 f2 ↔ f1 = f2 := Iff.rfl
+
 /-! ### KerML Element Representation and Type Definition (SFS.mm lines 3246-3324) -/
 
 /-- SFS.mm `cci`/`cuid`: `CI`/`UI` (Class Identifiers / Unique Identifiers) are both
