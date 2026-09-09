@@ -656,6 +656,16 @@ class CoreDesignModel where
   not derivable from anything already in this class. -/
   df_relabel : ∀ {T f g : Element} {Ct : Set Element},
       (DesignKind.type, T, Ct) ∈ Design → (DesignKind.type, relabel T f g, Ct) ∈ Design
+  /-- `Chapter/KerMLTypeInferencing.tex` §4.6 `MULTF`/`MULTS`'s own semantic content:
+  a directly-owned feature is inherited down every specialization -- if `Z` specializes
+  `W` and `W` owns feature `f` typed `X`, then `Z` owns (inherits) `f` typed `X` too.
+  Every prior rule's `OwnedFeatureTypedBy` hypothesis was about a type owning its own
+  feature directly (`FEAT`/`REDEF`/`REPL` all state it of the type doing the adding,
+  never propagate it to a further specializer), so this is a genuine new modeling
+  commitment, same status as `TRANS`/`df_relabel` above -- not derivable from anything
+  already in this class. -/
+  df_feature_inherit : ∀ {Z W f X : Element},
+      Specializes Z W → OwnedFeatureTypedBy W f X → OwnedFeatureTypedBy Z f X
 
 export CoreDesignModel (Design VT Specializes Unions Intersects Differences Disjoint
   TypeMultiplicityExact TypeMultiplicityRange VF FeatureContent FeaturedByDecl
@@ -667,7 +677,7 @@ export CoreDesignModel (Design VT Specializes Unions Intersects Differences Disj
   df_domainless df_featuremember df_featureoffeature df_fixedfeaturemultiplicity
   df_undefinedfeaturemultiplicity df_featuremultiplicityrange
   df_featuremultiplicityrangestar df_typebody df_featurechaining df_classifier
-  df_classifier2 df_relabel)
+  df_classifier2 df_relabel df_feature_inherit)
 
 /-- The consistency certificate: `Design := ∅` and `FeatureContent := fun _ _ => False`
 make every `df_*` constraint field above provable by contradiction on its own
@@ -734,7 +744,8 @@ theorem coreDesignModel_nonempty : Nonempty CoreDesignModel :=
      df_featurechaining := by intro _ _ _ _ _ hb _ _; exact hb.elim
      df_classifier := by intro _ h; obtain ⟨_, hC⟩ := h; exact absurd hC (by simp)
      df_classifier2 := Set.empty_subset _
-     df_relabel := by intro _ _ _ _ h; exact absurd h (by simp) }⟩
+     df_relabel := by intro _ _ _ _ h; exact absurd h (by simp)
+     df_feature_inherit := by intro _ _ _ _ h _; exact absurd h (by simp) }⟩
 
 noncomputable instance coreDesignModelInstance : CoreDesignModel :=
   Classical.choice coreDesignModel_nonempty
@@ -848,6 +859,38 @@ theorem MULTN {n : ℕ} {ts a : Element} {Cs : Set Element}
     (hspec : ∀ i, Specializes ts (tg i)) (ha : a ∈ Cs) :
     ∀ i, a ∈ Cg i :=
   fun i => df_specializes hs (hg i) (hspec i) ha
+
+/-- `Chapter/KerMLTypeInferencing.tex` §4.6 `MULTF`: if `T` specializes both `U1` and
+`V1`, `U1` specializes `U2` adding feature `f:U3`, `V1` specializes `V2` adding feature
+`g:V3`, and `f ≠ g`, then `T` specializes both `U2`/`V2` and inherits both features.
+The `Specializes` half of the conclusion is two applications of `TRANS`; the feature
+half is two applications of the new `df_feature_inherit`. `f ≠ g` (kept as `_hne`,
+unused) plays no logical role in deriving either half individually -- it only
+distinguishes this rule from `MULTS` below, which merges a *shared* label instead. -/
+theorem MULTF {T U1 U2 U3 V1 V2 V3 f g : Element}
+    (hspecTU1 : Specializes T U1) (hspecU1U2 : Specializes U1 U2)
+    (hfU1 : OwnedFeatureTypedBy U1 f U3)
+    (hspecTV1 : Specializes T V1) (hspecV1V2 : Specializes V1 V2)
+    (hgV1 : OwnedFeatureTypedBy V1 g V3)
+    (_hne : f ≠ g) :
+    Specializes T U2 ∧ Specializes T V2 ∧
+      OwnedFeatureTypedBy T f U3 ∧ OwnedFeatureTypedBy T g V3 :=
+  ⟨TRANS hspecTU1 hspecU1U2, TRANS hspecTV1 hspecV1V2,
+   df_feature_inherit hspecTU1 hfU1, df_feature_inherit hspecTV1 hgV1⟩
+
+/-- `Chapter/KerMLTypeInferencing.tex` §4.6 `MULTS`: same setup as `MULTF`, except both
+branches redefine the *same* label `f` -- `T` ends up inheriting `f` typed by both `U3`
+and `V3` simultaneously (the multi-typing a real KerML redefinition merge produces),
+proved by the identical `TRANS`/`df_feature_inherit` combination. -/
+theorem MULTS {T U1 U2 U3 V1 V2 V3 f : Element}
+    (hspecTU1 : Specializes T U1) (hspecU1U2 : Specializes U1 U2)
+    (hfU1 : OwnedFeatureTypedBy U1 f U3)
+    (hspecTV1 : Specializes T V1) (hspecV1V2 : Specializes V1 V2)
+    (hfV1 : OwnedFeatureTypedBy V1 f V3) :
+    Specializes T U2 ∧ Specializes T V2 ∧
+      OwnedFeatureTypedBy T f U3 ∧ OwnedFeatureTypedBy T f V3 :=
+  ⟨TRANS hspecTU1 hspecU1U2, TRANS hspecTV1 hspecV1V2,
+   df_feature_inherit hspecTU1 hfU1, df_feature_inherit hspecTV1 hfV1⟩
 
 /-- `Chapter/CoreSemanticsChapter.tex` §2.4 "Feature Member" ordering: pairs sharing
 the same first component are ordered by their second component's own (`Y`-relative)
