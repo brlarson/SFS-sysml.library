@@ -2012,6 +2012,32 @@ function *of* `now` to begin with. Formalizing `SetNow` this way is what makes t
 guarantee explicit and connects it to `Get`, not what creates it. -/
 def SetNow (d : Occurrence) (f : Element) (v : Set Item) : Prop := Get d f ⟨now, dl_nowt⟩ = v
 
+/-- KerML `classifier C { feature f:F=e; }` (§8.4.4.11, the book's own `df-bl.bfv`):
+book-original, not ported from a real `.kerml` file's `@Assert` -- `=` binding a
+feature's value permanently is KerML's own concrete syntax, not a domain predicate a
+modeler writes into a `.kerml` file. Says `f`'s value is the fixed `e` throughout
+`C`'s whole `life`, via `Get`. -/
+def BoundFeatureValue (C : Occurrence) (f : Element) (e : Set Item) : Prop :=
+  ∀ tau : Time, tau.val ∈ life C → Get C f tau = e
+
+/-- `Supplemental-Semantics`'s own `df-bl.bfv` biconditional, trivial by unfolding
+`BoundFeatureValue`. -/
+theorem df_bl_bfv (C : Occurrence) (f : Element) (e : Set Item) :
+    BoundFeatureValue C f e ↔ ∀ tau : Time, tau.val ∈ life C → Get C f tau = e := Iff.rfl
+
+/-- KerML `classifier C { var feature f:F := e; }` (§8.4.4.11, the book's own
+`df-bl.ifv`): book-original, same reason as `BoundFeatureValue` above -- `:=`
+assigning a feature's initial value is KerML's own concrete syntax. Says `f`'s value
+is `e` specifically at `C`'s `birth`, via `Get` (unlike `BoundFeatureValue`, only at
+one instant, not throughout `life`). -/
+def InitialFeatureValue (C : Occurrence) (f : Element) (e : Set Item) : Prop :=
+  Get C f (birth C) = e
+
+/-- `Supplemental-Semantics`'s own `df-bl.ifv` biconditional, trivial by unfolding
+`InitialFeatureValue`. -/
+theorem df_bl_ifv (C : Occurrence) (f : Element) (e : Set Item) :
+    InitialFeatureValue C f e ↔ Get C f (birth C) = e := Iff.rfl
+
 /-- `Domain.kerml`'s own `GetChange` behavior, formalized 2026-08-21 at direct
 request, same treatment as `SetNow` immediately above: not a new primitive, just the
 exact proposition `Domain.kerml`'s own `GetChange` assertion names -- "if the value
