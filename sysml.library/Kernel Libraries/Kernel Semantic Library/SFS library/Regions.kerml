@@ -88,7 +88,7 @@ library package Regions {
         if o istype Physical ? (o as Physical).location 
           else if o istype Virtual and notEmpty((o as Virtual).allocatedTo) ? Location((o as Virtual).allocatedTo)
             else if o istype Virtual and notEmpty((o as Virtual).delegatedTo) ? Location((o as Virtual).delegatedTo)
-                else Regions::nowhere
+                else Regions::noWhere
    }
 
      // SFS:  Two things having the same location are the same thing (df-lfu)
@@ -229,7 +229,7 @@ library package Regions {
         inv { r1.frameOfReference == r2.frameOfReference }
     }
 
-    feature nowhere : Region {
+    feature noWhere : Region {
         /* things which have no location are no where */
     }
    
