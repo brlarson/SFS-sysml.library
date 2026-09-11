@@ -485,6 +485,16 @@ class CoreDesignModel where
   VT : Set Element
   /-- `Chapter/CoreSemanticsChapter.tex` §2.2.1 `specializes`. -/
   Specializes : Element → Element → Prop
+  /-- `Chapter/KerMLTypeInferencing.tex` §4.9 `Matches`: the structural reuse relation
+  (Abadi/Cardelli's `⩽#`), distinct from `Specializes` (their `⩽`). `Matches Z W` means
+  "`Z`'s declaration reuses `W`'s owned features, each possibly redefined" -- a purely
+  structural claim, carrying none of `Specializes`'s extensional weight
+  (`df_specializes`'s `Ct ⊆ Cv`) on its own. Feature redefinition (`df_feature_inherit`,
+  `df_feature_inherit_range_merge`, `REDEF`/`REPL`) is licensed by `Matches`, not
+  `Specializes` -- `Specializes` between a redefining type and what it redefines is only
+  available once `MATCH_SPEC` below discharges a real per-feature variance check, not
+  merely assumed from the declaration the way `REDEF`/`REPL` did before this split. -/
+  Matches : Element → Element → Prop
   /-- `Chapter/CoreSemanticsChapter.tex` §2.2.1 `unions`. -/
   Unions : Element → Element → Prop
   /-- `Chapter/CoreSemanticsChapter.tex` §2.2.1 `intersects`. -/
@@ -663,16 +673,28 @@ class CoreDesignModel where
   not derivable from anything already in this class. -/
   df_relabel : ∀ {T f g : Element} {Ct : Set Element},
       (DesignKind.type, T, Ct) ∈ Design → (DesignKind.type, relabel T f g, Ct) ∈ Design
+  /-- `Chapter/KerMLTypeInferencing.tex` §4.9: ordinary specialization without any
+  feature redefinition is automatically a (trivial) matching relationship -- `Matches`
+  only becomes strictly weaker than `Specializes` once redefinition enters the picture
+  (see `MATCH_SPEC`). A genuine new modeling commitment (nothing about `Matches` being a
+  fresh primitive lets this be derived), but a minimal, expected one: it's what lets
+  `MULTF`/`MULTS`/`MULTM` keep feeding their existing `Specializes`-typed chains into
+  `df_feature_inherit`/`df_feature_inherit_range_merge` below now that those are stated
+  over `Matches`, for the ordinary (non-redefining) inheritance those rules perform. -/
+  matches_of_specializes : ∀ {Z W : Element}, Specializes Z W → Matches Z W
   /-- `Chapter/KerMLTypeInferencing.tex` §4.6 `MULTF`/`MULTS`'s own semantic content:
-  a directly-owned feature is inherited down every specialization -- if `Z` specializes
+  a directly-owned feature is inherited down every structural match -- if `Z` matches
   `W` and `W` owns feature `f` typed `X`, then `Z` owns (inherits) `f` typed `X` too.
   Every prior rule's `OwnedFeatureTypedBy` hypothesis was about a type owning its own
   feature directly (`FEAT`/`REDEF`/`REPL` all state it of the type doing the adding,
   never propagate it to a further specializer), so this is a genuine new modeling
   commitment, same status as `TRANS`/`df_relabel` above -- not derivable from anything
-  already in this class. -/
+  already in this class. Stated over `Matches` rather than `Specializes` (as of the
+  §4.9 matching split): feature inheritance is a structural fact about the declaration,
+  not something that should presuppose the extensional consequence (`Specializes`) the
+  declaration may or may not actually earn once redefinition is checked. -/
   df_feature_inherit : ∀ {Z W f X : Element},
-      Specializes Z W → OwnedFeatureTypedBy W f X → OwnedFeatureTypedBy Z f X
+      Matches Z W → OwnedFeatureTypedBy W f X → OwnedFeatureTypedBy Z f X
   /-- `Chapter/KerMLTypeInferencing.tex` §4.7 `MULTM`'s own semantic content: when the
   same feature label `f` is inherited from two different ancestors, each with a
   multiplicity given as a range (per direct request, multiplicities here are always
@@ -685,13 +707,29 @@ class CoreDesignModel where
   hypothesis, not something the rule derives -- matching the book's own note that an
   empty intersection must be a type error, not multiplicity `[0]`; a rule that produced
   a value regardless would be silently accepting exactly what the book says must be
-  rejected. -/
+  rejected. Stated over `Matches`, same reasoning as `df_feature_inherit` above. -/
   df_feature_inherit_range_merge : ∀ {Z W1 W2 f X1 X2 : Element} {l1 u1 l2 u2 : ℕ},
-      Specializes Z W1 → OwnedFeatureTypedByRange W1 f X1 l1 u1 →
-      Specializes Z W2 → OwnedFeatureTypedByRange W2 f X2 l2 u2 →
+      Matches Z W1 → OwnedFeatureTypedByRange W1 f X1 l1 u1 →
+      Matches Z W2 → OwnedFeatureTypedByRange W2 f X2 l2 u2 →
       max l1 l2 ≤ min u1 u2 →
       OwnedFeatureTypedByRange Z f X1 (max l1 l2) (min u1 u2) ∧
       OwnedFeatureTypedByRange Z f X2 (max l1 l2) (min u1 u2)
+  /-- `Chapter/KerMLTypeInferencing.tex` §4.9 `MATCH_SPEC`: matching plus a *checked*
+  covariant redefinition of a single feature together produce specialization -- the
+  derivation missing behind `REDEF`/`REPL`'s previously-assumed `Specializes W T`
+  premise. `f`/`g` may differ (covering `REPL`'s renaming case as well as `REDEF`'s
+  same-name case): `Z` matches `W`, `W` owns `f` typed `V`, `Z` owns some feature `g`
+  typed `X` -- if `X` specializes `V`, `Z` specializes `W`. This is a genuine new
+  modeling commitment, same status as `TRANS`/`df_relabel`/`df_feature_inherit` --
+  `Matches` alone carries no extensional content, so nothing about it could derive a
+  `Specializes` fact without one. Its point is exactly what it rules out: a redefinition
+  whose new feature type does *not* specialize the old one (a `DataValue` feature
+  redefined into an unrelated `Apple`) never lets `Specializes Z W` be established via
+  this route -- there is no longer any way to obtain it except by discharging this
+  hypothesis for real. -/
+  MATCH_SPEC : ∀ {Z W f g X V : Element},
+      Matches Z W → OwnedFeatureTypedBy W f V → OwnedFeatureTypedBy Z g X →
+      Specializes X V → Specializes Z W
   /-- `Chapter/KerMLTypeInferencing.tex` §4.8 `CONTRA`: specialization of arrow
   (expression/function) types is contravariant in the input, covariant in the result
   -- if `S1` specializes `T1` and `T2` specializes `S2`, then `T1 → T2` specializes
@@ -702,8 +740,8 @@ class CoreDesignModel where
   CONTRA : ∀ {S1 T1 T2 S2 : Element},
       Specializes S1 T1 → Specializes T2 S2 → Specializes (arrow T1 T2) (arrow S1 S2)
 
-export CoreDesignModel (Design VT Specializes Unions Intersects Differences Disjoint
-  TypeMultiplicityExact TypeMultiplicityRange VF FeatureContent FeaturedByDecl
+export CoreDesignModel (Design VT Specializes Matches Unions Intersects Differences
+  Disjoint TypeMultiplicityExact TypeMultiplicityRange VF FeatureContent FeaturedByDecl
   DomainlessDecl FeatureMemberOf OwnedFeatureTypedBy OwnedFeatureTypedByExact
   OwnedFeatureTypedByStar OwnedFeatureTypedByRange OwnedFeatureTypedByRangeStar
   MemberOf OwnedFeatures OrderedOn OrderedDecl ChainsDecl VC
@@ -712,7 +750,8 @@ export CoreDesignModel (Design VT Specializes Unions Intersects Differences Disj
   df_domainless df_featuremember df_featureoffeature df_fixedfeaturemultiplicity
   df_undefinedfeaturemultiplicity df_featuremultiplicityrange
   df_featuremultiplicityrangestar df_typebody df_featurechaining df_classifier
-  df_classifier2 df_relabel df_feature_inherit df_feature_inherit_range_merge CONTRA)
+  df_classifier2 df_relabel matches_of_specializes df_feature_inherit
+  df_feature_inherit_range_merge MATCH_SPEC CONTRA)
 
 /-- The consistency certificate: `Design := ∅` and `FeatureContent := fun _ _ => False`
 make every `df_*` constraint field above provable by contradiction on its own
@@ -729,6 +768,7 @@ theorem coreDesignModel_nonempty : Nonempty CoreDesignModel :=
   ⟨{ Design := ∅
      VT := ∅
      Specializes := fun _ _ => False
+     Matches := fun _ _ => False
      Unions := fun _ _ => False
      Intersects := fun _ _ => False
      Differences := fun _ _ => False
@@ -780,9 +820,11 @@ theorem coreDesignModel_nonempty : Nonempty CoreDesignModel :=
      df_classifier := by intro _ h; obtain ⟨_, hC⟩ := h; exact absurd hC (by simp)
      df_classifier2 := Set.empty_subset _
      df_relabel := by intro _ _ _ _ h; exact absurd h (by simp)
+     matches_of_specializes := by intro _ _ h; exact absurd h (by simp)
      df_feature_inherit := by intro _ _ _ _ h _; exact absurd h (by simp)
      df_feature_inherit_range_merge := by
        intro _ _ _ _ _ _ _ _ _ _ h _ _ _ _; exact absurd h (by simp)
+     MATCH_SPEC := by intro _ _ _ _ _ _ h _ _ _; exact absurd h (by simp)
      CONTRA := by intro _ _ _ _ h _; exact absurd h (by simp) }⟩
 
 noncomputable instance coreDesignModelInstance : CoreDesignModel :=
@@ -813,40 +855,45 @@ theorem FEAT {T U f V a : Element} {Ct Cu : Set Element}
   SUBS hT hU hspec ha
 
 /-- `Chapter/KerMLTypeInferencing.tex` §4.4 `REDEF`: if `T` specializes `U` by adding
-feature `f` typed by `V`, and `W` specializes `T` by redefining feature `f` to be typed
-by `X` which specializes `V`, and `a` has type `W`, then `a` also has type `T`. Even more
-of the premise goes unused than in `FEAT`: only `Specializes W T` and `a ∈ Cw` matter for
-this conclusion -- `T`'s own relationship to `U`/`f`/`V`, `W`'s redefinition of `f` to
-`X`, and `X`'s relationship to `V`, are all inert. Kept as its own theorem, with every
-unused hypothesis still named, for the same faithfulness reason as `FEAT`. -/
+feature `f` typed by `V`, and `W` *matches* `T` by redefining feature `f` to be typed by
+`X`, and `a` has type `W`, then `a` also has type `T` -- but only once `X` is checked to
+specialize `V`. As of the §4.9 matching split, `Specializes W T` is no longer a premise
+here: it's `MATCH_SPEC`'s conclusion, derived from `Matches W T` plus this very
+`X`-specializes-`V` check, rather than assumed outright the way this rule stated it
+before the split (which let a redefinition into an unrelated type, e.g. a `DataValue`
+feature redefined into an `Apple`, be treated as sound merely because `Specializes W T`
+was handed in for free). `T`'s own relationship to `U` remains inert for this
+conclusion, same as before. -/
 theorem REDEF {T U f V W X a : Element} {Ct Cu Cw : Set Element}
     (hT : (DesignKind.type, T, Ct) ∈ Design) (_hU : (DesignKind.type, U, Cu) ∈ Design)
     (hW : (DesignKind.type, W, Cw) ∈ Design)
-    (_hspecTU : Specializes T U) (_hfTU : OwnedFeatureTypedBy T f V)
-    (hspecWT : Specializes W T) (_hfWT : OwnedFeatureTypedBy W f X)
-    (_hspecXV : Specializes X V) (ha : a ∈ Cw) : a ∈ Ct :=
-  SUBS hW hT hspecWT ha
+    (_hspecTU : Specializes T U) (hfTU : OwnedFeatureTypedBy T f V)
+    (hmatchWT : Matches W T) (hfWT : OwnedFeatureTypedBy W f X)
+    (hspecXV : Specializes X V) (ha : a ∈ Cw) : a ∈ Ct :=
+  SUBS hW hT (MATCH_SPEC hmatchWT hfTU hfWT hspecXV) ha
 
-/-- `Chapter/KerMLTypeInferencing.tex` §4.4 `REPL`: same setup as `REDEF` (`W`
-specializes `T`, redefining `f`), except `W`'s own feature is labeled `g`, not `f`, and
-the conclusion is about `T(f ↓ g)` (`relabel T f g`), not `T` itself -- the one rule in
-this section whose conclusion genuinely depends on the redefinition, since `relabel`
-names a different `Element` than `T`. `CoreDesignModel`'s `Design` triples carry no
-notion of "type identity beyond extension" (nothing here distinguishes `T` from a
-relabeled variant except by literally constructing a different name for it, which
-`relabel` does), and `Design` is a general relation, not asserted functional -- a
-`Element` could in principle have more than one associated extension -- so instead of
-claiming `T(f ↓ g)`'s extension definitionally *equals* `T`'s, the conclusion pairs the
-same `a ∈ Ct` fact `REDEF` proves with `df_relabel`'s own witness that `Ct` genuinely is
-one of `relabel T f g`'s extensions. -/
+/-- `Chapter/KerMLTypeInferencing.tex` §4.4 `REPL`: same setup as `REDEF` (`W` matches
+`T`, redefining `f`), except `W`'s own feature is labeled `g`, not `f`, and the
+conclusion is about `T(f ↓ g)` (`relabel T f g`), not `T` itself -- the one rule in this
+section whose conclusion genuinely depends on the redefinition, since `relabel` names a
+different `Element` than `T`. `CoreDesignModel`'s `Design` triples carry no notion of
+"type identity beyond extension" (nothing here distinguishes `T` from a relabeled
+variant except by literally constructing a different name for it, which `relabel` does),
+and `Design` is a general relation, not asserted functional -- a `Element` could in
+principle have more than one associated extension -- so instead of claiming `T(f ↓ g)`'s
+extension definitionally *equals* `T`'s, the conclusion pairs the same `a ∈ Ct` fact
+`REDEF` proves with `df_relabel`'s own witness that `Ct` genuinely is one of
+`relabel T f g`'s extensions. `MATCH_SPEC`'s `f`/`g` genuinely differing is exactly this
+rule's own renaming case -- the "new feature type must specialize the old one" check
+spans the rename, comparing `W`'s `g`-typed `X` against `T`'s `f`-typed `V`. -/
 theorem REPL {T U f V W X g a : Element} {Ct Cu Cw : Set Element}
     (hT : (DesignKind.type, T, Ct) ∈ Design) (_hU : (DesignKind.type, U, Cu) ∈ Design)
     (hW : (DesignKind.type, W, Cw) ∈ Design)
-    (_hspecTU : Specializes T U) (_hfTU : OwnedFeatureTypedBy T f V)
-    (hspecWT : Specializes W T) (_hfWT : OwnedFeatureTypedBy W g X)
-    (_hspecXV : Specializes X V) (ha : a ∈ Cw) :
+    (_hspecTU : Specializes T U) (hfTU : OwnedFeatureTypedBy T f V)
+    (hmatchWT : Matches W T) (hfWT : OwnedFeatureTypedBy W g X)
+    (hspecXV : Specializes X V) (ha : a ∈ Cw) :
     a ∈ Ct ∧ (DesignKind.type, relabel T f g, Ct) ∈ Design :=
-  ⟨SUBS hW hT hspecWT ha, df_relabel hT⟩
+  ⟨SUBS hW hT (MATCH_SPEC hmatchWT hfTU hfWT hspecXV) ha, df_relabel hT⟩
 
 /-- `Chapter/CoreSemanticsChapter.tex` §2.2.1 `df-multspec`, the two-generalization
 case: proved directly from `df_specializes` applied to each generalization
@@ -902,8 +949,9 @@ theorem MULTN {n : ℕ} {ts a : Element} {Cs : Set Element}
 `V1`, `U1` specializes `U2` adding feature `f:U3`, `V1` specializes `V2` adding feature
 `g:V3`, and `f ≠ g`, then `T` specializes both `U2`/`V2` and inherits both features.
 The `Specializes` half of the conclusion is two applications of `TRANS`; the feature
-half is two applications of the new `df_feature_inherit`. `f ≠ g` (kept as `_hne`,
-unused) plays no logical role in deriving either half individually -- it only
+half is two applications of the new `df_feature_inherit`, fed via `matches_of_specializes`
+(plain, non-redefining specialization is trivially a match -- see §4.9). `f ≠ g` (kept as
+`_hne`, unused) plays no logical role in deriving either half individually -- it only
 distinguishes this rule from `MULTS` below, which merges a *shared* label instead. -/
 theorem MULTF {T U1 U2 U3 V1 V2 V3 f g : Element}
     (hspecTU1 : Specializes T U1) (hspecU1U2 : Specializes U1 U2)
@@ -914,12 +962,14 @@ theorem MULTF {T U1 U2 U3 V1 V2 V3 f g : Element}
     Specializes T U2 ∧ Specializes T V2 ∧
       OwnedFeatureTypedBy T f U3 ∧ OwnedFeatureTypedBy T g V3 :=
   ⟨TRANS hspecTU1 hspecU1U2, TRANS hspecTV1 hspecV1V2,
-   df_feature_inherit hspecTU1 hfU1, df_feature_inherit hspecTV1 hgV1⟩
+   df_feature_inherit (matches_of_specializes hspecTU1) hfU1,
+   df_feature_inherit (matches_of_specializes hspecTV1) hgV1⟩
 
 /-- `Chapter/KerMLTypeInferencing.tex` §4.6 `MULTS`: same setup as `MULTF`, except both
 branches redefine the *same* label `f` -- `T` ends up inheriting `f` typed by both `U3`
 and `V3` simultaneously (the multi-typing a real KerML redefinition merge produces),
-proved by the identical `TRANS`/`df_feature_inherit` combination. -/
+proved by the identical `TRANS`/`df_feature_inherit`-via-`matches_of_specializes`
+combination. -/
 theorem MULTS {T U1 U2 U3 V1 V2 V3 f : Element}
     (hspecTU1 : Specializes T U1) (hspecU1U2 : Specializes U1 U2)
     (hfU1 : OwnedFeatureTypedBy U1 f U3)
@@ -928,14 +978,15 @@ theorem MULTS {T U1 U2 U3 V1 V2 V3 f : Element}
     Specializes T U2 ∧ Specializes T V2 ∧
       OwnedFeatureTypedBy T f U3 ∧ OwnedFeatureTypedBy T f V3 :=
   ⟨TRANS hspecTU1 hspecU1U2, TRANS hspecTV1 hspecV1V2,
-   df_feature_inherit hspecTU1 hfU1, df_feature_inherit hspecTV1 hfV1⟩
+   df_feature_inherit (matches_of_specializes hspecTU1) hfU1,
+   df_feature_inherit (matches_of_specializes hspecTV1) hfV1⟩
 
 /-- `Chapter/KerMLTypeInferencing.tex` §4.7 `MULTM`: same setup as `MULTS`, except the
 inherited feature's multiplicity is a range on both branches, and the conclusion's
 multiplicity is their intersection. The `Specializes`/feature-typing halves are the
-same `TRANS`/`df_feature_inherit_range_merge` combination as `MULTS`'s
-`TRANS`/`df_feature_inherit`; `hoverlap` is required, not derived, matching the book's
-own note that an empty intersection is a type error rather than a valid conclusion. -/
+same `TRANS`/`df_feature_inherit_range_merge`-via-`matches_of_specializes` combination
+as `MULTS`'s; `hoverlap` is required, not derived, matching the book's own note that an
+empty intersection is a type error rather than a valid conclusion. -/
 theorem MULTM {T U1 U2 U3 V1 V2 V3 f : Element} {lu uu lv uv : ℕ}
     (hspecTU1 : Specializes T U1) (hspecU1U2 : Specializes U1 U2)
     (hfU1 : OwnedFeatureTypedByRange U1 f U3 lu uu)
@@ -946,8 +997,10 @@ theorem MULTM {T U1 U2 U3 V1 V2 V3 f : Element} {lu uu lv uv : ℕ}
       OwnedFeatureTypedByRange T f U3 (max lu lv) (min uu uv) ∧
       OwnedFeatureTypedByRange T f V3 (max lu lv) (min uu uv) :=
   ⟨TRANS hspecTU1 hspecU1U2, TRANS hspecTV1 hspecV1V2,
-   (df_feature_inherit_range_merge hspecTU1 hfU1 hspecTV1 hfV1 hoverlap).1,
-   (df_feature_inherit_range_merge hspecTU1 hfU1 hspecTV1 hfV1 hoverlap).2⟩
+   (df_feature_inherit_range_merge (matches_of_specializes hspecTU1) hfU1
+     (matches_of_specializes hspecTV1) hfV1 hoverlap).1,
+   (df_feature_inherit_range_merge (matches_of_specializes hspecTU1) hfU1
+     (matches_of_specializes hspecTV1) hfV1 hoverlap).2⟩
 
 /-- `Chapter/CoreSemanticsChapter.tex` §2.4 "Feature Member" ordering: pairs sharing
 the same first component are ordered by their second component's own (`Y`-relative)
