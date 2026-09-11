@@ -28,8 +28,9 @@ library package Tangibility {
     inv { notEmpty(allocatedTo) != notEmpty(delegatedTo) }
 
     @Assert{n="Virtual location"; f="<< (notEmpty(allocatedTo) implies "+
-      " Location(self) = Location(allocatedTo)) and"+
-      " (notEmpty(delegatedTo) implies Location(self) = Location(delegatedTo)) >>";}
+      " exists p~Occurrence that (allocatedTo=p and Location(self) = Location(p))) and"+
+      " (notEmpty(delegatedTo) implies "+
+      " exists q~Occurrence that (delegatedTo=q and Location(self) = Location(q))) >>";}
   }
 
   abstract classifier Physical :> Occurrence disjoint from Virtual {

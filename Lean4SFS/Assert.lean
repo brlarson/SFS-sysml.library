@@ -379,6 +379,16 @@ class DSLEq (α β : Type _) (γ : outParam (Type _)) where eq : α → β → �
 
 instance {α : Type _} : DSLEq α α Prop := ⟨Eq⟩
 
+/-- `o = v` for `o : Option α`, `v : α` -- an *optional* feature's value equated
+with a plain witness (`Tangibility.kerml`'s own real `allocatedTo=p`, `allocatedTo`
+a `[0..1]`-typed feature, `p` an `exists`-bound plain occurrence). Not a
+reintroduction of the retired Kleene/compare-only-when-defined machinery this
+section's header note describes removing: this is ordinary, total equality
+(`o = some v`), never partial/three-valued -- it only ever appears guarded by a
+`notEmpty` check in practice, same as `death`'s own partiality no longer needs
+guarding here now that it's gone. -/
+instance {α : Type _} : DSLEq (Option α) α Prop := ⟨fun o v => o = some v⟩
+
 /-- `and`/`or` are used generically on plain `Prop` (every `@Assert` formula, now
 that nothing here is `Option`-valued). Field names are `conj`/`disj`, not `and`/
 `or` -- the latter are this file's own `dslWff` syntax keywords (`syntax ... "

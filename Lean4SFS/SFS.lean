@@ -2105,6 +2105,23 @@ def Get (d : Occurrence) (f : Element) (tau : Time) : Set Item := interpValAt (f
 /-- `I[[d::f]]`: the (untimed/constant) value of feature `f` of `d`. -/
 def GetC (d : Occurrence) (f : Element) : Set Item := interpVal (featureAccess d f)
 
+/-- `SequenceFunctions::including`'s own KerML body is `union(seq, values)` --
+`Get`/`GetC`'s codomain is `Set Item`, not an order/duplicate-preserving `List`,
+so this is the abstract, set-theoretic reading of `including`, matching every
+other multi-valued feature `Get` already abstracts the same way -- not the
+concrete operational one (`@Lean{l="List.append";}`, used for the pure-function
+smoke tests elsewhere, a different, order-preserving encoding of the same KerML
+function for a different purpose). -/
+def including {α : Type} (a b : Set α) : Set α := a ∪ b
+
+/-- `SequenceFunctions::notEmpty`, for a `[0..1]`-typed feature read as `Option α`
+(`Tangibility.kerml`'s own real `notEmpty(allocatedTo)`, `allocatedTo[0..1]`) --
+distinct from `notEmpty`'s own `List`-flavored declared body (`not isEmpty(seq)`,
+`@Lean{l="fun seq => !List.isEmpty seq";}`), same relationship `including` above
+has to its own `@Lean` tag: the abstract domain-logic reading for the shape a
+real formula actually needs, not the concrete operational one. -/
+def notEmpty {α : Type} (o : Option α) : Prop := o ≠ none
+
 /-- The predicate-reading counterpart to `featureAccess` above, for `d::f` when `f`
 is itself Boolean-valued (KerML's `BooleanEvaluation`, `Domain.kerml`'s own real
 `GetBooleanChange`/`GetChangeToTrue`/`GetChangeToFalse` -- `I[[d::e,tau]]` used bare,

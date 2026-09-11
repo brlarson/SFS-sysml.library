@@ -10,6 +10,7 @@ standard library package SequenceFunctions {
 	private import ScalarValues::*;
 	private import ControlFunctions::*;
 	private import Assertion::Lean;
+	private import Assertion::Assert;
 
 	function '#' specializes BaseFunctions::'#' { in seq: Anything[0..*] ordered nonunique; in index: Positive[1];
 		return : Anything[0..1];
@@ -114,6 +115,7 @@ doc
 	 */
 
 	behavior add { inout seq: Anything[0..*] ordered nonunique; in values: Anything[0..*] ordered nonunique;
+		@Assert{n="add appends values"; f="<<add : seq~Anything : I[[self::seq,endShot]] = including(I[[self::seq,startShot]],values) >>";}
 		succession first calcNewSeq then bindNewSeq;
 		private step calcNewSeq {
 			feature newSeq = seq->including(values);

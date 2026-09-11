@@ -513,6 +513,8 @@ def mkPredicateStub (name : String) : Predicate := { elementId := name, declared
 def mkInteractionStub (name : String) : Interaction := { elementId := name, declaredName := some name }
 def mkPackageStub (name : String) : Package := { elementId := name, declaredName := some name }
 def mkBindingConnectorStub (name : String) : BindingConnector := { elementId := name, declaredName := some name }
+def mkStepStub (name : String) : Step := { elementId := name, declaredName := some name }
+def mkSuccessionStub (name : String) : Succession := { elementId := name, declaredName := some name }
 
 def dataTypeStubTerm (s : String) : MacroM (TSyntax `term) := `(mkDataTypeStub $(quote s))
 def kClassStubTerm (s : String) : MacroM (TSyntax `term) := `(mkKClassStub $(quote s))
@@ -1229,6 +1231,21 @@ Both operands are existing feature *references*, not declarations -- reuses
 rather than declaring fresh features. -/
 syntax "binding " kermlQualName " = " kermlQualName " ;" : kermlKDecl
 
+/-- KerML §8.3.4.9 `Step` (a `Feature` typed by a `Behavior`), and §8.3.4.5
+`Succession` (a binary `Connector` requiring temporal ordering between its two
+related features) -- `SequenceFunctions.kerml`'s own real `succession first
+calcNewSeq then bindNewSeq; private step calcNewSeq { feature newSeq = ...; }
+step bindNewSeq { binding seq = calcNewSeq.newSeq; }` (`add`/`addAt`/`remove`/
+`removeAt`'s current, non-covariance-violating redefinition of the old
+`feature redefines endShot: <name> {...}` idiom `binding`/`feature redefines G`
+above were built for). `step`'s body is `kermlKDecl*`, not `kermlBody`, same
+reason `feature redefines G {kermlKDecl+}` needed it above: it must hold
+`binding`, itself Kernel-layer-only. `succession`'s two operands are existing
+feature/step *references*, same `mkFeatureReferenceStub` treatment as
+`binding`'s own operands, not fresh declarations. -/
+syntax (kermlVisibilityFlag)? "step " kermlIdent "{" kermlKDecl* "}" : kermlKDecl
+syntax "succession " "first " kermlQualName " then " kermlQualName " ;" : kermlKDecl
+
 /-- `feature redefines G : T { ... }`'s own Kernel-layer-only alternative, needed
 whenever its body contains real Kernel-only content like `binding` above --
 `Core.lean`'s own `feature redefines G [: T] {...}` (`kermlDecl`) only nests
@@ -1347,6 +1364,15 @@ partial def elabKermlKDecl : TSyntax `kermlKDecl → MacroM (Array (TSyntax `ter
   | `(kermlKDecl| binding $a:kermlQualName = $b:kermlQualName ;) => do
     let elemId := "binding-" ++ qualNameStr a ++ "-" ++ qualNameStr b
     pure #[← `((mkBindingConnectorStub $(quote elemId)).elt),
+      ← `((mkFeatureReferenceStub $(quote (qualNameStr a))).elt),
+      ← `((mkFeatureReferenceStub $(quote (qualNameStr b))).elt)]
+  | `(kermlKDecl| $[$_vis2:kermlVisibilityFlag]? step $a:kermlIdent { $decls:kermlKDecl* }) => do
+    let aT ← `(mkStepStub $(quote (kermlIdentStr a)))
+    let declElems ← decls.mapM elabKermlKDecl
+    pure (#[← `(($aT).elt)] ++ declElems.foldl (· ++ ·) #[])
+  | `(kermlKDecl| succession first $a:kermlQualName then $b:kermlQualName ;) => do
+    let elemId := "succession-" ++ qualNameStr a ++ "-" ++ qualNameStr b
+    pure #[← `((mkSuccessionStub $(quote elemId)).elt),
       ← `((mkFeatureReferenceStub $(quote (qualNameStr a))).elt),
       ← `((mkFeatureReferenceStub $(quote (qualNameStr b))).elt)]
   | `(kermlKDecl| feature redefines $g:kermlQualName $[: $ty:kermlQualName]? { $decls:kermlKDecl* }) => do
@@ -2623,11 +2649,23 @@ end KerML.Kernel
   private import SI::L ;
 }
 #check kerml% abstract classifier Virtual {
-  feature allocatedTo : Physical[1] ;
+  feature allocatedTo[0..1] : Physical ;
+  feature delegatedTo[0..1] : Virtual ;
 }
 #check kerml% abstract classifier Physical disjoint from Virtual {
   feature location : Region[1] ;
 }
+-- `Virtual`'s own real `@Assert{n="Virtual location";...}` and `Physical`'s own
+-- `@Assert{n="Physical location";...}`, each kept as a separate sibling `#check`
+-- (same layering reason as `SequenceFunctions::add`'s own above): `notEmpty`'s
+-- `Option`-flavored reading (`SFS.lean`, distinct from its `List`-flavored
+-- `@Lean` tag) and the new `DSLEq (Option α) α Prop` instance (`Assert.lean`)
+-- both genuinely exercised here for the first time.
+#check kernel% @Assert{n="Virtual location"; f="<< (notEmpty(allocatedTo) implies "+
+  " exists p~Occurrence that (allocatedTo=p and Location(self) = Location(p))) and"+
+  " (notEmpty(delegatedTo) implies "+
+  " exists q~Occurrence that (delegatedTo=q and Location(self) = Location(q))) >>";}
+#check kernel% @Assert{n="Physical location"; f="<< Location(self) = location >>";}
 #check kerml% abstract classifier Solid :> Physical {
   doc "something that might bend or deform, but not flow"
 }
@@ -2670,6 +2708,7 @@ set_option maxRecDepth 4096 in
 #check kernel% library package SequenceFunctions {
   private import Base::Anything ;
   private import Occurrences::SelfSameLifeLink ;
+  private import Assertion::Assert ;
 
   function «#» specializes BaseFunctions::«#» { in seq: Anything[0..*] ordered nonunique; in index: Positive[1] ;
     return : Anything[0..1] ;
@@ -2743,30 +2782,56 @@ set_option maxRecDepth 4096 in
     return : Anything[0..1] = seq#(size(seq)) ;
   }
 
+  -- `add`'s own real `@Assert{...}` (its first member) is *not* nested here, even
+  -- though the real file nests it and `syside check` accepts it: `kermlKDecl`
+  -- (`behavior`'s body category) only embeds `kermlDecl`, the Core.lean-layer
+  -- category (line ~1159) -- the same category-layering constraint noted above for
+  -- `predicate`/`@Assert` inside `library package` bodies, but one level deeper
+  -- here: `@Assert`'s formula validation needs a real `Environment` (`TermElabM`),
+  -- only available at this file's outermost `elab "kernel% " ... : term` entry, not
+  -- inside `elabKermlKDecl`'s `MacroM`. Tested as a separate, sibling `#check`
+  -- below instead, same treatment as `SetNow`/Allen.kerml's predicates above.
   behavior add { inout seq: Anything[0..*] ordered nonunique; in values: Anything[0..*] ordered nonunique ;
-    private feature newSeq = seq->including(values) ;
-    feature redefines endShot: add {
-      binding seq = newSeq ;
+    succession first calcNewSeq then bindNewSeq ;
+    private step calcNewSeq {
+      feature newSeq = seq->including(values) ;
+    }
+    step bindNewSeq {
+      binding seq = calcNewSeq.newSeq ;
     }
   }
   behavior addAt { inout seq: Anything[0..*] ordered nonunique; in values: Anything[0..*] ordered nonunique ;
     in index: Positive[1] ;
-    private feature newSeq = seq->includingAt(values, index) ;
-    feature redefines endShot: addAt {
-      binding seq = newSeq ;
+    succession first calcNewSeq then bindNewSeq ;
+    private step calcNewSeq {
+      feature newSeq = seq->includingAt(values, index) ;
+    }
+    step bindNewSeq {
+      binding seq = calcNewSeq.newSeq ;
     }
   }
   behavior remove { inout seq: Anything[0..*] ordered nonunique; in values: Anything[0..*] ;
-    private feature newSeq = seq->excluding(values) ;
-    feature redefines endShot: remove {
-      binding seq = newSeq ;
+    succession first calcNewSeq then bindNewSeq ;
+    private step calcNewSeq {
+      feature newSeq = seq->excluding(values) ;
+    }
+    step bindNewSeq {
+      binding seq = calcNewSeq.newSeq ;
     }
   }
   behavior removeAt { inout seq: Anything[0..*] ordered nonunique ;
     in startIndex: Positive[1]; in endIndex: Positive[1] default startIndex ;
-    private feature newSeq = seq->excludingAt(startIndex, endIndex) ;
-    feature redefines endShot: removeAt {
-      binding seq = newSeq ;
+    succession first calcNewSeq then bindNewSeq ;
+    private step calcNewSeq {
+      feature newSeq = seq->excludingAt(startIndex, endIndex) ;
+    }
+    step bindNewSeq {
+      binding seq = calcNewSeq.newSeq ;
     }
   }
 }
+
+-- `add`'s own real `@Assert{...}`, kept as a separate sibling check (see the
+-- comment above `behavior add`): `including`/`self::seq` genuinely re-parsed and
+-- type-checked against `SFS.lean`'s real `including`/`Get`, not merely structural.
+#check kernel% @Assert{n="add appends values"; f="<<add : seq~Anything : I[[self::seq,endShot]] = including(I[[self::seq,startShot]],values) >>";}
