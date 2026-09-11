@@ -1528,6 +1528,146 @@ theorem hasFirstTick {α : Type} (d : TVal α) (P : α → Prop) (h : ∃ s : Ti
   have hjT : j ∈ T := by simp only [hTdef, Finset.mem_filter, Finset.mem_univ, true_and]; exact hjP
   exact absurd (ticks_mono_le (T.min'_le j hjT) |>.trans hjle) (not_le.mpr hlt')
 
+/-- `ticks` is injective: immediate from `ticks_mono` (distinct indices give
+`≺`-related, hence distinct, tick values in either order). -/
+theorem ticks_injective : Function.Injective ticks := by
+  intro i j hij
+  rcases lt_trichotomy i j with h | h | h
+  · exact absurd (congrArg (·.val) hij) (ticks_mono i j h).ne
+  · exact h
+  · exact absurd (congrArg (·.val) hij.symm) (ticks_mono j i h).ne
+
+/-- `Chapter/KerMLExecution.tex` `df-change`: the instants at which `d`'s value
+actually changes -- a tick (`i > 0`) whose value differs from the immediately
+preceding tick's. Restricted to ticks rather than an open-ended existential over
+`Time`: `ticks_bucket` above already shows every instant's value matches its
+largest-tick-below anchor, so a genuine change can only ever be *at* a tick,
+never strictly between two of them -- matching the book's own disclosure that a
+`Lean` counterpart of `df-change` can be proved finite from `finitePartition`
+rather than assumed so. -/
+def changeSet {α : Type} (d : TVal α) : Set Time :=
+  {τ : Time | ∃ i : Fin (tickCount + 1), ticks i = τ ∧
+    ∃ h : 0 < (i : ℕ), interpValAt d (ticks i) ≠ interpValAt d (ticks ⟨(i : ℕ) - 1, by omega⟩)}
+
+/-- `changeSet` membership at a tick, restated without the existential over
+which index -- `ticks_injective` collapses it to the unique index `i` itself. -/
+theorem changeSet_iff {α : Type} (d : TVal α) (i : Fin (tickCount + 1)) (h : 0 < (i : ℕ)) :
+    ticks i ∈ changeSet d ↔
+      interpValAt d (ticks i) ≠ interpValAt d (ticks ⟨(i : ℕ) - 1, by omega⟩) := by
+  constructor
+  · rintro ⟨i', hi', hpos', hne⟩
+    obtain rfl : i' = i := ticks_injective hi'
+    exact hne
+  · intro hne
+    exact ⟨i, rfl, h, hne⟩
+
+/-- `df-change`'s finiteness claim, proved rather than assumed: `changeSet d` is a
+subset of the finitely many shared ticks (`finitePartition`'s own `breaks`, via
+`ticks`), hence finite. -/
+theorem changeSet_subset_ticks {α : Type} (d : TVal α) : changeSet d ⊆ Set.range ticks := by
+  rintro τ ⟨i, hi, -, -⟩
+  exact ⟨i, hi⟩
+
+theorem changeSet_finite {α : Type} (d : TVal α) : (changeSet d).Finite :=
+  (Set.finite_range ticks).subset (changeSet_subset_ticks d)
+
+/-- One index-step of `df-nochange`: if `ticks i` isn't itself a change instant,
+`d`'s value there matches the immediately preceding tick's -- the contrapositive
+of `changeSet_iff`. -/
+theorem changeSet_step {α : Type} (d : TVal α) (i : Fin (tickCount + 1)) (h : 0 < (i : ℕ))
+    (hnotin : ticks i ∉ changeSet d) :
+    interpValAt d (ticks i) = interpValAt d (ticks ⟨(i : ℕ) - 1, by omega⟩) := by
+  by_contra hne
+  exact hnotin ((changeSet_iff d i h).mpr hne)
+
+/-- `df-nochange`: if no element of `changeSet d` falls in `(t1,t2]`, `d`'s value
+is the same at `t1` and `t2` -- constancy between (and beyond) the actual change
+instants, sharper than `ticks_constant` (which needs no tick at all in range, not
+just no *changing* tick: a "wasted" tick with no real jump is allowed inside).
+Proved by chaining `changeSet_step` index-by-index from `t1`'s bucket anchor up
+to `t2`'s. -/
+theorem changeSet_constant {α : Type} (d : TVal α) {t1 t2 : Time} (h : t1.val ≼ t2.val)
+    (hno : ¬ ∃ τ ∈ changeSet d, τ.val ∈ Set.Ioc t1.val t2.val) :
+    interpValAt d t1 = interpValAt d t2 := by
+  classical
+  set S1 : Finset (Fin (tickCount + 1)) := Finset.univ.filter (fun i => (ticks i).val ≼ t1.val)
+    with hS1def
+  set S2 : Finset (Fin (tickCount + 1)) := Finset.univ.filter (fun i => (ticks i).val ≼ t2.val)
+    with hS2def
+  have hS1ne : S1.Nonempty :=
+    ⟨0, by simp only [hS1def, Finset.mem_filter, Finset.mem_univ, true_and, ticks_zero]
+           exact t1.2.1⟩
+  have hS2ne : S2.Nonempty :=
+    ⟨0, by simp only [hS2def, Finset.mem_filter, Finset.mem_univ, true_and, ticks_zero]
+           exact t2.2.1⟩
+  set j1 := S1.max' hS1ne with hj1def
+  set j2 := S2.max' hS2ne with hj2def
+  have hj1mem : j1 ∈ S1 := S1.max'_mem hS1ne
+  have hj2mem : j2 ∈ S2 := S2.max'_mem hS2ne
+  have hj1le : (ticks j1).val ≼ t1.val := (Finset.mem_filter.mp hj1mem).2
+  have hj2le : (ticks j2).val ≼ t2.val := (Finset.mem_filter.mp hj2mem).2
+  have hd1 : interpValAt d t1 = interpValAt d (ticks j1) := by
+    symm; apply ticks_constant d hj1le
+    rintro ⟨i, hi1, hi2⟩
+    have hiS1 : i ∈ S1 := by
+      simp only [hS1def, Finset.mem_filter, Finset.mem_univ, true_and]; exact hi2
+    exact absurd (ticks_mono_le (S1.le_max' i hiS1)) (not_le.mpr hi1)
+  have hd2 : interpValAt d t2 = interpValAt d (ticks j2) := by
+    symm; apply ticks_constant d hj2le
+    rintro ⟨i, hi1, hi2⟩
+    have hiS2 : i ∈ S2 := by
+      simp only [hS2def, Finset.mem_filter, Finset.mem_univ, true_and]; exact hi2
+    exact absurd (ticks_mono_le (S2.le_max' i hiS2)) (not_le.mpr hi1)
+  have hj1j2 : j1 ≤ j2 := by
+    have hj1inS2 : j1 ∈ S2 := by
+      simp only [hS2def, Finset.mem_filter, Finset.mem_univ, true_and]
+      exact hj1le.trans h
+    exact S2.le_max' j1 hj1inS2
+  have hj1max : ∀ i : Fin (tickCount + 1), (j1 : ℕ) < (i : ℕ) → t1.val ≺ (ticks i).val := by
+    intro i hi
+    by_contra hcon
+    have hcon' : (ticks i).val ≼ t1.val := not_lt.mp hcon
+    have hiS1 : i ∈ S1 := by
+      simp only [hS1def, Finset.mem_filter, Finset.mem_univ, true_and]; exact hcon'
+    have : (i : ℕ) ≤ (j1 : ℕ) := S1.le_max' i hiS1
+    omega
+  have key : ∀ n : ℕ, ∀ hn : n < tickCount + 1, (j1 : ℕ) ≤ n → n ≤ (j2 : ℕ) →
+      interpValAt d (ticks j1) = interpValAt d (ticks ⟨n, hn⟩) := by
+    intro n
+    induction n with
+    | zero =>
+      intro hn hge _
+      have hfin : j1 = (⟨0, hn⟩ : Fin (tickCount + 1)) := Fin.ext (show (j1 : ℕ) = 0 by omega)
+      rw [hfin]
+    | succ n ih =>
+      intro hn hge hle
+      set jn1 : Fin (tickCount + 1) := ⟨n + 1, hn⟩ with hjn1def
+      rcases hge.eq_or_lt with heq | hgt
+      · have hfin : j1 = jn1 := Fin.ext heq
+        rw [hfin]
+      · have hn' : n < tickCount + 1 := by omega
+        set jn : Fin (tickCount + 1) := ⟨n, hn'⟩ with hjndef
+        have step1 : interpValAt d (ticks j1) = interpValAt d (ticks jn) :=
+          ih hn' (by omega) (by omega)
+        have hjn1_gt : (j1 : ℕ) < (jn1 : ℕ) := by rw [hjn1def]; omega
+        have hjn1_le2 : (jn1 : ℕ) ≤ (j2 : ℕ) := by rw [hjn1def]; omega
+        have hnotin : ticks jn1 ∉ changeSet d := by
+          intro hmem
+          apply hno
+          refine ⟨ticks jn1, hmem, hj1max jn1 hjn1_gt, ?_⟩
+          exact (ticks_mono_le (show jn1 ≤ j2 by exact_mod_cast hjn1_le2)).trans hj2le
+        have hpos : 0 < (jn1 : ℕ) := by rw [hjn1def]; omega
+        have step2 := changeSet_step d jn1 hpos hnotin
+        have hpred_eq : (⟨(jn1 : ℕ) - 1, by omega⟩ : Fin (tickCount + 1)) = jn :=
+          Fin.ext (show (jn1 : ℕ) - 1 = (jn : ℕ) by simp only [hjn1def, hjndef]; omega)
+        rw [hpred_eq] at step2
+        rw [step1, step2]
+  have hn2 : (j2 : ℕ) < tickCount + 1 := j2.isLt
+  have hkey := key (j2 : ℕ) hn2 (by exact_mod_cast hj1j2) (le_refl _)
+  have hj2eq : (⟨(j2 : ℕ), hn2⟩ : Fin (tickCount + 1)) = j2 := Fin.ext rfl
+  rw [hj2eq] at hkey
+  rw [hd1, hd2, hkey]
+
 /-- A total selector satisfying `birthIff`'s guarded spec exists for every
 occurrence: `hasFirstTick`'s witness when `A` exists somewhere, `Time`'s own
 `⟨now, dl_nowt⟩` (unconstrained junk, matching this file's own precedent for an
