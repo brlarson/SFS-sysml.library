@@ -1198,9 +1198,14 @@ standard library package Occurrences {
 	// 	end spaceShotWithin subsets spaceSliceOf feature spaceShottedOccurrence: Occurrence redefines spaceSlicedOccurrence;
 	// }
 
-//SFS:  remove "all", add spatial relationship and Allen interval
-	assoc //all 
-		Without specializes BinaryLink //unions HappensBefore, OutsideOf 
+//SFS:  "all" left off (redundant once a structural anchor exists, same reasoning as
+//SFS:  Within's own live "intersects" below); "unions HappensBefore, OutsideOf"
+//SFS:  restored as a real structural anchor -- sound despite HappensBefore's own
+//SFS:  directionality, since nonoverlaps(A,B) = precedes(A,B) or precedes(B,A) is
+//SFS:  symmetric in A,B regardless of which of the two is source vs target for any
+//SFS:  one HappensBefore instance, and RegionOverlap is symmetric the same way.
+	assoc
+		Without specializes BinaryLink unions HappensBefore, OutsideOf
 	{
 		doc
 		/*
@@ -1216,9 +1221,13 @@ standard library package Occurrences {
 //		  crosses separateOccurrenceToo.withoutOccurrences;
 	}
 
-//SFS:  remove "all", add Allen interval
-	assoc //all 
-		HappensBefore specializes HappensLink //, Without 
+//SFS:  remove "all", add Allen interval; "Without" supertype restored -- not
+//SFS:  circular with Without's own "unions HappensBefore, OutsideOf" below, since
+//SFS:  W = H union O already trivially entails H subsets W (any set is a subset of
+//SFS:  its own union with another), so this is a harmless, explicit restatement of
+//SFS:  something Without's own declaration already implies, not a new constraint.
+	assoc //all
+		HappensBefore specializes HappensLink, Without
 	{
 		doc
 		/*
