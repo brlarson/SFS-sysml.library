@@ -144,29 +144,29 @@ standard library package Transfers {
         // }
 
 //SFS:  remove payloadNum        
-        connector sourceOutputLink: BinaryLinkObject[1] {
-//        connector sourceOutputLink: BinaryLinkObject[payloadNum] {
-            doc
-            /*
-             * The output of the payloads from the sourceOutput.
-             */
+//         connector sourceOutputLink: BinaryLinkObject[1] {
+// //        connector sourceOutputLink: BinaryLinkObject[payloadNum] {
+//             doc
+//             /*
+//              * The output of the payloads from the sourceOutput.
+//              */
         
-            end [1] feature transferSource references source;
-            end [1] feature transferPayload references payload; // subsets transferSource.sourceOutput;
-//            end [payloadNum] feature transferPayload references payload subsets transferSource.sourceOutput;
-        }
+//             end [1] feature transferSource references source;
+//             end [1] feature transferPayload references payload; // subsets transferSource.sourceOutput;
+// //            end [payloadNum] feature transferPayload references payload subsets transferSource.sourceOutput;
+//         }
         
-        connector targetInputLink: BinaryLinkObject[1] {
-//        connector targetInputLink: BinaryLinkObject[payloadNum] {
-            doc
-            /*
-             * The input of the payload to the targetInput.
-             */
+//         connector targetInputLink: BinaryLinkObject[1] {
+// //        connector targetInputLink: BinaryLinkObject[payloadNum] {
+//             doc
+//             /*
+//              * The input of the payload to the targetInput.
+//              */
         
-            end [1] feature transferTarget references target;
-            end [1] feature transferPayload references payload; // subsets transferTarget.targetInput;
-//            end [payloadNum] feature transferPayload references payload subsets transferTarget.targetInput;
-        }
+//             end [1] feature transferTarget references target;
+//             end [1] feature transferPayload references payload; // subsets transferTarget.targetInput;
+// //            end [payloadNum] feature transferPayload references payload subsets transferTarget.targetInput;
+//         }
         
         // private connector sending: HappensDuring[payloadNum] from [1] startShot to [payloadNum] sourceOutputLink {
         //   doc

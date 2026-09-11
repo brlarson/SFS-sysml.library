@@ -114,29 +114,41 @@ doc
 	 */
 
 	behavior add { inout seq: Anything[0..*] ordered nonunique; in values: Anything[0..*] ordered nonunique;
-		private feature newSeq = seq->including(values);
-		feature redefines endShot: add {
-			binding seq = newSeq;
+		succession first calcNewSeq then bindNewSeq;
+		private step calcNewSeq {
+			feature newSeq = seq->including(values);
 		}
-	}	
+		step bindNewSeq {
+			binding seq = calcNewSeq.newSeq;
+		}
+	}
 	behavior addAt { inout seq: Anything[0..*] ordered nonunique; in values: Anything[0..*] ordered nonunique;
 		in index: Positive[1];
-		private feature newSeq = seq->includingAt(values, index);
-		feature redefines endShot: addAt {
-			binding seq = newSeq;
+		succession first calcNewSeq then bindNewSeq;
+		private step calcNewSeq {
+			feature newSeq = seq->includingAt(values, index);
+		}
+		step bindNewSeq {
+			binding seq = calcNewSeq.newSeq;
 		}
 	}
 	behavior remove{ inout seq: Anything[0..*] ordered nonunique; in values: Anything[0..*];
-		private feature newSeq = seq->excluding(values);
-		feature redefines endShot: remove {
-			binding seq = newSeq;
+		succession first calcNewSeq then bindNewSeq;
+		private step calcNewSeq {
+			feature newSeq = seq->excluding(values);
+		}
+		step bindNewSeq {
+			binding seq = calcNewSeq.newSeq;
 		}
 	}
 	behavior removeAt{ inout seq: Anything[0..*] ordered nonunique;
 		in startIndex: Positive[1]; in endIndex: Positive[1] default startIndex;
-		private feature newSeq = seq->excludingAt(startIndex, endIndex);
-		feature redefines endShot: removeAt {
-			binding seq = newSeq;
+		succession first calcNewSeq then bindNewSeq;
+		private step calcNewSeq {
+			feature newSeq = seq->excludingAt(startIndex, endIndex);
+		}
+		step bindNewSeq {
+			binding seq = calcNewSeq.newSeq;
 		}
 	}
 }
