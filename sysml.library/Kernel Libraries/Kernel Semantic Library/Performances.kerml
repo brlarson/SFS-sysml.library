@@ -47,7 +47,7 @@ standard library package Performances {
 		}
 		
 		feature redefines isDispatch default true;
-  		feature redefines dispatchScope default thisPerformance;
+  	feature redefines dispatchScope default thisPerformance;
   		
 //SFS:  enclosedPerformances are suboccurrences (containment)			
 		step enclosedPerformances: Performance[0..*] subsets subperformances

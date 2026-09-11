@@ -7,6 +7,7 @@ standard library package SequenceFunctions {
 
 	private import Base::Anything;
 	private import Occurrences::SelfSameLifeLink;
+	private import Occurrences::HappensJustBefore;
 	private import ScalarValues::*;
 	private import ControlFunctions::*;
 	private import Assertion::Lean;
@@ -117,7 +118,7 @@ doc
 	behavior add { inout seq: Anything[0..*] ordered nonunique; in values: Anything[0..*] ordered nonunique;
 		@Assert{n="add appends values"; f="<<add : seq~Anything : I[[self::seq,endShot]]"+
 				" = including(I[[self::seq,startShot]],values) >>";}
-		succession first calcNewSeq then bindNewSeq;
+		succession :HappensJustBefore first calcNewSeq then bindNewSeq;
 		private step calcNewSeq {
 			feature newSeq = seq->including(values);
 		}
@@ -129,7 +130,7 @@ doc
 		in index: Positive[1];
 		@Assert{n="addAt inserts values"; f="<<addAt : seq~Anything : I[[self::seq,endShot]]"+
 				" = includingAt(I[[self::seq,startShot]],values,index) >>";}
-		succession first calcNewSeq then bindNewSeq;
+		succession :HappensJustBefore first calcNewSeq then bindNewSeq;
 		private step calcNewSeq {
 			feature newSeq = seq->includingAt(values, index);
 		}
@@ -140,7 +141,7 @@ doc
 	behavior remove{ inout seq: Anything[0..*] ordered nonunique; in values: Anything[0..*];
 		@Assert{n="remove excludes values"; f="<<remove : seq~Anything : I[[self::seq,endShot]]"+
 				" = excluding(I[[self::seq,startShot]],values) >>";}
-		succession first calcNewSeq then bindNewSeq;
+		succession :HappensJustBefore first calcNewSeq then bindNewSeq;
 		private step calcNewSeq {
 			feature newSeq = seq->excluding(values);
 		}
@@ -152,7 +153,7 @@ doc
 		in startIndex: Positive[1]; in endIndex: Positive[1] default startIndex;
 		@Assert{n="removeAt shrinks seq"; f="<<removeAt : seq~Anything :"+
 				" subsetOf(I[[self::seq,endShot]],I[[self::seq,startShot]]) >>";}
-		succession first calcNewSeq then bindNewSeq;
+		succession :HappensJustBefore first calcNewSeq then bindNewSeq;
 		private step calcNewSeq {
 			feature newSeq = seq->excludingAt(startIndex, endIndex);
 		}
