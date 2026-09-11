@@ -990,30 +990,32 @@ standard library package Occurrences {
 	}
 
 //SFS:  substituted getLife for portionOfLife
-// why the multiplicity [1..*] on the ends?
-// what does "all" mean here?
-	assoc //all 
+//SFS:  end multiplicity must narrow source/target's own Anything[1] (BinaryLink), not
+//SFS:  widen it -- [1..*] was invalid; [1] restored. "all" (isSufficient) restored too,
+//SFS:  matching SelfLink's own assoc all: sharing a Life (or, for DataValues, being the
+//SFS:  same value) is meant to be sufficient for SelfSameLifeLink, not merely necessary.
+	assoc all
 	  SelfSameLifeLink specializes BinaryLink {
 		doc
 		/*
 		 * SelfSameLifeLink is a binary association that is equivalent to SelfLink if the
 		 * linked things are DataValues, but asserts that the linked things are portions of
-		 * the same Life if they are Occurrences. 
+		 * the same Life if they are Occurrences.
 		 */
 
-		end myselfSameLives [1..*] feature myselfSameLife: Anything redefines source;
-		end selfSameLives [1..*] feature selfSameLife: Anything redefines target;
+		end myselfSameLives [1] feature myselfSameLife: Anything redefines source;
+		end selfSameLives [1] feature selfSameLife: Anything redefines target;
 
-		feature //all 
+		feature all
 			sourceOccurrence : Occurrence [0..1] subsets myselfSameLife;
-		feature //all 
+		feature all
 		  targetOccurrence : Occurrence [0..1] subsets selfSameLife;  //, sourceOccurrence.sameLifeOccurrences;
 		binding oSelf of sourceOccurrence.getLife = targetOccurrence.getLife;
 		// binding oSelf of sourceOccurrence.portionOfLife = targetOccurrence.portionOfLife;
 
-		feature //all 
+		feature all
 			sourceDataValue : DataValue [0..1] subsets myselfSameLife;
-		feature //all 
+		feature all
 		  targetDataValue : DataValue [0..1] subsets selfSameLife;
 		binding dSelf of sourceDataValue = targetDataValue;
 	}
