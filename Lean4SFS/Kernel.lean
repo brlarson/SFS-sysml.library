@@ -731,8 +731,24 @@ syntax (kermlAbstractFlag)? "expr " ident (" specializes " kermlQualName,+)? (" 
 grammar at all: `bool` had simply never been added as a keyword here, confirmed via a
 real "unexpected identifier" error attempting `sameLife`'s own new `@Assert`).
 Elaborated the same way `expr` is, reusing `kFunctionStubTerm` -- same "structure
-without semantics" trade, no dedicated metaclass. -/
-syntax (kermlAbstractFlag)? "bool " ident (" specializes " kermlQualName,+)? (" conjugates " kermlQualName)?
+without semantics" trade, no dedicated metaclass. Also accepts an optional
+`" : " kermlQualName` clause (2026-09-11, at direct request, giving
+`Occurrences.kerml`'s own real `bool earlierFirstIncomingTransferSort :
+IncomingTransferSort {...}` a Kernel.lean structural check -- confirmed via a
+real "unexpected token ':'" error that `bool`'s grammar, unlike `feature`, had
+never needed to support a type annotation before): related via
+`mkSubclassificationTerm`, the same relation `specializes` itself already
+builds (`classifierLikeDeclElems`'s own `specs` handling) -- not
+`mkFeatureTypingTerm` (tried first, a real `Type mismatch` build error:
+`kFunctionStubTerm` produces a `KFunction`, not a `Feature`), matching that
+`bool`'s own stub is Classifier-kind, same as `predicate`/`function`
+declarations normally relate to a supertype via `specializes`, not "typed
+by." `incomingTransferSort`'s own sibling feature-shaped `bool name : T
+[mult] default v {...}` is a genuinely different, `Feature`-shaped use of
+`:` (out of scope here; that one has no predicate body to give an `@Assert`
+anyway). -/
+syntax (kermlAbstractFlag)? "bool " ident (" : " kermlQualName)? (" specializes " kermlQualName,+)?
+  (" conjugates " kermlQualName)?
   (" disjoint" " from " kermlQualName,+)? (" unions " kermlQualName,+)? (" intersects " kermlQualName,+)?
   (" differences " kermlQualName,+)? kermlPredBody : kernelDecl
 /-- KerML §8.2.5.13 `Package`/`LibraryPackage`: `package Name { ... }` (`Base.kerml`'s
@@ -1512,10 +1528,19 @@ partial def elabKernelDecl : TSyntax `kernelDecl → MacroM (Array (TSyntax `ter
         $[disjoint from $disj,*]? $[unions $uni,*]? $[intersects $inter,*]? $[differences $diff,*]? $body:kermlPredBody) => do
     let declElems ← classifierLikeDeclElems kFunctionStubTerm a specs conj disj uni inter diff
     pure (declElems ++ (← elabKermlPredBody body))
-  | `(kernelDecl| $[$_abs:kermlAbstractFlag]? bool $a:ident $[specializes $specs,*]? $[conjugates $conj:kermlQualName]?
+  | `(kernelDecl| $[$_abs:kermlAbstractFlag]? bool $a:ident $[: $ty:kermlQualName]? $[specializes $specs,*]?
+        $[conjugates $conj:kermlQualName]?
         $[disjoint from $disj,*]? $[unions $uni,*]? $[intersects $inter,*]? $[differences $diff,*]? $body:kermlPredBody) => do
     let declElems ← classifierLikeDeclElems kFunctionStubTerm a specs conj disj uni inter diff
-    pure (declElems ++ (← elabKermlPredBody body))
+    let tyElems ← match ty with
+      | some t => do
+          let aT ← kFunctionStubTerm a.getId.toString
+          let aC ← `(($aT).toClassifierC)
+          let tC ← classifierStubTermQ t
+          let rel ← mkSubclassificationTerm aC tC a.getId.toString (qualNameStr t)
+          pure #[← `(($rel).elt)]
+      | none => pure #[]
+    pure (declElems ++ tyElems ++ (← elabKermlPredBody body))
   | `(kernelDecl| package $a:ident $body:kernelBody) => do
     let pT ← packageStubTerm a.getId.toString
     pure (#[← `(($pT).elt)] ++ (← elabKernelBody body))
@@ -2468,6 +2493,135 @@ elab "kernel% " d:kernelDecl : term => do
 -- self-referential `successor(o)` call itself is unresolvable, same reason
 -- `sameLife`/`withoutOccurrence`/`predecessor` above are also excluded from a
 -- permanent `#check`.
+
+-- 2026-09-11, at direct request ("add @Assert metadata to all 'bool' in
+-- Occurrences.kerml"): the 13 remaining `bool`-declared predicates that didn't
+-- already have one. Same two-check-and-explain treatment as `sameLife`/
+-- `withoutOccurrence`/`predecessor`/`successor` above throughout: structural
+-- body verified permanently via `#check kernel% bool name {...}`; the `@Assert`
+-- formula itself verified via a real (temporary, not committed) probe --
+-- confirmed real errors, not guessed -- then documented here rather than kept
+-- as a permanent `#check`, since each one's own self-referential call
+-- (`name(o)`, no `SFS.lean` counterpart for a *newly*-defined predicate) would
+-- fail `lake build`, same ceiling as the four predicates above.
+
+#check kernel% bool immediatePredecessor {
+  in o : Occurrence;
+  nearlyMeets(o,this)
+}
+-- `<<immediatePredecessor(o) iff nearlyMeets(o,this)>>`: `nearlyMeets` real,
+-- only the self-reference unresolved.
+
+#check kernel% bool immediateSuccessor {
+  in o : Occurrence;
+  nearlyMeets(this,o)
+}
+-- `<<immediateSuccessor(o) iff nearlyMeets(this,o)>>`: `nearlyMeets` real,
+-- only the self-reference unresolved.
+
+#check kernel% bool timeEnclosedOccurrence {
+  in o : Occurrence;
+  during(o,this)
+}
+-- `<<timeEnclosedOccurrence(o) iff during(o,this)>>`: `during` real, only the
+-- self-reference unresolved.
+
+#check kernel% bool timeCoincidentOccurrence {
+  in o : Occurrence;
+  coincident(o,this)
+}
+-- `<<timeCoincidentOccurrence(o) iff coincident(o,this)>>`: `coincident` real,
+-- only the self-reference unresolved.
+
+#check kernel% bool spaceEnclosedOccurrence {
+  in o : Occurrence;
+  RegionContainment(Location(this),Location(o))
+}
+-- `<<spaceEnclosedOccurrence(o) iff RegionContainment(Location(this),Location(o))>>`:
+-- `RegionContainment`/`Location` real, only the self-reference unresolved.
+
+#check kernel% bool spaceTimeEnclosedOccurrence {
+  in o : Occurrence;
+  spaceEnclosedOccurrence(o) and timeEnclosedOccurrence(o)
+}
+-- `<<spaceTimeEnclosedOccurrence(o) iff spaceEnclosedOccurrence(o) and
+-- timeEnclosedOccurrence(o)>>`: three unresolved names this time, not one --
+-- the self-reference *and* both `spaceEnclosedOccurrence`/
+-- `timeEnclosedOccurrence`, themselves newly-defined predicates with no
+-- `SFS.lean` counterpart either. Confirmed via the same real probe, not
+-- assumed by analogy.
+
+#check kernel% bool spaceTimeEnclosedPoint {
+  in o : Occurrence;
+  spaceTimeEnclosedOccurrence(o) and (o.innerSpaceDimension == 0)
+}
+-- `<<spaceTimeEnclosedPoint(o) iff spaceTimeEnclosedOccurrence(o) and
+-- (o.innerSpaceDimension = 0)>>`: beyond the self-reference and
+-- `spaceTimeEnclosedOccurrence`'s own gap, `innerSpaceDimension` is *also*
+-- unresolved -- unlike `endShot` below (which has a real `SFS.lean` stand-in,
+-- `death`), this real KerML feature (`Objects.kerml`'s `Solid`/`Surface`/
+-- `Curve`/`Point` each redefine it to 3/2/1/0) has no `SFS.lean` model at all,
+-- a genuine, separate gap this formula alone doesn't attempt to close.
+
+#check kernel% bool spaceCoincidentOccurrence {
+  in o : Occurrence;
+  RegionContainment(Location(o),Location(this)) and RegionContainment(Location(this),Location(o))
+}
+-- `<<spaceCoincidentOccurrence(o) iff RegionContainment(Location(o),Location(this))
+-- and RegionContainment(Location(this),Location(o))>>`: `RegionContainment`/
+-- `Location` real (both directions), only the self-reference unresolved.
+
+#check kernel% bool spaceTimeCoincidentOccurrence {
+  in o : Occurrence;
+  spaceCoincidentOccurrence(o) and timeCoincidentOccurrence(o)
+}
+-- `<<spaceTimeCoincidentOccurrence(o) iff spaceCoincidentOccurrence(o) and
+-- timeCoincidentOccurrence(o)>>`: same chained-gap shape as
+-- `spaceTimeEnclosedOccurrence` above -- three unresolved names (itself,
+-- `spaceCoincidentOccurrence`, `timeCoincidentOccurrence`), confirmed via probe.
+
+#check kernel% bool outsideOfOccurrence {
+  in o : Occurrence;
+  not RegionOverlap(Location(this),Location(o))
+}
+-- `<<outsideOfOccurrence(o) iff not RegionOverlap(Location(this),Location(o))>>`:
+-- `RegionOverlap`/`Location` real, only the self-reference unresolved.
+
+#check kernel% bool justOutsideOfOccurrence {
+  in o : Occurrence;
+  ExternallyConnected(Location(this),Location(o))
+}
+-- `<<justOutsideOfOccurrence(o) iff ExternallyConnected(Location(this),Location(o))>>`:
+-- `ExternallyConnected`/`Location` real, only the self-reference unresolved.
+
+#check kernel% bool matesWithOccurrence {
+  in o : Occurrence;
+  justOutsideOfOccurrence(o)
+}
+-- `<<matesWithOccurrence(o) iff justOutsideOfOccurrence(o)>>`: two unresolved
+-- names, itself and `justOutsideOfOccurrence` (also newly-defined, no
+-- `SFS.lean` counterpart), confirmed via probe.
+
+-- `earlierFirstIncomingTransferSort`'s own real `@Assert` formula originally
+-- read `t1.endShot < t2.endShot` (`Occurrences.kerml`'s own KerML *body*,
+-- verbatim) -- but unlike `I[[d::f,tau]]`'s dedicated `endShot`/`startShot`
+-- tau-slot (auto-bound freely, `add`'s own formulas above), a bare `.endShot`
+-- dot-chain segment is a call head (`elabDotChain`), needing a real `SFS.lean`
+-- name -- and this project's temporal model has no function literally named
+-- `endShot`, only `death`/`effectiveEnd` playing that role under a different
+-- name (confirmed via a real "Unknown identifier `endShot`" probe error, not
+-- guessed). Fixed to `death(t1) < death(t2)` -- `death`'s own special-cased
+-- `SFS.effectiveEnd` elaboration (`Assert.lean`'s `elabDslTerm`) is exactly
+-- Allen.kerml's own established idiom for "when does this occurrence end,"
+-- reused here rather than inventing a second name for the same concept.
+#check kernel% bool earlierFirstIncomingTransferSort : IncomingTransferSort {
+  in t1: Transfers::Transfer [1] ;
+  in t2: Transfers::Transfer [1] ;
+  return t1First: Boolean [1] = t1.endShot < t2.endShot ;
+}
+-- `<<earlierFirstIncomingTransferSort(t1,t2) iff death(t1) < death(t2)>>`:
+-- `death` real (both), only the self-reference unresolved -- same ceiling as
+-- every predicate above, now fully closed except for that one, inherent gap.
 
 -- `suboccurrences`/`immediatePredecessors`/`immediateSuccessors`: their real
 -- top-level shape (plain/`composite`-flagged `feature ... : Occurrence[m]

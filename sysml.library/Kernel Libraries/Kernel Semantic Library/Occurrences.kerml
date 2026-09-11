@@ -239,8 +239,9 @@ standard library package Occurrences {
 		}
 
 //SFS new
-    bool immediatePredecessor { 
+    bool immediatePredecessor {
       doc /* SFS:  true when o nearly meets this */
+      @Assert{f="<<immediatePredecessor(o) iff nearlyMeets(o,this)>>";}
       in o : Occurrence;
       nearlyMeets(o,this)
     }
@@ -258,8 +259,9 @@ standard library package Occurrences {
 		}
 
  //SFS new
-   bool immediateSuccessor { 
+   bool immediateSuccessor {
       doc /* SFS:  true when this nearly meets o */
+      @Assert{f="<<immediateSuccessor(o) iff nearlyMeets(this,o)>>";}
       in o : Occurrence;
       nearlyMeets(this,o)
     }
@@ -293,6 +295,7 @@ standard library package Occurrences {
 //SFS new
     bool timeEnclosedOccurrence {
       doc /* SFS:  true when o during self */
+      @Assert{f="<<timeEnclosedOccurrence(o) iff during(o,this)>>";}
       in o : Occurrence;
       during(o,this)
     }
@@ -321,6 +324,7 @@ standard library package Occurrences {
 //SFS new
 		bool timeCoincidentOccurrence {
 			doc /* SFS:  true when o coincident self */
+			@Assert{f="<<timeCoincidentOccurrence(o) iff coincident(o,this)>>";}
 			in o : Occurrence;
 			coincident(o,this)
 		}
@@ -345,6 +349,7 @@ standard library package Occurrences {
 //SFS new
 		bool spaceEnclosedOccurrence {
 			doc /* SFS:  true when this contains o */
+			@Assert{f="<<spaceEnclosedOccurrence(o) iff RegionContainment(Location(this),Location(o))>>";}
 			in o : Occurrence;
 			RegionContainment(Location(this),Location(o))
 		}
@@ -366,6 +371,7 @@ standard library package Occurrences {
 //SFS new
 		bool spaceTimeEnclosedOccurrence {
 			doc /* SFS:  replaces feature spaceEnclosedOccurrences; true when self contains o */
+			@Assert{f="<<spaceTimeEnclosedOccurrence(o) iff spaceEnclosedOccurrence(o) and timeEnclosedOccurrence(o)>>";}
 			in o : Occurrence;
 			spaceEnclosedOccurrence(o) and timeEnclosedOccurrence(o)
 		}
@@ -384,6 +390,7 @@ standard library package Occurrences {
 //SFS new
 		bool spaceTimeEnclosedPoint {
 			doc /* SFS: an occurrence with dimension 0 is different than Regions::Point */
+			@Assert{f="<<spaceTimeEnclosedPoint(o) iff spaceTimeEnclosedOccurrence(o) and (o.innerSpaceDimension = 0)>>";}
 			in o : Occurrence;
 			spaceTimeEnclosedOccurrence(o) and (o.innerSpaceDimension == 0)
 		}
@@ -391,6 +398,8 @@ standard library package Occurrences {
 //SFS new
 		bool spaceCoincidentOccurrence {
 			doc /* SFS:  true when self and o are space coincident */
+			@Assert{f="<<spaceCoincidentOccurrence(o) iff RegionContainment(Location(o),Location(this))"+
+			  " and RegionContainment(Location(this),Location(o))>>";}
 			in o : Occurrence;
 			RegionContainment(Location(o),Location(this)) and RegionContainment(Location(this),Location(o))
 		}
@@ -419,6 +428,8 @@ standard library package Occurrences {
 //SFS new
 		bool spaceTimeCoincidentOccurrence {
 			doc /* SFS:  true when self and o are space-time coincident */
+			@Assert{f="<<spaceTimeCoincidentOccurrence(o) iff spaceCoincidentOccurrence(o)"+
+					" and timeCoincidentOccurrence(o)>>";}
 			in o : Occurrence;
 			spaceCoincidentOccurrence(o) and timeCoincidentOccurrence(o)
 		}
@@ -434,6 +445,7 @@ standard library package Occurrences {
 //SFS new
 	  bool outsideOfOccurrence {
 			doc /* SFS:  true when region of self does not overlap region of o */
+			@Assert{f="<<outsideOfOccurrence(o) iff not RegionOverlap(Location(this),Location(o))>>";}
 			in o : Occurrence;
 			not RegionOverlap(Location(this),Location(o))
 		}
@@ -456,6 +468,7 @@ standard library package Occurrences {
 //SFS new
 		bool justOutsideOfOccurrence {
 			doc /* SFS:  true when this is just outside of o */
+			@Assert{f="<<justOutsideOfOccurrence(o) iff ExternallyConnected(Location(this),Location(o))>>";}
 			in o : Occurrence;
 			ExternallyConnected(Location(this),Location(o))
 		}
@@ -479,9 +492,10 @@ standard library package Occurrences {
 //SFS new
 		bool matesWithOccurrence {
 			doc /* SFS:  true when self is just outside of o and they touch without overlapping */
+			@Assert{f="<<matesWithOccurrence(o) iff justOutsideOfOccurrence(o)>>";}
 			in o : Occurrence;
 			justOutsideOfOccurrence(o)
-		}	
+		}
 
 		feature innerSpaceDimension : Natural [1] {
 			doc
@@ -965,9 +979,10 @@ standard library package Occurrences {
 
 //SFS:  use temporal relationship instead of M0 features
 	bool earlierFirstIncomingTransferSort : IncomingTransferSort {
+		@Assert{f="<<earlierFirstIncomingTransferSort(t1,t2) iff death(t1) < death(t2)>>";}
 		in t1: Transfers::Transfer [1];
-		in t2: Transfers::Transfer [1];  
-		return t1First: Boolean [1] = t1.endShot < t2.endShot; 
+		in t2: Transfers::Transfer [1];
+		return t1First: Boolean [1] = t1.endShot < t2.endShot;
 //		return t1First = includes(t1.endShot.successors, t2.endShot);
 	}
 
