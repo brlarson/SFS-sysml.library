@@ -890,7 +890,10 @@ standard library package Occurrences {
 		feature isDispatch : Boolean[1] default false {
 			doc
 			/*
-			 * Determines whether transfers to the dispatch scope might be accepted more than once.
+			 * Determines whether transfers to the dispatch scope might be accepted more than once:
+			 * true allows another still-live occurrence in the same dispatch scope to also accept
+			 * the same transfer (dispatch to parallel states); false is exclusive, preventing any
+			 * other still-live occurrence in the dispatch scope from also accepting it.
 			 */
 		}
  		feature dispatchScope: Occurrence [1] default self;

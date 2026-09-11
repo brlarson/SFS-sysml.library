@@ -78,8 +78,8 @@ standard library package StatePerformances {
 			feature accT : Transfer = thatSP.accepted;
 			inv { accableT == accT | incomingTransferSort(accT, accableT) }  
 //SFS:  need to reformulate for SFS			
-			inv { isDispatch implies
-				     allSubstatePerformances(dispatchScope as Performance)->forAll{in oSP : StatePerformance;						
+			inv { not isDispatch implies
+				     allSubstatePerformances(dispatchScope as Performance)->forAll{in oSP : StatePerformance;
 //				     allSubstatePerformances(dispatchScope)->forAll{in oSP : StatePerformance;						
 						  oSP == thatSP | isEmpty(oSP.accepted) |
 //SFS:  use Instant inequality for precidence							
