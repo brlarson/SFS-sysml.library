@@ -2835,3 +2835,6 @@ set_option maxRecDepth 4096 in
 -- comment above `behavior add`): `including`/`self::seq` genuinely re-parsed and
 -- type-checked against `SFS.lean`'s real `including`/`Get`, not merely structural.
 #check kernel% @Assert{n="add appends values"; f="<<add : seq~Anything : I[[self::seq,endShot]] = including(I[[self::seq,startShot]],values) >>";}
+#check kernel% @Assert{n="addAt inserts values"; f="<<addAt : seq~Anything : I[[self::seq,endShot]] = includingAt(I[[self::seq,startShot]],values,index) >>";}
+#check kernel% @Assert{n="remove excludes values"; f="<<remove : seq~Anything : I[[self::seq,endShot]] = excluding(I[[self::seq,startShot]],values) >>";}
+#check kernel% @Assert{n="removeAt shrinks seq"; f="<<removeAt : seq~Anything : subsetOf(I[[self::seq,endShot]],I[[self::seq,startShot]]) >>";}

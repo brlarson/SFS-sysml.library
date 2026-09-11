@@ -2114,6 +2114,39 @@ smoke tests elsewhere, a different, order-preserving encoding of the same KerML
 function for a different purpose). -/
 def including {α : Type} (a b : Set α) : Set α := a ∪ b
 
+/-- `SequenceFunctions::includingAt`'s own KerML body inserts `values` at
+`index` -- purely a matter of *where* in the list, not *whether* an element is
+present, so at the `Set Item` level (order already gone, same as `including`
+above) it's indistinguishable from plain `including`: the index has no effect
+on set membership regardless of its value, so this is exact, not approximate,
+for the shape `Get` already commits to. `index`'s own type is left fully
+generic (`β`), never constrained to a specific `Positive`-like Lean type --
+it's discarded either way. -/
+def includingAt {α β : Type} (a b : Set α) (_index : β) : Set α := a ∪ b
+
+/-- `SequenceFunctions::excluding`'s own KerML body (`seq->reject{in x;
+values->includes(x)}`) removes every element of `seq` that's a member of
+`values` -- ordinary set difference, and (unlike `includingAt`/`excludingAt`)
+needs no order/position information at all to be exact: which elements get
+removed is determined purely by value membership in `values`, never by where
+they sit in `seq`. -/
+def excluding {α : Type} (a b : Set α) : Set α := a \ b
+
+/-- `SequenceFunctions::excludingAt` removes elements *by position*
+(`startIndex`..`endIndex`), not by value -- unlike `includingAt`/`excluding`
+above, which values get removed genuinely depends on order/position
+information `Get`'s `Set Item` codomain has already discarded (`[x,y,z]`
+minus index 1 is `{y,z}`; minus index 2 is `{x,z}` -- different sets from the
+very same set `{x,y,z}`, since a `Set` remembers no positions to index by).
+No exact `Set α → Set α` reading exists at this abstraction level, so this is
+deliberately *not* given one; `removeAt`'s own `@Assert` below is weakened to
+the one honest claim that *does* hold regardless of position -- the result is
+always a subset of the original -- via this relation instead. Named `subsetOf`, not `subset` -- the bare word
+`subset` is already a reserved token elsewhere in this project's own grammar
+(`Kernel.lean`'s `subset`/`subsets` relationship keyword), confirmed via a
+real "unexpected token" build error. -/
+def subsetOf {α : Type} (a b : Set α) : Prop := a ⊆ b
+
 /-- `SequenceFunctions::notEmpty`, for a `[0..1]`-typed feature read as `Option α`
 (`Tangibility.kerml`'s own real `notEmpty(allocatedTo)`, `allocatedTo[0..1]`) --
 distinct from `notEmpty`'s own `List`-flavored declared body (`not isEmpty(seq)`,
