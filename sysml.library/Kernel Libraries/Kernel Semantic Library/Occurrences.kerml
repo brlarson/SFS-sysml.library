@@ -1263,8 +1263,11 @@ standard library package Occurrences {
 		end feature redefines laterOccurrence: Occurrence;  // crosses earlierOccurrence.immediateSuccessors;
 	}
 
-//SFS:  remove "all", gets Allen interval from HappensBefore
-	feature //all 
+//SFS:  "all" restored -- its own defining condition (subsets binaryLinks, typed
+//SFS:  HappensBefore) is real and structural, same as incomingTransfersToSelf/
+//SFS:  outgoingTransfersFromSelf/spaceShotOf above, unlike HappensBefore itself
+//SFS:  (the association), whose only defining content is its own @Assert.
+	feature all
 		happensBeforeLinks: HappensBefore[0..*] nonunique subsets binaryLinks {
 		doc
 		/*
@@ -1279,9 +1282,14 @@ standard library package Occurrences {
 		end feature laterOccurrence: Domain::Temporal redefines HappensBefore::laterOccurrence, binaryLinks::target;
 	 }
 
-//SFS:  remove "all", add spatial relationship
-	assoc //all 
-		OutsideOf specializes SpaceLink { //, Without {
+//SFS:  remove "all" (still no structural anchor, only the @Assert below -- same
+//SFS:  reasoning as HappensBefore); "Without" supertype restored, safe by the same
+//SFS:  argument as HappensBefore's own: Without's "unions HappensBefore, OutsideOf"
+//SFS:  already gives W = H union O, so O subsets W trivially follows. Ends now
+//SFS:  redefine both parents' corresponding ends (both ultimately trace to the same
+//SFS:  BinaryLink::source/target), same multi-parent-merge pattern Within uses.
+	assoc //all
+		OutsideOf specializes SpaceLink, Without {
 		doc
 		/*
 		 * OutsideOf asserts that two occurrences do not overlap in space (not necessarily in time,
@@ -1289,9 +1297,9 @@ standard library package Occurrences {
 		 * spatial extent of both of them. This means no Occurrence is OutsideOf itself.
 		 */
 		@Assert{f="<< not RegionOverlap(Location(separateSpaceToo), Location(separateSpace)) >>";}
-		end feature separateSpaceToo: Occurrence redefines sourceOccurrence; //, separateOccurrenceToo;
+		end feature separateSpaceToo: Occurrence redefines sourceOccurrence, separateOccurrenceToo;
 //			crosses separateSpace.outsideOfOccurrences;
-		end feature separateSpace: Occurrence redefines targetOccurrence; //, separateOccurrence;
+		end feature separateSpace: Occurrence redefines targetOccurrence, separateOccurrence;
 //			crosses separateSpaceToo.outsideOfOccurrences;
 	}
 
