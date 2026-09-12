@@ -234,15 +234,16 @@ standard library package Performances {
 	abstract expr evaluations: Evaluation[0..*] nonunique subsets things {  // performances {
 		doc
 		/*
-		 * evaluations is a specialization of performances for evaluations of Functions.
+		 * evaluations is a specialization of things for evaluations of Functions.
 		 */
 	}
 
 //SFS:  add computations
-	abstract step computations: Computation[0..*] nonunique subsets performances {
+	abstract step computations: Computation[0..*] nonunique subsets performances, evaluations
+		intersects performances, evaluations {
 		doc
 		/*
-		 * computations is a specialization of performances for the Computation.
+		 * computations is a specialization of both performances and evaluations for the Computation.
 		 */
 	}
 
@@ -264,10 +265,12 @@ standard library package Performances {
 	}
 
 //SFS:  new
-	abstract expr booleanComputations: BooleanComputation[0..*] nonunique subsets computations {
+	abstract expr booleanComputations: BooleanComputation[0..*] nonunique subsets computations, booleanEvaluations
+		intersects computations, booleanEvaluations {
 		doc
 		/*
-		 * booleanComputations is a specialization of computations restricted to type BooleanComputation.
+		 * booleanComputations is a specialization of both computations and booleanEvaluations
+		 * restricted to type BooleanComputation.
 		 */
 	}
 	
