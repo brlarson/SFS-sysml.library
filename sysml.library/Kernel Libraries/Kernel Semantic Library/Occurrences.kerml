@@ -1325,7 +1325,7 @@ standard library package Occurrences {
 		/*
 		 * MatesWith is an OutsideOf asserting that two occurrences have no space between them.
 		 */
-
+		@Assert{f="<< FilmConnected(Location(matingSpaceToo), Location(matingSpace)) >>";}
 		end feature matingSpaceToo: Occurrence redefines separateSpaceToo;
 //		  crosses matingSpace.matingOccurrences;
 		end feature matingSpace: Occurrence redefines separateSpace;
