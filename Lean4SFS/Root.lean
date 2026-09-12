@@ -46,6 +46,8 @@ Imported by `Core.lean` (KerML §8.2.4/§8.3.3) and, as of the `KElement` replac
 above, by `SFS.lean` and (transitively, via `SFS.lean`) `Assert.lean` too.
 -/
 
+import Lean
+
 namespace KerML.Root
 
 /-- KerML §8.3.2.1.2 `Element`. "A constituent of a model that is uniquely identified
@@ -183,5 +185,119 @@ structure MembershipImport extends Import where
 structure NamespaceImport extends Import where
   importedNamespace : Namespace
   deriving Repr
+
+/-! ## Concrete syntax (KerML §8.2.3 "Root Concrete Syntax")
+
+Real `syntax`/`elab` productions for the Root package's own concrete syntax, in the
+same house style `Assert.lean`/`Core.lean` establish (`declare_syntax_cat`/
+`syntax ... : category` productions, pure `MacroM (TSyntax `term)` elaborator
+helpers). `kermlDecl` -- the shared "one KerML declaration" category every layer
+(Root here, Core, Kernel) adds alternatives to -- is declared here rather than in
+`Core.lean`, since `Root.lean` is the *earliest* file in the dependency chain
+(`Core.lean` imports `Root`, `Kernel.lean` imports both): a category must be
+declared before any file can add `syntax ... : <category>` alternatives to it, so
+anchoring it at the root of the import graph is what lets `Root.lean` itself host
+Root-layer productions (`doc`, `import`) as `kermlDecl` alternatives, the way real
+KerML has Root-layer declarations (`Import`, `Comment`/`Documentation`, ...) as
+alternatives of the same top-level declaration grammar Core/Kernel also extend.
+`Core.lean`'s own Core-layer productions (`type`, `classifier`, `feature`, ...)
+continue to add further `kermlDecl` alternatives from that file, unchanged -- only
+the category *declaration* and the Root-layer productions themselves moved here;
+`elabKermlDecl` (`Core.lean`), the single elaborator dispatching over every
+`kermlDecl` alternative regardless of which file declared it, is unaffected. -/
+
+open Lean
+
+declare_syntax_cat kermlDecl
+
+/-- KerML `QualifiedName` (§8.2.3.4.1, BNF line ~285): `A` or `A::B::C`. Used at
+every *reference* position throughout the Root/Core/Kernel grammars (a
+`specializes`/`typed by`/`subsets`/... target, or either operand of a standalone
+relationship declaration) -- never for a *primary* declared name, which stays plain
+`ident` (KerML's own `Identification`, not `QualifiedName`). Elaborates to a `String`
+(`qualNameStr`, "::"-joined) used the same way a bare reference `ident`'s
+`.getId.toString` always was -- still no symbol table, so `Anything::self` becomes a
+stub carrying the string `"Anything::self"`, not an actual lookup of `Anything`'s
+real `self` member; this is a strictly more faithful *label* for the reference than
+dropping the qualifier ever was, not a resolution mechanism. -/
+declare_syntax_cat kermlQualName
+/-- `atomic(...)` on the repeated `"::" ident` group: without it, once `"::"` is
+consumed inside one repetition attempt, a following token that isn't a valid `ident`
+(e.g. the `*` in `import Kernel::* ;`'s wildcard suffix, parsed by a different,
+*outer* production) is a hard parse error ("expected identifier") rather than a
+graceful "this repetition doesn't apply, stop extending here, let the outer grammar
+have the `::`" backtrack -- `atomic` makes a failed attempt fully unconsume so `*`
+(the repetition combinator) can correctly stop at zero further repetitions instead of
+propagating the failure. -/
+syntax ident (atomic("::" ident))* : kermlQualName
+
+def qualNameStr : TSyntax `kermlQualName → String
+  | `(kermlQualName| $x:ident $[:: $xs:ident]*) =>
+    String.intercalate "::" ((#[x] ++ xs).toList.map (·.getId.toString))
+  | _ => "?"
+
+/-- A `Membership`/`Import` visibility prefix (BNF `VisibilityIndicator`):
+`public`/`private`/`protected`. Parsed but discarded -- `Import`'s own visibility
+already defaults to `.private` (see `import`'s own doc comment below), so neither
+`private import ...` nor `public import ...` (both real forms -- e.g. `Domain.kerml`'s
+`private import ScalarValues::Real;` and `KerML.kerml`'s own `public import ...`)
+actually flips a field, only needs to *parse*. `protected` isn't a production here --
+no real file in this repo uses it on an `import`. -/
+declare_syntax_cat kermlVisibilityFlag
+syntax "private " : kermlVisibilityFlag
+syntax "public " : kermlVisibilityFlag
+
+/-- `doc "..."` stub for KerML `Documentation` (§8.2.3.3.2). Real KerML writes
+`doc /* ... */`, a C-style block comment whose contents *are* the documentation
+text -- lexing that needs a custom low-level parser this project doesn't attempt
+(every other production here is built from existing token categories --
+`ident`/`num`/`str`/literal keyword atoms -- never a raw custom one). `doc "..."`
+(a plain quoted string, Lean's own `str` token) stands in for it: same
+simplified-surface/faithful-structure trade this grammar already makes throughout
+(`;` for `{ ... }`, bare `ident` for `QualifiedName`) -- `Base.kerml`'s literal
+`doc /* This package defines... */` becomes `doc "This package defines..."` in the
+smoke tests, not its exact text. `elementId` is a fixed placeholder (uniqueness not
+enforced anywhere else in this grammar either). -/
+def mkDocumentationStub (body : String) : Documentation := { elementId := "doc", body := body }
+def Documentation.elt (d : Documentation) : Element := d.toComment.toAnnotatingElement.toElement
+
+/-- Valid as a nested `kermlDecl` (so it appears inside a `kermlBody` alongside
+sibling declarations, matching `Base.kerml`'s own `classifier Anything { doc ...
+feature self ... }` shape) or standalone. Produces a `Documentation` element -- per
+this grammar's established "no containment graph" principle, its *ownership* (which
+element it documents) isn't modeled, only its existence as a sibling `Element`, same
+as every other nested declaration. -/
+syntax "doc " str : kermlDecl
+
+/-- `MembershipImport`/`NamespaceImport` (§8.3.2.4.7/§8.3.2.4.8) stubs for
+`import A::B ;` / `import A::* ;` respectively. As with every other reference in
+this grammar, no symbol table means `importedMembership`/`importedNamespace` are
+freshly-built minimal stub values (`memberElement`/nothing extra) carrying just the
+referenced name, not real lookups. -/
+def mkMembershipImportStub (name : String) : MembershipImport :=
+  { elementId := "import-" ++ name,
+    importedMembership := { elementId := name, memberElement := { elementId := name } } }
+def mkNamespaceImportStub (name : String) : NamespaceImport :=
+  { elementId := "import-" ++ name, importedNamespace := { elementId := name } }
+def MembershipImport.elt (m : MembershipImport) : Element :=
+  m.toImport.toRelationship.toElement
+def NamespaceImport.elt (n : NamespaceImport) : Element :=
+  n.toImport.toRelationship.toElement
+
+/-- KerML §8.2.3.4.2 `Import` family: `import A::B ;` (one specific member) or
+`import A::* ;` (every visible member of `A`), both with an optional
+`private`/`public` prefix (`kermlVisibilityFlag` above -- parsed, not stored, see
+that category's own doc comment). Being a `kermlDecl` alternative is what lets
+`import` nest inside a `kermlBody` the way a real KerML import statement scopes to
+the namespace/body it appears in -- any classifier/feature/predicate body that can
+hold a nested `doc`/`feature` can equally hold a nested `import`, genuinely visible
+to (in the same flat scope/list as) every sibling declaration in that same body, not
+restricted to a fixed position. (Real name *resolution* against an import --
+expanding a later bare `Assert` into `Assertion::Assert` because of an `import
+Assertion::Assert;` earlier in the same scope -- is not attempted; this project has
+no symbol table anywhere, and a bare reference already always becomes its own fresh
+stub regardless of what's been imported, same as before this addition.) -/
+syntax (kermlVisibilityFlag)? "import " kermlQualName "::" "*" " ;" : kermlDecl
+syntax (kermlVisibilityFlag)? "import " kermlQualName " ;" : kermlDecl
 
 end KerML.Root

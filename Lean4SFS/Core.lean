@@ -1047,6 +1047,11 @@ A real, working parser and elaborator for a subset of KerML's textual notation, 
 `Assert.lean`'s house style (`declare_syntax_cat`, `syntax ... : category` productions,
 pure `MacroM (TSyntax `term)` elaborators, one top-level triggering `elab`).
 
+The shared `kermlDecl`/`kermlQualName` categories and the Root-layer `doc`/`import`
+productions live in `Root.lean` (KerML §8.2.3 "Root Concrete Syntax") -- this section
+only adds the Core-layer alternatives (`type`/`classifier`/`feature`/the standalone
+relationship declarations) to that same `kermlDecl` category.
+
 **Scope, deliberately narrower than the full grammar (documented, not accidental)**:
 
 - Only the *relationship-forming* productions are covered: `Type`, `Classifier`,
@@ -1225,14 +1230,9 @@ marking part-whole/ownership semantics for the association it subsets). Same
 declare_syntax_cat kermlCompositeFlag
 syntax "composite " : kermlCompositeFlag
 
-/-- A `Membership`/`Import` visibility prefix: `private`/`public`. Parsed but
-discarded, same status as `abstract` above -- `Import`'s own visibility already
-defaults to `.private` (see `import`'s own doc comment below), so `private import
-...` (`Domain.kerml`'s own real form, e.g. `private import ScalarValues::Real;`)
-just needs to *parse*, not actually flip a field. Only `private` is wired (the only
-value any real file in this repo uses); `public` isn't a production here. -/
-declare_syntax_cat kermlVisibilityFlag
-syntax "private " : kermlVisibilityFlag
+-- `kermlVisibilityFlag` (the `private`/`public` `Membership`/`Import` prefix) moved
+-- to `Root.lean`'s own "Concrete syntax" section -- visible here via `open
+-- KerML.Root` above.
 
 /-- A multiplicity bound: a bare integer or `*` (unbounded). -/
 declare_syntax_cat kermlMultBound
@@ -1263,30 +1263,9 @@ syntax "ordered " : kermlOrderedFlag
 declare_syntax_cat kermlNonuniqueFlag
 syntax "nonunique " : kermlNonuniqueFlag
 
-/-- KerML `QualifiedName`: `A` or `A::B::C`. Used at every *reference* position below
-(a `specializes`/`typed by`/`subsets`/... target, or either operand of a standalone
-relationship declaration) -- never for a *primary* declared name, which stays plain
-`ident` (KerML's own `Identification`, not `QualifiedName`). Elaborates to a `String`
-(`qualNameStr`, "::"-joined) used the same way a bare reference `ident`'s
-`.getId.toString` always was -- still no symbol table, so `Anything::self` becomes a
-stub carrying the string `"Anything::self"`, not an actual lookup of `Anything`'s
-real `self` member; this is a strictly more faithful *label* for the reference than
-dropping the qualifier ever was, not a resolution mechanism. -/
-declare_syntax_cat kermlQualName
-/-- `atomic(...)` on the repeated `"::" ident` group: without it, once `"::"` is
-consumed inside one repetition attempt, a following token that isn't a valid `ident`
-(e.g. the `*` in `import Kernel::* ;`'s wildcard suffix, parsed by a different,
-*outer* production) is a hard parse error ("expected identifier") rather than a
-graceful "this repetition doesn't apply, stop extending here, let the outer grammar
-have the `::`" backtrack -- `atomic` makes a failed attempt fully unconsume so `*`
-(the repetition combinator) can correctly stop at zero further repetitions instead of
-propagating the failure. -/
-syntax ident (atomic("::" ident))* : kermlQualName
-
-def qualNameStr : TSyntax `kermlQualName → String
-  | `(kermlQualName| $x:ident $[:: $xs:ident]*) =>
-    String.intercalate "::" ((#[x] ++ xs).toList.map (·.getId.toString))
-  | _ => "?"
+-- `kermlQualName` (KerML `QualifiedName`), `qualNameStr`, and the `kermlDecl`
+-- category itself all moved to `Root.lean`'s own "Concrete syntax" section (KerML
+-- §8.2.3 "Root Concrete Syntax") -- visible here via `open KerML.Root` above.
 
 /-- `kermlQualName`-taking counterparts of `kTypeStubTerm`/`classifierStubTerm`/
 `featureStubTerm` above, for reference positions (everywhere those three were
@@ -1299,42 +1278,11 @@ def classifierStubTermQ (q : TSyntax `kermlQualName) : MacroM (TSyntax `term) :=
 def featureStubTermQ (q : TSyntax `kermlQualName) : MacroM (TSyntax `term) :=
   `(mkFeatureStub $(quote (qualNameStr q)))
 
-/-- `doc "..."` stub -- see that production's own doc comment for the `/* ... */`
-simplification. `elementId` is a fixed placeholder (uniqueness not enforced anywhere
-else in this grammar either). -/
-def mkDocumentationStub (body : String) : Documentation := { elementId := "doc", body := body }
-/-- Fully-qualified name required here (unlike `KType.elt`/`Classifier.elt`/etc.
-above, which live in *this* file's own `KerML.Core` namespace): `Documentation` is
-declared in `Root.lean`'s `KerML.Root` namespace, and dot notation (`d.elt`) resolves
-against a type's own declaring namespace, not wherever an extension `def` happens to
-be written -- `def Documentation.elt` here would silently become
-`KerML.Core.Documentation.elt`, invisible to `d.elt` for a real
-`KerML.Root.Documentation`. `_root_.` is required too: merely writing
-`KerML.Root.Documentation.elt` while *inside* `namespace KerML.Core` still nests
-under the current namespace (`KerML.Core.KerML.Root.Documentation.elt`) rather than
-replacing it -- `_root_.` anchors the name at the true top level. -/
-def _root_.KerML.Root.Documentation.elt (d : Documentation) : Element := d.toComment.toAnnotatingElement.toElement
-
-/-- KerML §8.3.2.4.7/8.3.2.4.8 `MembershipImport`/`NamespaceImport` (`Root.lean`)
-stubs for `import A::B ;` / `import A::* ;` respectively. As with every other
-reference in this grammar, no symbol table means `importedMembership`/
-`importedNamespace` are freshly-built minimal stub values (`memberElement`/nothing
-extra) carrying just the referenced name, not real lookups. -/
-def mkMembershipImportStub (name : String) : MembershipImport :=
-  { elementId := "import-" ++ name,
-    importedMembership := { elementId := name, memberElement := { elementId := name } } }
-def mkNamespaceImportStub (name : String) : NamespaceImport :=
-  { elementId := "import-" ++ name, importedNamespace := { elementId := name } }
-/-- `_root_.KerML.Root....` required for both -- see `Documentation.elt`'s own note
-just above for why (dot notation needs the extension `def`'s name to match the
-type's actual declaring namespace, `_root_.` needed on top of that to escape the
-current `namespace KerML.Core` block rather than nesting under it). -/
-def _root_.KerML.Root.MembershipImport.elt (m : MembershipImport) : Element :=
-  m.toImport.toRelationship.toElement
-def _root_.KerML.Root.NamespaceImport.elt (n : NamespaceImport) : Element :=
-  n.toImport.toRelationship.toElement
-
-declare_syntax_cat kermlDecl
+-- `mkDocumentationStub`/`Documentation.elt`, `mkMembershipImportStub`/
+-- `mkNamespaceImportStub`/`MembershipImport.elt`/`NamespaceImport.elt`, and the
+-- `doc "..."` / `import ...` productions themselves all moved to `Root.lean` too
+-- (same section) -- no more `_root_.KerML.Root....` qualification dance needed
+-- there, since they're now defined directly inside `namespace KerML.Root`.
 
 /-- KerML `TypeBody`/`FeatureBody`-style bodies: `;` (no owned members) or `{
 kermlDecl* }` -- real nested member declarations, e.g. `Base.kerml`'s `classifier
@@ -1504,22 +1452,7 @@ syntax "inverse " kermlQualName " of " kermlQualName " ;" : kermlDecl
 keyword from `Feature`'s inline `featured by` part above, per the spec). -/
 syntax "featuring " kermlQualName " by " kermlQualName " ;" : kermlDecl
 
-/-- KerML `Documentation` (`Root.lean`): real KerML writes `doc /* ... */`, a
-C-style block comment whose contents *are* the documentation text -- lexing that
-needs a custom low-level parser this project doesn't attempt (every other production
-here is built from existing token categories -- `ident`/`num`/`str`/literal keyword
-atoms -- never a raw custom one). `doc "..."` (a plain quoted string, Lean's own
-`str` token) stands in for it: same simplified-surface/faithful-structure trade this
-grammar already makes throughout (`;` for `{ ... }`, bare `ident` for
-`QualifiedName`, before those were separately closed) -- `Base.kerml`'s literal
-`doc /* This package defines... */` becomes `doc "This package defines..."` in the
-smoke tests below, not its exact text. Valid as a nested `kermlDecl` (so it appears
-inside a `kermlBody` alongside sibling declarations, matching `Base.kerml`'s own
-`classifier Anything { doc ... feature self ... }` shape) or standalone. Produces a
-`Documentation` element -- per this grammar's established "no containment graph"
-principle, its *ownership* (which element it documents) isn't modeled, only its
-existence as a sibling `Element`, same as every other nested declaration. -/
-syntax "doc " str : kermlDecl
+-- `doc "..." : kermlDecl` (the `Documentation` stand-in) moved to `Root.lean` too.
 
 /-- KerML §8.2.4.3.1 `Feature`, direction-prefixed short form: `in x : T ;` / `out x :
 T ;` / `inout x : T ;` -- real usage (`Allen.kerml`'s parameter declarations, e.g.
@@ -1544,24 +1477,11 @@ syntax "in " ident " : " kermlQualName (kermlMult)? (kermlOrderedFlag)? (kermlNo
 syntax "out " ident " : " kermlQualName (kermlMult)? (kermlOrderedFlag)? (kermlNonuniqueFlag)? " ;" : kermlDecl
 syntax "inout " ident " : " kermlQualName (kermlMult)? (kermlOrderedFlag)? (kermlNonuniqueFlag)? " ;" : kermlDecl
 
-/-- KerML §8.2.3.4 `Import` family (`Root.lean`'s `MembershipImport`/
-`NamespaceImport`): `import A::B ;` (one specific member) or `import A::* ;` (every
-visible member of `A`). Declared here in `Core.lean`, not `Root.lean` itself, even
-though the *structures* these produce are `Root.lean`'s own -- `Root.lean` is a
-*dependency* of `Core.lean` (imported before `Core.lean` exists), so it has no way to
-reference `kermlDecl` at all, and being a `kermlDecl` alternative is exactly what
-lets `import` nest inside a `kermlBody` the way a real KerML import statement scopes
-to the namespace/body it appears in -- any classifier/feature/predicate body that can
-hold a nested `doc`/`feature` can equally hold a nested `import`, genuinely visible
-to (in the same flat scope/list as) every sibling declaration in that same body, not
-restricted to a fixed position. (Real name *resolution* against an import --
-expanding a later bare `Assert` into `Assertion::Assert` because of an `import
-Assertion::Assert;` earlier in the same scope -- is not attempted; this project has
-no symbol table anywhere, and a bare reference already always becomes its own fresh
-stub regardless of what's been imported, same as before this addition.) Visibility
-(`private`/`public`) isn't parsed -- defaults to `Import`'s own `.private`. -/
-syntax (kermlVisibilityFlag)? "import " kermlQualName "::" "*" " ;" : kermlDecl
-syntax (kermlVisibilityFlag)? "import " kermlQualName " ;" : kermlDecl
+-- The `import A::B ;` / `import A::* ;` family (`kermlVisibilityFlag`-prefixed,
+-- optional) moved to `Root.lean` too (KerML §8.2.3.4.2) -- see that file's own
+-- "Concrete syntax" section. `public import` now parses (previously only `private`
+-- was a valid `kermlVisibilityFlag` alternative, silently rejecting real files like
+-- `KerML.kerml`'s own `public import ...;`).
 
 /-- One `kermlTypeRelPart` (see its own doc comment above), elaborated with the
 enclosing `type`/`classifier`'s own stub type (`aT`) and name (`an`) already in scope
@@ -1897,6 +1817,9 @@ elab "kerml% " d:kermlDecl : term => do
 -- parsed, still not threaded into a stored field -- see kermlVisibilityFlag's own
 -- doc comment).
 #check kerml% private import ScalarValues::Real ;
+-- KerML.kerml's own real `public import ...;` form -- previously unparseable
+-- (`public` wasn't a `kermlVisibilityFlag` alternative at all; only `private` was).
+#check kerml% public import Base::Anything ;
 #check kerml% classifier Widget {
   import Assertion::Assert ;
   feature self : Widget ;
