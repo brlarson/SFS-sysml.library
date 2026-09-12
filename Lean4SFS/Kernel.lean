@@ -459,23 +459,22 @@ Two independent syntax/elaboration pieces, in `Assert.lean`/`Core.lean`'s house 
 Mirrors `Core.lean`'s `kermlDecl` `Type`/`Classifier` productions exactly (same
 optional relationship parts, same "referenced names are scope-visible, stood in for
 by a stub rather than resolved via a symbol table this project doesn't have"
-treatment, same `;`-only body), just for nine more KerML §8.2.5 declaration keywords:
-`datatype`/`class`/`struct`/`assoc`/`behavior`/`function`/`predicate`/`interaction`
-(all "classifier-like" -- their `specializes` clause produces a `Subclassification`,
-reusing `Core.lean`'s own `mkSubclassificationTerm`/`mkConjugationTerm`/
-`mkDisjoiningTerm`/`mkUnioningTerm`/`mkIntersectingTerm`/`mkDifferencingTerm`/
-`classifierStubTerm`/`kTypeStubTerm` directly, since `open KerML.Core` brings them
-into scope) plus `package` (structurally different -- no relationship parts at all in
-the real grammar, just a bare name). A genuinely separate category name from
+treatment, same `;`-only body), just for ten more KerML §8.2.5 declaration keywords:
+`datatype`/`class`/`struct`/`assoc`/`metaclass`/`behavior`/`function`/`predicate`/
+`interaction` (all "classifier-like" -- their `specializes` clause produces a
+`Subclassification`, reusing `Core.lean`'s own `mkSubclassificationTerm`/
+`mkConjugationTerm`/`mkDisjoiningTerm`/`mkUnioningTerm`/`mkIntersectingTerm`/
+`mkDifferencingTerm`/`classifierStubTerm`/`kTypeStubTerm` directly, since `open
+KerML.Core` brings them into scope) plus `package`/`library package`/`standard
+library package` (structurally different -- no relationship parts at all in the real
+grammar, just a bare name) and `multiplicity` (KerML §8.2.5.11's standalone
+`MultiplicityRange` declaration). A genuinely separate category name from
 `Core.lean`'s `kermlDecl` (not an extension of it) to avoid any risk of collision if
-both files are ever imported together. **Not covered** (documented, matching
-`Core.lean`'s own scope note): `AssociationStructure`/`BindingConnector`/
-`Succession`/`Step`/`Expression`/`BooleanExpression`/`Invariant`/`Flow`/
-`SuccessionFlow`/`Metaclass`/`LibraryPackage`/`MultiplicityRange` declaration forms,
-and `FunctionBody`'s `return`/result-expression parts -- all use richer grammar
-(binary connector ends, function bodies with owned steps, ...) that would need the
-containment-graph machinery this whole project deliberately drops; a plain `;` body
-is used everywhere here instead, exactly like `Core.lean`'s `Type`/`Classifier`. -/
+both files are ever imported together. **Still not covered** (documented, not an
+oversight): `Flow`/`SuccessionFlow` -- both use richer grammar (payload/redefinition
+parts) than any real file in this repo's own `flow`/`succession flow` usage needs
+(there is none), unlike `Connector`/`AssociationStructure` just below, which real
+files do use and which do have their own dedicated productions now. -/
 
 /-- `.toClassifier`-style coercion to `Classifier`, uniform across all nine
 "classifier-like" declaration keywords below regardless of how deep their own
@@ -484,11 +483,13 @@ without caring which concrete type it's holding. -/
 def DataType.toClassifierC (t : DataType) : Classifier := t.toClassifier
 def KClass.toClassifierC (t : KClass) : Classifier := t.toClassifier
 def KStructure.toClassifierC (t : KStructure) : Classifier := t.toKClass.toClassifier
+def Metaclass.toClassifierC (t : Metaclass) : Classifier := t.toKStructure.toClassifierC
 def Association.toClassifierC (t : Association) : Classifier := t.toClassifier
 def Behavior.toClassifierC (t : Behavior) : Classifier := t.toKClass.toClassifier
 def KFunction.toClassifierC (t : KFunction) : Classifier := t.toClassifier
 def Predicate.toClassifierC (t : Predicate) : Classifier := t.toKFunction.toClassifier
 def Interaction.toClassifierC (t : Interaction) : Classifier := t.toAssociation.toClassifier
+def AssociationStructure.toClassifierC (t : AssociationStructure) : Classifier := t.toAssociation.toClassifier
 
 /-- `.toElement` for each of the nine, composed through `.toClassifierC` above. -/
 def DataType.elt (t : DataType) : Element := t.toClassifierC.toKType.toNamespace.toElement
@@ -500,6 +501,8 @@ def KFunction.elt (t : KFunction) : Element := t.toClassifierC.toKType.toNamespa
 def Predicate.elt (t : Predicate) : Element := t.toClassifierC.toKType.toNamespace.toElement
 def Interaction.elt (t : Interaction) : Element := t.toClassifierC.toKType.toNamespace.toElement
 def Package.elt (t : Package) : Element := t.toNamespace.toElement
+def Metaclass.elt (t : Metaclass) : Element := t.toClassifierC.toKType.toNamespace.toElement
+def AssociationStructure.elt (t : AssociationStructure) : Element := t.toClassifierC.toKType.toNamespace.toElement
 def MultiplicityRange.elt (t : MultiplicityRange) : Element :=
   t.toMultiplicity.toFeature.toKType.toNamespace.toElement
 
@@ -512,9 +515,12 @@ def mkKFunctionStub (name : String) : KFunction := { elementId := name, declared
 def mkPredicateStub (name : String) : Predicate := { elementId := name, declaredName := some name }
 def mkInteractionStub (name : String) : Interaction := { elementId := name, declaredName := some name }
 def mkPackageStub (name : String) : Package := { elementId := name, declaredName := some name }
+def mkMetaclassStub (name : String) : Metaclass := { elementId := name, declaredName := some name }
+def mkAssociationStructureStub (name : String) : AssociationStructure := { elementId := name, declaredName := some name }
 def mkBindingConnectorStub (name : String) : BindingConnector := { elementId := name, declaredName := some name }
 def mkStepStub (name : String) : Step := { elementId := name, declaredName := some name }
 def mkSuccessionStub (name : String) : Succession := { elementId := name, declaredName := some name }
+def mkConnectorStub (name : String) : Connector := { elementId := name, declaredName := some name }
 
 def dataTypeStubTerm (s : String) : MacroM (TSyntax `term) := `(mkDataTypeStub $(quote s))
 def kClassStubTerm (s : String) : MacroM (TSyntax `term) := `(mkKClassStub $(quote s))
@@ -525,6 +531,9 @@ def kFunctionStubTerm (s : String) : MacroM (TSyntax `term) := `(mkKFunctionStub
 def predicateStubTerm (s : String) : MacroM (TSyntax `term) := `(mkPredicateStub $(quote s))
 def interactionStubTerm (s : String) : MacroM (TSyntax `term) := `(mkInteractionStub $(quote s))
 def packageStubTerm (s : String) : MacroM (TSyntax `term) := `(mkPackageStub $(quote s))
+def metaclassStubTerm (s : String) : MacroM (TSyntax `term) := `(mkMetaclassStub $(quote s))
+def associationStructureStubTerm (s : String) : MacroM (TSyntax `term) := `(mkAssociationStructureStub $(quote s))
+def connectorStubTerm (s : String) : MacroM (TSyntax `term) := `(mkConnectorStub $(quote s))
 def mkLibraryPackageStub (name : String) (isStd : Bool) : LibraryPackage :=
   { elementId := name, declaredName := some name, isStandard := isStd }
 def LibraryPackage.elt (t : LibraryPackage) : Element := t.toPackage.toNamespace.toElement
@@ -692,6 +701,16 @@ syntax (kermlAbstractFlag)? "struct " ident (" specializes " kermlQualName,+)? (
 syntax (kermlAbstractFlag)? "assoc " ident (" specializes " kermlQualName,+)? (" conjugates " kermlQualName)?
   (" disjoint" " from " kermlQualName,+)? (" unions " kermlQualName,+)? (" intersects " kermlQualName,+)?
   (" differences " kermlQualName,+)? kermlBody : kernelDecl
+/-- KerML §8.2.5.12 `Metaclass`: `metaclass Name specializes Metaobjects::Metaobject
+{...}` -- same shape as `struct` above (`Metaclass extends KStructure`, §8.3.4.12).
+Real usage: `KerML.kerml`'s ~50 declarations re-expressing KerML's own metamodel,
+`Metaobjects.kerml`'s `Metaobject`/`SemanticMetadata`, and SFS's own
+`Assertion.kerml`'s `metaclass Assert specializes Metaobject {...}`/`metaclass Lean
+specializes Metaobject {...}` -- the very definitions `@Assert`/`@Lean` are typed by,
+previously unparseable since `metaclass` wasn't a keyword here at all. -/
+syntax (kermlAbstractFlag)? "metaclass " ident (" specializes " kermlQualName,+)? (" conjugates " kermlQualName)?
+  (" disjoint" " from " kermlQualName,+)? (" unions " kermlQualName,+)? (" intersects " kermlQualName,+)?
+  (" differences " kermlQualName,+)? kermlBody : kernelDecl
 /-- `behavior` alone (of the nine classifier-like keywords) also accepts the symbolic
 `:>` alternate spelling of `specializes` (`Domain.kerml`'s own real `behavior
 GetBooleanChange :> GetChange {...}` / `behavior GetChangeToTrue :>
@@ -768,6 +787,70 @@ syntax "standard " "library " "package " ident kernelBody : kernelDecl
 bracket there -- `MultiplicityRange` has zero stored fields. -/
 syntax "multiplicity " ident kermlMult kermlBody : kernelDecl
 
+/-- One `ConnectorEnd` (§8.2.5.5.1): an optional cross-multiplicity, an optional
+`localName references` prefix (`Occurrences.kerml`'s own real `smallerOccurrence
+references surroundedSpace` -- `smallerOccurrence` is a fresh local end name, not
+itself a reference; the real target is what follows `references`), then the actual
+target `kermlQualName` (possibly dotted -- `hOccurrence.spaceBoundary`). Same
+"reference, not declaration" stub treatment as `binding`/`succession`'s own operands
+above (`mkFeatureReferenceStub` on the target only) -- the optional local name is
+parsed but discarded, no attempt at `ConnectorEnd`'s own richer
+`Feature`/`OwnedReferenceSubsetting` structure. -/
+declare_syntax_cat kermlConnEnd
+syntax (kermlMult)? (atomic(ident " references "))? kermlQualName : kermlConnEnd
+-- `elabKermlConnEnd` (needs `mkFeatureReferenceStub`, declared much later in this
+-- file's `kermlExpr` section) is defined further down, right before
+-- `elabKernelDecl`'s own `mutual` block -- a plain `def` written here, this early,
+-- would capture a macro-hygiene scope from *before* `mkFeatureReferenceStub` exists
+-- as a global, which fails to resolve at elaboration time even once the real
+-- definition exists later in the file (confirmed via a real "Unknown identifier
+-- `mkFeatureReferenceStub✝`" build error before moving it).
+
+/-- KerML's `isSufficient` `all` flag on a `Connector`/binary relationship
+declaration (`TransitionPerformances.kerml`'s own real `connector all
+guardConstraint: ...`). Parsed but not stored, same "prefix flag, structural not
+semantic" treatment as `abstract`/`end`/`composite` elsewhere in this grammar. -/
+declare_syntax_cat kermlAllFlag
+syntax "all " : kermlAllFlag
+
+/-- KerML §8.2.5.5.1 `Connector`, binary form (`BinaryConnectorDeclaration`):
+`connector [all] [name] [: Type] [mult] from End to End ;` (`Occurrences.kerml`'s
+own real `connector hbi: WithinBoth [0..1] from [0..1] hOccurrence.spaceBoundary to
+[0..1] outerSpace.spaceBoundary.inner;`, `connector :WithinBoth from [1]
+hOccurrence.spaceInterior to [1] innerSpace;`) or, when the leading `from` is
+dropped entirely (also real KerML, per the spec's own optional leading group), a
+bare `connector End to End ;` (`TransitionPerformances.kerml`'s own real `connector
+[0..1] transitionLink to [1..*] trigger;`). Two alternatives rather than one
+fully-optional `" from "`: `kermlConnEnd`'s own leading `kermlMult`/`kermlQualName`
+shape is structurally identical to this production's own optional `name`/`mult`
+prefix, so collapsing both into one production would make `connector [0..1]
+transitionLink to ...` genuinely ambiguous between "end1's own mult+name" and
+"connector's own mult+name, no from, missing end1" -- keeping them separate
+alternatives lets the required literal `" from "` (present in one, absent in the
+other) disambiguate deterministically instead, the same way this grammar already
+disambiguates `feature G ...` from `feature :>> G ...` by keyword presence alone.
+Produces one `Connector` stub (name/type/mult/all discarded, same "structure without
+semantics" trade `import`'s own visibility flag makes) plus one reference stub per
+end -- no attempt at the real `EndFeatureMembership`/`ConnectorEnd` containment
+structure. -/
+syntax (kermlVisibilityFlag)? "connector " (kermlAllFlag)? (ident)? (" : " kermlQualName)? (kermlMult)?
+  " from " kermlConnEnd " to " kermlConnEnd kermlBody : kernelDecl
+syntax (kermlVisibilityFlag)? "connector " kermlConnEnd " to " kermlConnEnd kermlBody : kernelDecl
+
+/-- KerML §8.2.5.4 `AssociationStructure`: `assoc struct Name specializes A, B
+intersects A, B {...}` (`Objects.kerml`'s own real `abstract assoc struct
+LinkObject specializes Link, Object intersects Link, Object {...}`,
+`BinaryLinkObject`; `TransitionPerformances.kerml`'s `TPCGuardConstraint`). Same
+shape and elaboration as the ten classifier-like keywords above (`AssociationStructure
+extends Association, KStructure`, §8.3.4.4) -- previously unparseable since only
+bare `assoc` (without `struct`) was a recognized keyword pair here; `struct` is
+already a reserved token from its own `kernelDecl` production above, so plain
+`assoc`'s own alternative can never mistake `struct` for an ordinary `ident`,
+letting the two coexist without ambiguity. -/
+syntax (kermlAbstractFlag)? "assoc " "struct " ident (" specializes " kermlQualName,+)? (" conjugates " kermlQualName)?
+  (" disjoint" " from " kermlQualName,+)? (" unions " kermlQualName,+)? (" intersects " kermlQualName,+)?
+  (" differences " kermlQualName,+)? kermlBody : kernelDecl
+
 /-- A `MetadataBodyFeature` attribute *value* (KerML §8.2.5.12): a bare string, a
 `+`-concatenated chain of strings (`Domain.kerml`'s own real multi-line `f="..."+
 "...";` formulas, split across lines for readability -- real KerML attribute values
@@ -834,10 +917,16 @@ drops (see file header).
 literals, `null`, bare identifiers (`FeatureReferenceExpression`), function
 invocation `f(a, b)`, `new T(a, b)` construction, feature chaining `.`, indexing
 `#(...)`, unary `-`/`not`, and binary `^`/`**` `*` `/` `%` `+` `-` `<` `>` `<=` `>=`
-`==` `!=` `and` `xor` `or` `implies` -- precedence/associativity ordering taken
-directly from the spec's Table 6 (right-associative `^`/`**`, all others
-left-associative), with `&`/`|` collapsed into `and`/`or` (documented simplification,
-not a distinct KerML operator).
+`==` `!=` `===` `!==` `and` `xor` `or` `implies` `..` -- precedence/associativity
+ordering taken directly from the spec's Table 6 (right-associative `^`/`**`, all
+others left-associative). Also covered: the `as` classification-cast operator, the
+`istype`/`hastype` classification-test operators, the unit-bracket `[...]` suffix,
+`->` function-operation syntax (plain-call and block-argument forms), the ternary
+`if ... ? ... else ...` conditional, and bare grouping/`SequenceExpression`
+`(e1, e2, ...)` -- each has its own dedicated doc comment at its declaration site
+below. `&`/`|` are genuinely **not** covered (see "Not covered" just below) --
+despite an earlier version of this comment claiming they were "collapsed into
+`and`/`or`", no such production ever existed.
 
 A bare identifier (`x`, `self`, ...) always elaborates to a `FeatureReferenceExpression`
 stub, which is the semantically correct treatment, not just a fallback: per the repo's
@@ -848,12 +937,14 @@ stub carries only the referenced name because this project has no symbol table t
 actually resolve it against (same limitation as `kernelDecl`'s own reference targets
 above), not because the reference is meant to be new.
 
-**Not covered** (documented, not guessed at): `..` range construction, `??` null
-coalescing, the classification/cast operators (`istype`/`hastype`/`@`/`@@`/`as`/
-`meta`), the ternary conditional (`if ... ? ... else ...`), `[...]` bracket
-invocation, `->` function-operation syntax, `.?` select / `.` collect (both share
-concrete-syntax tokens with feature chaining and invocation respectively, requiring
-lookahead this grammar doesn't attempt), sequence construction (`,`), and named
+**Not covered** (documented, not guessed at): `&`/`|` symbolic boolean operators,
+`??` null coalescing, the classification-test symbolic alternate `@` and the
+metaclassification operators `@@`/`meta` (real usage of `meta`/`@@` found in this
+repo is exclusively in `.sysml` files, outside this project's KerML-only scope --
+see file header), general `[...]` bracket *invocation* (`BracketExpression`,
+distinct from the unit-bracket suffix just above, which *is* covered), `.?` select /
+`.` collect (both share concrete-syntax tokens with feature chaining and invocation
+respectively, requiring lookahead this grammar doesn't attempt), and named
 arguments (`name = value` inside a call) -- each would need either more grammar
 machinery than is worth it here or (for select/collect) genuine disambiguation
 lookahead; real formulas needing them aren't guessed at, matching this project's
@@ -915,6 +1006,15 @@ for `@Assert` wiring) reserves `"result"` as its own `dslTerm` keyword, unusable
 plain `ident` (hence `kermlQualName`'s own `ident` component) anywhere in this file's
 grammar once that import exists. -/
 syntax "result" : kermlExpr
+/-- `that`, KerML's automatically-bound "other value" feature (`Base::that`),
+referenced as a bare value -- `TrigFunctions.kerml`'s own real `inv unitBound {
+-1.0 <= that & that <= 1.0 }`. Same reservation issue as `result` right above:
+`Assert.lean`'s own `exists x~T that P`/`numberof`/`productof`/`sumof` productions
+all use `" that "` as a literal keyword token, so plain `ident` (hence
+`kermlQualName`) can never match it once that import exists -- confirmed via a real
+"unexpected token 'that'; expected kermlQualName" build error attempting this file's
+own `-1.0 <= that & that <= 1.0` smoke test before adding this. -/
+syntax "that" : kermlExpr
 syntax kermlQualName : kermlExpr
 
 syntax (priority := high) ident "(" kermlExpr,* ")" : kermlExpr
@@ -937,6 +1037,21 @@ the cast target is parsed but discarded, and the operand's own elements pass thr
 unchanged, matching every other "structure without semantics" simplification this grammar
 already makes (`kermlMult`, unit brackets, ...). -/
 syntax:90 kermlExpr:90 " as " kermlQualName : kermlExpr
+/-- KerML's `istype`/`hastype` classification-test operators (§7.4.6's
+`ClassificationExpression`, `ClassificationTestOperator = 'istype' | 'hastype' |
+'@'` -- only the two keyword spellings here, not the symbolic `@` alternate, which
+isn't used this way anywhere in this repo and would collide with this file's own
+`@ident{...}` metadata-feature syntax). `Regions.kerml`'s SFS-library own real
+`Location` body, `if o istype Physical ? (o as Physical).location else if o istype
+Virtual and notEmpty((o as Virtual).allocatedTo) ? ... else ...`, and `Transfers.
+kerml`'s `payload istype Physical implies size(...) <= 1`. Same "structure without
+semantics" trade as `as` just above -- no `ClassificationExpression` structure
+exists in this project, the type target is parsed but discarded, and the operand's
+own elements pass through unchanged. `hastype` has no real behavioral usage in this
+repo (only its own declaring `BaseFunctions.kerml` stub function), but shares
+`istype`'s exact shape, so it costs nothing extra to close out the pair. -/
+syntax:90 kermlExpr:90 " istype " kermlQualName : kermlExpr
+syntax:90 kermlExpr:90 " hastype " kermlQualName : kermlExpr
 /-- `->`'s own method-name slot (below), widened past bare `ident` to also accept
 `"exists"` (`SequenceFunctions.kerml`'s own real `seq1->exists{in y; x == y}`,
 `includes`): `exists` is a Lean-reserved term-level keyword (`Exists`/`∃`), the same
@@ -1009,6 +1124,28 @@ syntax:50 kermlExpr:50 " and " kermlExpr:51 : kermlExpr
 syntax:45 kermlExpr:45 " xor " kermlExpr:46 : kermlExpr
 syntax:40 kermlExpr:40 " or " kermlExpr:41 : kermlExpr
 syntax:35 kermlExpr:35 " implies " kermlExpr:36 : kermlExpr
+/-- `|`/`&` (KerML's symbolic alternate spellings of `or`/`and`, `BinaryOperator =
+'|' | '&' | 'xor' | ...`): `StatePerformances.kerml`'s own real `accableT == accT |
+incomingTransferSort(accT, accableT)`, `Objects.kerml`'s `cellOrientation >= -1 &
+cellOrientation <= 1`, `Occurrences.kerml`'s `(isEmpty(hbi) == notEmpty(hbo)) &
+(notEmpty(hbo) == outerSpace.isClosed)`, `TrigFunctions.kerml`'s `-1.0 <= that & that
+<= 1.0`. Routed through the exact same `elabBinOp "or"`/`elabBinOp "and"` calls
+(not distinct `"|"`/`"&"` op tags) at the same precedence tier as their keyword
+counterparts just above -- genuinely making this file's own earlier "Covered" note
+(an inaccurate doc comment, now fixed) that `&`/`|` are "collapsed into `and`/`or`"
+true, rather than a distinct symbolic operator with its own semantics. -/
+syntax:50 kermlExpr:50 " & " kermlExpr:51 : kermlExpr
+syntax:40 kermlExpr:40 " | " kermlExpr:41 : kermlExpr
+/-- KerML's `??` null-coalescing conditional-binary operator (§8.2.5.8.1's
+`ConditionalBinaryOperator = '??' | 'or' | 'and' | 'implies'`). `Collections.kerml`'s
+own real `dimensions->reduce '*' ?? 1` uses it (that specific line still doesn't
+fully parse here -- its `->reduce '*'` is a separate, unimplemented no-parens
+function-reference-argument form of `->`, a distinct gap from this operator itself,
+not attempted). Same "structure without semantics" trade as `and`/`or`/`implies`
+above -- a plain `elabBinOp` call, no short-circuit/control-function semantics
+attempted. Given the loosest precedence of the four `ConditionalBinaryOperator`
+spellings, matching its "last-resort fallback value" semantics. -/
+syntax:34 kermlExpr:34 " ?? " kermlExpr:35 : kermlExpr
 
 /-- KerML's range-expression operator (`SequenceFunctions.kerml`'s own real `(1..
 size(x))->forAll {...}` / `(startIndex..endIndex)->collect {...}`): distinct from
@@ -1050,6 +1187,7 @@ partial def elabKermlExpr : TSyntax `kermlExpr → MacroM (Array (TSyntax `term)
   | `(kermlExpr| *) => do pure #[← `((mkLiteralInfinityStub "infinity").elt)]
   | `(kermlExpr| null) => do pure #[← `((mkNullExpressionStub "null-expr").elt)]
   | `(kermlExpr| result) => do pure #[← `((mkFeatureReferenceStub "result").elt)]
+  | `(kermlExpr| that) => do pure #[← `((mkFeatureReferenceStub "that").elt)]
   | `(kermlExpr| $x:kermlQualName) => do
     pure #[← `((mkFeatureReferenceStub $(quote (qualNameStr x))).elt)]
   | `(kermlExpr| $f:ident($args,*)) => do
@@ -1070,6 +1208,8 @@ partial def elabKermlExpr : TSyntax `kermlExpr → MacroM (Array (TSyntax `term)
     let eElems ← elabKermlExpr e
     pure (eElems ++ #[← `((mkFeatureReferenceStub $(quote (qualNameStr u))).elt)])
   | `(kermlExpr| $e:kermlExpr as $_ty:kermlQualName) => elabKermlExpr e
+  | `(kermlExpr| $e:kermlExpr istype $_ty:kermlQualName) => elabKermlExpr e
+  | `(kermlExpr| $e:kermlExpr hastype $_ty:kermlQualName) => elabKermlExpr e
   | `(kermlExpr| $e:kermlExpr -> $f:kermlArrowIdent($args,*)) => do
     let eElems ← elabKermlExpr e
     let argElems ← args.getElems.mapM elabKermlExpr
@@ -1104,6 +1244,9 @@ partial def elabKermlExpr : TSyntax `kermlExpr → MacroM (Array (TSyntax `term)
   | `(kermlExpr| $a:kermlExpr xor $b:kermlExpr) => elabBinOp "xor" a b
   | `(kermlExpr| $a:kermlExpr or $b:kermlExpr) => elabBinOp "or" a b
   | `(kermlExpr| $a:kermlExpr implies $b:kermlExpr) => elabBinOp "implies" a b
+  | `(kermlExpr| $a:kermlExpr & $b:kermlExpr) => elabBinOp "and" a b
+  | `(kermlExpr| $a:kermlExpr | $b:kermlExpr) => elabBinOp "or" a b
+  | `(kermlExpr| $a:kermlExpr ?? $b:kermlExpr) => elabBinOp "??" a b
   | `(kermlExpr| $a:kermlExpr .. $b:kermlExpr) => elabBinOp ".." a b
   | `(kermlExpr| ($es,*)) => do
     match es.getElems with
@@ -1459,6 +1602,17 @@ own `#check` either, since `library package`'s body is `Core.lean`'s `kermlBody`
 compiled before `kermlExpr` exists; kept as its own sibling `#check`. -/
 syntax "feature " kermlIdent " : " kermlQualName (kermlMult)? " = " kermlExpr kermlBody : kernelDecl
 
+/-- `kermlConnEnd` → one reference-stub `Element` term for its target
+`kermlQualName` (the optional leading mult and `name references` prefix are parsed
+but discarded, same trade every other connector-adjacent piece here makes). Defined
+here, not alongside `kermlConnEnd`'s own `syntax` declaration above, for the same
+forward-reference reason `elabKernelDecl` itself is placed here rather than earlier:
+it needs `mkFeatureReferenceStub` (declared in the `kermlExpr` section above). -/
+def elabKermlConnEnd : TSyntax `kermlConnEnd → MacroM (TSyntax `term)
+  | `(kermlConnEnd| $[$_mult:kermlMult]? $[$_dn:ident references]? $t:kermlQualName) =>
+      `((mkFeatureReferenceStub $(quote (qualNameStr t))).elt)
+  | _ => Macro.throwUnsupported
+
 /-- `kernelDecl` → `Array (TSyntax term)`, matching `Core.lean`'s own
 `elabKermlDecl` convention (adopted there first, for the same "nested `kermlBody`
 content composes as a flat array, wrapped into a `List Element` only at the very top"
@@ -1498,6 +1652,25 @@ partial def elabKernelDecl : TSyntax `kernelDecl → MacroM (Array (TSyntax `ter
         $[disjoint from $disj,*]? $[unions $uni,*]? $[intersects $inter,*]? $[differences $diff,*]? $body:kermlBody) => do
     let declElems ← classifierLikeDeclElems associationStubTerm a specs conj disj uni inter diff
     pure (declElems ++ (← elabKermlBody body))
+  | `(kernelDecl| $[$_abs:kermlAbstractFlag]? metaclass $a:ident $[specializes $specs,*]? $[conjugates $conj:kermlQualName]?
+        $[disjoint from $disj,*]? $[unions $uni,*]? $[intersects $inter,*]? $[differences $diff,*]? $body:kermlBody) => do
+    let declElems ← classifierLikeDeclElems metaclassStubTerm a specs conj disj uni inter diff
+    pure (declElems ++ (← elabKermlBody body))
+  | `(kernelDecl| $[$_abs:kermlAbstractFlag]? assoc struct $a:ident $[specializes $specs,*]? $[conjugates $conj:kermlQualName]?
+        $[disjoint from $disj,*]? $[unions $uni,*]? $[intersects $inter,*]? $[differences $diff,*]? $body:kermlBody) => do
+    let declElems ← classifierLikeDeclElems associationStructureStubTerm a specs conj disj uni inter diff
+    pure (declElems ++ (← elabKermlBody body))
+  | `(kernelDecl| $[$_vis:kermlVisibilityFlag]? connector $[$_all:kermlAllFlag]? $[$a:ident]? $[: $ty:kermlQualName]?
+        $[$_mult:kermlMult]? from $e1:kermlConnEnd to $e2:kermlConnEnd $body:kermlBody) => do
+    let elemId := "connector-" ++ (a.map (·.getId.toString)).getD (ty.map qualNameStr |>.getD "anon")
+    let cT ← connectorStubTerm elemId
+    let e1T ← elabKermlConnEnd e1
+    let e2T ← elabKermlConnEnd e2
+    pure (#[← `(($cT).elt), e1T, e2T] ++ (← elabKermlBody body))
+  | `(kernelDecl| $[$_vis:kermlVisibilityFlag]? connector $e1:kermlConnEnd to $e2:kermlConnEnd $body:kermlBody) => do
+    let e1T ← elabKermlConnEnd e1
+    let e2T ← elabKermlConnEnd e2
+    pure (#[← `((mkConnectorStub "connector-anon").elt), e1T, e2T] ++ (← elabKermlBody body))
   | `(kernelDecl| $[$_abs:kermlAbstractFlag]? behavior $a:ident $[specializes $specs,*]? $[:> $specs2,*]?
         $[conjugates $conj:kermlQualName]?
         $[disjoint from $disj,*]? $[unions $uni,*]? $[intersects $inter,*]? $[differences $diff,*]? $body:kermlPredBody) => do
@@ -1613,6 +1786,13 @@ elab "kernel% " d:kernelDecl : term => do
 #check kernel% class Vehicle specializes Car, Truck ;
 #check kernel% struct Point3D specializes Point ;
 #check kernel% assoc Owns specializes Association ;
+#check kernel% assoc struct LinkStruct specializes Link, Object intersects Link, Object ;
+-- Objects.kerml's own real `assoc struct` declarations, verbatim.
+#check kernel% abstract assoc struct LinkObject specializes Link, Object intersects Link, Object ;
+#check kernel% assoc struct BinaryLinkObject specializes BinaryLink, LinkObject intersects BinaryLink, LinkObject ;
+#check kernel% metaclass Assert specializes Metaobject ;
+#check kernel% connector hbi : WithinBoth from smallerOccurrence to largerOccurrence ;
+#check kernel% connector transitionLink to trigger ;
 #check kernel% behavior Drive specializes Behavior ;
 #check kernel% function Sum specializes Function ;
 #check kernel% predicate IsPositive specializes Predicate ;
@@ -1638,6 +1818,18 @@ elab "kernel% " d:kernelDecl : term => do
 }
 #check kernel% multiplicity zeroToMany [0..*] {
   doc "zeroToMany is a multiplicity range allowing any cardinality of zero or more (that is, no restriction)."
+}
+
+-- SFS's own `Assertion.kerml`'s real `metaclass Assert specializes Metaobject {...}`
+-- body -- the definitions `@Assert`/`@Lean` annotations throughout this whole repo
+-- are typed by, previously unparseable since `metaclass` wasn't a keyword here.
+#check kernel% metaclass Assert specializes Metaobject {
+  feature n[0..1] : String ;
+  feature f[1..*] : String ;
+  feature t[0..*] : String ;
+}
+#check kernel% metaclass Lean specializes Metaobject {
+  feature l : String ;
 }
 
 -- Allen.kerml's own real `library package Allen { ... }` wrapper, containing its
@@ -2681,6 +2873,19 @@ elab "kernel% " d:kernelDecl : term => do
 #check kerml% feature spaceBoundary: Occurrence[0..1] subsets spaceShots ;
 #check kernel% @Assert{f="<< innerSpaceDimension = 3 implies RegionSurface(this) = spaceBoundary >>";}
 
+-- Occurrences.kerml's own real `connector` declarations, verbatim (previously
+-- unparseable -- `connector` wasn't a keyword here at all): named+typed with a
+-- leading mult, anonymous+typed, and the `references`-qualified end-name form.
+#check kernel% connector hbi: WithinBoth [0..1] from [0..1] hOccurrence.spaceBoundary to [0..1] outerSpace.spaceBoundary.inner ;
+#check kernel% connector :WithinBoth from [1] hOccurrence.spaceInterior to [1] innerSpace ;
+#check kernel% connector :InsideOf
+  from [0..1] smallerOccurrence references surroundedSpace
+  to [1..*] largerOccurrence references surroundingSpace.innerSpaceOccurrences ;
+-- TransitionPerformances.kerml's own real `connector`s, verbatim: the bare
+-- end-to-end form with no `from` at all, and the `all`-flagged, named+typed form.
+#check kernel% private connector [0..1] transitionLink to [1..*] trigger ;
+#check kernel% private connector all guardConstraint: TPCGuardConstraint [*] from [0..1] transitionLink to [*] guard ;
+
 #check kexpr% 1 + 2 * 3
 #check kexpr% true and not false
 #check kexpr% x.y.z
@@ -2689,6 +2894,14 @@ elab "kernel% " d:kernelDecl : term => do
 #check kexpr% new Widget(1, 2)
 #check kexpr% -x + y
 #check kexpr% a < b and b < c or d
+#check kexpr% x ?? 1
+-- StatePerformances.kerml/Objects.kerml/Occurrences.kerml/TrigFunctions.kerml's own
+-- real `|`/`&` usage, verbatim (previously unparseable at all, despite an earlier,
+-- inaccurate doc comment here claiming they were "collapsed into `and`/`or`").
+#check kexpr% accableT == accT | incomingTransferSort(accT, accableT)
+#check kexpr% notEmpty(cellOrientation) implies (cellOrientation >= -1 & cellOrientation <= 1)
+#check kexpr% (isEmpty(hbi) == notEmpty(hbo)) & (notEmpty(hbo) == outerSpace.isClosed)
+#check kexpr% -1.0 <= that & that <= 1.0
 #check kexpr% count#(1, 2)
 #check kexpr% 3.14
 #check kexpr% "hello"
@@ -2698,6 +2911,22 @@ elab "kernel% " d:kernelDecl : term => do
 #check kexpr% x->head().getLife
 #check kexpr% if true ? 1 else 2
 #check kexpr% Anything::self
+
+#check kexpr% x istype Physical
+#check kexpr% x hastype Physical
+-- Transfers.kerml's own real `inv { payload istype Physical implies
+-- size(source.outgoingTransfersFromSelf) <= 1 }` body (dropping the `inv {}`
+-- wrapper, exercised bare via `kexpr%` the same way the other real-formula smoke
+-- tests above do).
+#check kexpr% payload istype Physical implies size(source.outgoingTransfersFromSelf) <= 1
+-- SFS library/Regions.kerml's own real `Location` function body, verbatim (the
+-- nested-ternary form `istype`/`hastype` were added to unblock) -- previously
+-- unparseable in full: `as` alone got as far as `(o as Physical).location`, but
+-- every `istype` guarding each branch failed.
+#check kexpr% if o istype Physical ? (o as Physical).location
+  else if o istype Virtual and notEmpty((o as Virtual).allocatedTo) ? Location((o as Virtual).allocatedTo)
+    else if o istype Virtual and notEmpty((o as Virtual).delegatedTo) ? Location((o as Virtual).delegatedTo)
+      else null
 
 /-! ## Smoke tests
 
