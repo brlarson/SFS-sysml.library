@@ -267,8 +267,12 @@ standard library package Occurrences {
     }
 
 //SFS:  use timeEnclosedOccurrence bool instead of timeEnclosedOccurrences feature
-//  commenting timeEnclosedOccurrences out causes strange error in Flows::Message
-//Could not find implicit supertype EventOccurrenceUsage.suboccurrence ('Occurrences'::'Occurrence'::'timeEnclosedOccurrences') - invalid standard library.(implicit-supertype)
+//  this feature cannot be removed: it is a normative SysML v2 dependency, not a leftover.
+//  Per the EventOccurrenceUsage metaclass, every `event occurrence` usage with no explicit
+//  supertype implicitly subsets 'Occurrences'::'Occurrence'::'timeEnclosedOccurrences' by that
+//  exact qualified name (Flows::Message::sourceEvent/targetEvent, StateSpaceRepresentation::
+//  zeroCrossingEvents). Removing it breaks that implicit-supertype lookup everywhere the
+//  keyword is used, with no current SFS replacement type to point those usages at instead.
 		feature timeEnclosedOccurrences: Occurrence[1..*] subsets occurrences {
 			doc
 			/*
