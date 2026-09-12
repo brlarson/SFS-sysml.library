@@ -1357,7 +1357,17 @@ syntax (name := kermlClassifier) (kermlAbstractFlag)? "classifier " ident
 optional unit-bracket suffix (`Tangibility.kerml`'s own real `feature amount :
 VolumeValue[1] default 0 [L] {...}`) -- same "structure without semantics" trade
 `kermlMult`/unit brackets already make, still parsed-but-not-stored either way (no
-`kermlExpr` needed, keeping this in `Core.lean`, not `Kernel.lean`). -/
+`kermlExpr` needed, keeping this in `Core.lean`, not `Kernel.lean`). Real KerML also
+allows a boolean literal here (`Occurrences.kerml`'s own `Boolean[1] default
+false;`) -- **deliberately not added**: a literal `syntax "true"/"false" :
+kermlDefaultVal` here would register those as reserved keyword tokens in *this*
+file, which `SFS.lean` (2350+ lines, imports `Core.lean` directly, never imports
+`Kernel.lean`) relies on staying plain `Bool` literals throughout -- confirmed via a
+real "unexpected token 'true'; expected '⟩'" build error in `SFS.lean`'s own
+`⟨a, b, true, true⟩` before reverting this. `default Bool.false`/`default
+Bool.true` (Lean's own dotted-identifier lexing already treats `Bool.false` as one
+compound `ident`, matching `kermlQualName`'s existing bare-`ident` case) works as an
+unambiguous spelling wherever a real boolean default is needed without this risk. -/
 declare_syntax_cat kermlDefaultVal
 syntax kermlQualName : kermlDefaultVal
 syntax num ("[" kermlQualName "]")? : kermlDefaultVal
