@@ -55,7 +55,7 @@ standard library package Performances {
 		{
 			doc
 			/*
-			 * timeEnclosedOccurrences of this Performance that are also Performances.
+			 * subperformances of this Performance, which are during its thisPerformance.
 			 */
 			@Assert{f="<< forall ep~Performance in enclosedPerformances are during(ep,thisPerformance) >>";}
 		}
@@ -75,7 +75,7 @@ standard library package Performances {
 			// enclosedPerformances, suboccurrences intersects enclosedPerformances, suboccurrences
 			doc
 			/*
-			 * enclosedPerformances that are composite.
+			 * Composite suboccurrences of this Performance that are also Performances.
 			 */
 			@Assert{f="<< forall sp~Occurrence in subperformances are during(sp,self) and PartOf(sp,self) >>";}
 
